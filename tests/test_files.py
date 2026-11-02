@@ -25,7 +25,7 @@ def by_name(refs, name) -> DocRef:
 def test_scan_finds_127_files_in_sample(sample_settings):
     refs = scan(sample_settings)
     assert len(refs) == 127
-    assert Counter(r.ext for r in refs) == {"pdf": 82, "docx": 24, "csv": 8, "xlsx": 7, "txt": 5}
+    assert Counter(r.ext for r in refs) == {"pdf": 83, "docx": 24, "csv": 8, "xlsx": 7, "txt": 5}
 
 
 def test_scan_sets_scope_and_user_folder(sample_settings):
