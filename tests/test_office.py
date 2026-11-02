@@ -197,3 +197,15 @@ def test_declare_from_screen(env):
 def test_home_links_to_office_with_count(env):
     s, c = env
     assert "事業所のこと" in TestClient(create_app(s)).get("/").text
+
+
+def test_committee_mentioning_a_planned_training_is_not_a_training(env):
+    s, c = env
+    _abuse_docs(s, c, [activity("委員会", "虐待防止委員会（新任職員研修の予定）", "2026-06-15", "真柴 洋子、井波 拓真")])
+    assert "虐待防止の研修を年1回以上" in row(s, c, "R25").next_step
+
+
+def test_training_recorded_under_another_kind_still_counts(env):
+    s, c = env
+    _abuse_docs(s, c, [activity("会議", "虐待防止研修", "2026-07-10", "真柴 洋子、井波 拓真")])
+    assert row(s, c, "R25").status == "done"

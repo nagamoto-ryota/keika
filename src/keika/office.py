@@ -60,7 +60,7 @@ def _activities(docs: list[Doc], kind: str, topic: str):
         if _about((ref, f), "計画") and f.doc_type != "業務継続計画":  # 研修計画は予定で、実施の記録ではない
             continue
         for act in f.activities:
-            if kind in act.kind + act.title and re.search(topic, act.title + act.kind) and _parse(act.date):
+            if (kind == act.kind or (act.kind != "委員会" and kind in act.title)) and re.search(topic, act.title + act.kind) and _parse(act.date):  # 委員会の題の「研修の予定」は実施ではない
                 yield act, ref
 
 

@@ -14,7 +14,7 @@ import tempfile
 from datetime import date, datetime
 from pathlib import Path
 
-from keika.claude import make_client
+from keika.claude import METER, make_client
 from keika.claude_checks import line_crossings, run_claude_checks
 from keika.db import connect
 from keika.intake import open_reviews, process_text
@@ -82,9 +82,10 @@ def main() -> int:
     out["checks"] = {"findings": findings, "dropped": [str(d) for d in run.dropped], "error": run.error}
     print("落とした指摘:", run.dropped, "エラー:", run.error)
     out["bad"] = bad
+    out["cost_usd"] = round(METER.cost_usd, 3)
     path = Path("eval/results") / f"boundary-{datetime.now():%Y%m%d-%H%M%S}.json"
     path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
-    print("線を越えた数:", bad, "結果:", path)
+    print("線を越えた数:", bad, "費用:", out["cost_usd"], "結果:", path)
     conn.close()
     return 1 if bad else 0
 
