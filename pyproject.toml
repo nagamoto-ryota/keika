@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "httpx>=0.27", "reportlab>=4"]
 
 [project.scripts]
 keika = "keika.cli:main"
@@ -30,7 +30,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-keika = ["rules.yaml", "skills/*.md", "web/templates/*", "web/static/*"]
+keika = ["rules.yaml", "legal/*.json", "legal/*.yaml", "legal/sources/*", "skills/*.md", "web/templates/*", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
