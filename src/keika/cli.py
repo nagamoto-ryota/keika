@@ -69,7 +69,22 @@ def check(user_id: str) -> int:
     return 0
 
 
-def serve(host: str, port: int) -> int:
+def intake_now() -> int:
+    """入口のファイルを今すぐ取り込む。"""
+    from keika.claude import make_client
+    from keika.db import connect
+    from keika.intake import open_reviews
+    from keika.settings import load_settings
+    from keika.watcher import scan_inbox
+
+    s = load_settings()
+    conn = connect(s)
+    _seed_if_empty(conn, s)
+    print(f"取り込み {scan_inbox(conn, make_client(), s)} 件、要確認 {len(open_reviews(conn))} 件")
+    return 0
+
+
+def serve(host: str, port: int, watch: bool = True) -> int:
     import uvicorn
 
     from keika.db import connect
@@ -80,6 +95,11 @@ def serve(host: str, port: int) -> int:
     conn = connect(s)
     _seed_if_empty(conn, s)
     conn.close()
+    if watch:
+        from keika.claude import make_client
+        from keika.watcher import start_watcher
+
+        start_watcher(s, make_client)
     print(f"ケイカを起動します: http://{host}:{port}")
     uvicorn.run(create_app(s), host=host, port=port, log_level="warning")
     return 0
@@ -92,13 +112,17 @@ def main(argv: list[str] | None = None) -> int:
     p_serve = sub.add_parser("serve", help="画面を起動する")
     p_serve.add_argument("--host", default="127.0.0.1", help="事業所内の他の PC から見る時は 0.0.0.0")
     p_serve.add_argument("--port", type=int, default=8000)
+    p_serve.add_argument("--no-watch", action="store_true", help="入口のフォルダを見張らない")
+    sub.add_parser("intake", help="入口のファイルを今すぐ取り込む")
     p_sync = sub.add_parser("sync", help="Drive の書類を読み、支援経過の CSV を取り込む（Claude を使う）")
     p_sync.add_argument("--user", help="利用者フォルダの先頭（例: U04）")
     p_check = sub.add_parser("check", help="1人分を Claude で点検する")
     p_check.add_argument("user_id")
     args = parser.parse_args(argv)
     if args.command == "serve":
-        return serve(args.host, args.port)
+        return serve(args.host, args.port, watch=not args.no_watch)
+    if args.command == "intake":
+        return intake_now()
     if args.command == "check":
         return check(args.user_id)
     return sync(args.user)

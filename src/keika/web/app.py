@@ -21,7 +21,7 @@ from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
 from keika.progress import STEPS, user_progress
 from keika.reading import stored_facts
-from keika.records import RecordIn, add_record, list_records
+from keika.records import RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
 from keika.tasks import build_board
@@ -164,6 +164,41 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client) -> 
         results = process_text(conn, client, s, text.strip(), "画面", on_saved=lambda uid: background.add_task(_check_in_background, uid))
         names = {u.id: u.name for u in list_users(conn)}
         return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
+
+    def _record_or_404(record_id: int):
+        record = get_record(conn, record_id)
+        if record is None:
+            raise HTTPException(404, "記録が見つかりません")
+        return record
+
+    @app.get("/records/{record_id}/edit")
+    def edit_form(request: Request, record_id: int):
+        return templates.TemplateResponse(request, "edit_record.html", {"r": _record_or_404(record_id), "users": list_users(conn)})
+
+    @app.post("/records/{record_id}/edit")
+    def edit_save(
+        record_id: int, background: BackgroundTasks, user_id: str = Form(...), event_date: str = Form(...), event_time: str = Form(""),
+        kind_written: str = Form(""), partner: str = Form(""), body: str = Form(...), author: str = Form(""),
+    ):
+        before = _record_or_404(record_id)
+        if not body.strip():
+            raise HTTPException(400, "本文を入れてください")
+        changes = dict(user_id=user_id, event_date=event_date, event_time=event_time, kind_written=kind_written, partner=partner, body=body.strip(), author=author)
+        edit_record(conn, record_id, changes, editor=author or "画面")
+        for uid in {before.user_id, user_id}:
+            background.add_task(_check_in_background, uid)
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+    @app.get("/records/{record_id}/history")
+    def record_history(request: Request, record_id: int):
+        names = {u.id: u.name for u in list_users(conn)}
+        return templates.TemplateResponse(request, "history.html", {"r": _record_or_404(record_id), "versions": history(conn, record_id), "names": names})
+
+    @app.post("/records/{record_id}/checked")
+    def record_checked(record_id: int):
+        record = _record_or_404(record_id)
+        mark_checked(conn, record_id, editor=record.author or "画面")
+        return RedirectResponse(f"/users/{record.user_id}", status_code=303)
 
     @app.get("/review")
     def review(request: Request):

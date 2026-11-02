@@ -50,9 +50,12 @@
         {% if r.kind_read and r.kind_written and r.kind_read not in r.kind_written and '訪問' in r.kind_written %}<span class="pill finding">種別は「{{ r.kind_written }}」</span>{% endif %}
       </div>
       <p>{{ r.body }}</p>
-      <details class="more"><summary>記入の情報</summary>
-        <p class="small muted">記入日時: {{ r.first_written_at[:16].replace('T', ' ') if r.first_written_at else '不明（取り込み）' }}{% if r.author %} / {{ r.author }}{% endif %}{% if r.event_time %} / 時刻 {{ r.event_time }}{% endif %}</p>
-      </details>
+      <div class="record-links small">
+        {% if r.unchecked %}<form method="post" action="/records/{{ r.id }}/checked"><button class="plain">読んだ</button></form>{% endif %}
+        <a href="/records/{{ r.id }}/edit">直す</a>
+        <a href="/records/{{ r.id }}/history">履歴</a>
+        <span class="muted">記入: {{ r.first_written_at[:16].replace('T', ' ') if r.first_written_at else '不明（取り込み）' }}</span>
+      </div>
     </article>
   {% else %}
     <p class="muted">記録はまだありません。</p>
