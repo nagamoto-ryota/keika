@@ -1,9 +1,11 @@
+import hashlib
 from collections import Counter
 from pathlib import Path
 
 import docx
 import openpyxl
 
+from keika import files
 from keika.files import DocRef, scan, to_payload
 from keika.settings import Settings
 
@@ -54,6 +56,17 @@ def test_sha_changes_with_content(tmp_path):
     first = scan(s)[0].sha256
     f.write_text("二", encoding="utf-8")
     assert scan(s)[0].sha256 != first
+
+
+def test_scan_reuses_hash_when_file_unchanged(tmp_path, monkeypatch):
+    s = s_for(tmp_path)
+    (s.drive_root / "事業所" / "a.txt").write_text("一", encoding="utf-8")
+    first = scan(s)[0].sha256
+    calls = []
+    real = hashlib.sha256
+    monkeypatch.setattr(files.hashlib, "sha256", lambda *a: calls.append(1) or real(*a))
+    assert scan(s)[0].sha256 == first
+    assert calls == []
 
 
 def test_docx_table_text_is_kept(sample_settings):

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}台帳 - ケイカ{% endblock %}
+{% block main %}
+<h1>台帳</h1>
+<p class="muted">名前の補正、記録の振り分け、交付先の点検の土台になります。</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>氏名</th><th>読み</th><th>担当</th><th>要介護度</th><th>認定の始まり</th><th>認定の期限</th><th>種別</th><th></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <form method="post" action="/ledger">
+        <input type="hidden" name="id" value="{{ u.id }}">
+        <td><input name="name" value="{{ u.name }}" required></td>
+        <td><input name="kana" value="{{ u.kana }}"></td>
+        <td><select name="cm"><option value=""></option>{% for p in staff %}<option value="{{ p.id }}" {{ 'selected' if u.cm == p.id }}>{{ p.name }}</option>{% endfor %}</select></td>
+        <td><input name="care_level" value="{{ u.data.get('care_level', '') }}" size="6"></td>
+        {% set c = u.data.get('cert_period') or ['', ''] %}
+        <td><input type="date" name="cert_start" value="{{ c[0] }}"></td>
+        <td><input type="date" name="cert_end" value="{{ c[1] }}"></td>
+        <td><input name="type" value="{{ u.data.get('type', '') }}"></td>
+        <td><button>直す</button></td>
+      </form>
+    </tr>
+  {% endfor %}
+  <tr class="new">
+    <form method="post" action="/ledger">
+      <td><input name="name" placeholder="新しい利用者の氏名" required></td>
+      <td><input name="kana"></td>
+      <td><select name="cm"><option value=""></option>{% for p in staff %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></td>
+      <td><input name="care_level" size="6"></td>
+      <td><input type="date" name="cert_start"></td>
+      <td><input type="date" name="cert_end"></td>
+      <td><input name="type" value="居宅介護支援"></td>
+      <td><button>追加</button></td>
+    </form>
+  </tr>
+  </tbody>
+</table>
+</div>
+{% endblock %}

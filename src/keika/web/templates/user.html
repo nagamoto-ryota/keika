@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }} - ケイカ{% endblock %}
+{% macro src(s) %}{% if s %}<span class="src">{% if s.page %}{{ s.page }}ページ {% endif %}{% if s.quote %}「{{ s.quote }}」{% endif %}</span>{% endif %}{% endmacro %}
+{% block main %}
+<h1>{{ user.name }} <small>{{ user.data.get('care_level', '') }} / {{ user.data.get('type', '') }}</small></h1>
+
+<section>
+  <h2>お知らせ</h2>
+  {% for v in findings %}
+    <article class="card {{ v.f.kind }}">
+      <div class="head"><span class="pill {{ v.f.kind }}">{{ v.label }}</span> <strong>{{ v.title }}</strong> {% if v.f.period %}<span class="muted">{{ v.f.period }}</span>{% endif %}</div>
+      <p>{{ v.f.message }}</p>
+      {% if v.f.evidence %}
+        <ul class="evidence">
+        {% for e in v.f.evidence %}
+          <li>{{ e.file.rsplit('/', 1)[-1] }}{% if e.page %} {{ e.page }}ページ{% endif %}{% if e.record_date %} {{ e.record_date }}{% endif %}{% if e.quote %}<br><span class="src">「{{ e.quote }}」</span>{% endif %}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+      {% if v.f.searched_scope %}<p class="muted">探した範囲: {{ v.f.searched_scope }}</p>{% endif %}
+      <p class="muted">根拠: {{ v.basis }}</p>
+    </article>
+  {% else %}
+    <p class="muted">今のところお知らせはありません。</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>支援経過</h2>
+  {% for r in records %}
+    <article class="record">
+      <div class="head">
+        <strong>{{ r.event_date }}</strong> {{ r.event_time }}
+        <span class="muted">{{ r.kind_written }}{% if r.kind_read and r.kind_read != r.kind_written %} → 本文からは「{{ r.kind_read }}」{% endif %}{% if r.partner %} / {{ r.partner }}{% endif %}</span>
+        {% if r.unchecked %}<span class="pill todo">未確認</span>{% endif %}
+      </div>
+      <p>{{ r.body }}</p>
+      <p class="muted small">記入日時: {{ r.first_written_at[:16].replace('T', ' ') if r.first_written_at else '不明（取り込み）' }}{% if r.author %} / {{ r.author }}{% endif %}</p>
+    </article>
+  {% else %}
+    <p class="muted">記録はまだありません。</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>読み取った書類の要点</h2>
+  {% if unread %}<p class="muted">まだ読み取っていない書類が {{ unread }} 件あります。</p>{% endif %}
+  {% for d in docs %}
+    <details class="doc">
+      <summary><strong>{{ d.name }}</strong> <span class="muted">{{ d.facts.doc_type }}{% if d.facts.doc_date %} / {{ d.facts.doc_date }}{% endif %}</span></summary>
+      <p>{{ d.facts.summary }}</p>
+      {% if d.facts.period_start %}<p>期間: {{ d.facts.period_start }} 〜 {{ d.facts.period_end }} {{ src(d.facts.period_source) }}</p>{% endif %}
+      {% if d.facts.signature_present is not none %}<p>署名: {{ 'あり' if d.facts.signature_present else '空欄' }} {{ src(d.facts.signature_source) }}</p>{% endif %}
+      {% if d.facts.consent_date %}<p>同意日: {{ d.facts.consent_date }} {{ src(d.facts.consent_source) }}</p>{% endif %}
+      {% if d.facts.issues %}<h3>課題</h3><ul>{% for x in d.facts.issues %}<li>{{ x.text }} {{ src(x.source) }}</li>{% endfor %}</ul>{% endif %}
+      {% if d.facts.goals %}<h3>目標</h3><ul>{% for x in d.facts.goals %}<li>{{ x.text }} {{ src(x.source) }}</li>{% endfor %}</ul>{% endif %}
+      {% if d.facts.services %}<h3>サービスと頻度</h3><ul>{% for x in d.facts.services %}<li>{{ x.name }}{% if x.per_week is not none %} 週{{ x.per_week|int if x.per_week == x.per_week|int else x.per_week }}回{% endif %} {{ x.days or '' }} {{ src(x.source) }}</li>{% endfor %}</ul>{% endif %}
+      {% if d.facts.read_note %}<p class="muted">読み取りのメモ: {{ d.facts.read_note }}</p>{% endif %}
+    </details>
+  {% else %}
+    <p class="muted">まだ読み取った書類はありません。</p>
+  {% endfor %}
+</section>
+{% endblock %}

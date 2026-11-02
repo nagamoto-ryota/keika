@@ -15,6 +15,7 @@ from docx.table import Table
 from keika.settings import OutsideRootError, Settings, safe_path
 
 SCOPES = {"利用者": "user", "事業所": "office", "入口": "inbox"}
+_HASHES: dict[tuple[str, int, int], str] = {}  # 変わっていないファイルは計算し直さない
 TEXT_EXTS = {"txt", "csv"}
 OFFICE_EXTS = {"docx", "xlsx"}
 BINARY_EXTS = {"pdf", "png", "jpg", "jpeg"}
@@ -59,7 +60,7 @@ def scan(s: Settings) -> list[DocRef]:
                 continue
             parts = Path(rel).parts
             user_folder = parts[1] if scope == "user" and len(parts) > 2 else None
-            refs.append(DocRef(rel, hashlib.sha256(path.read_bytes()).hexdigest(), ext, scope, user_folder))
+            refs.append(DocRef(rel, _hash(path), ext, scope, user_folder))
     return refs
 
 
@@ -128,3 +129,11 @@ def to_payload(s: Settings, ref: DocRef) -> Payload:
 
 def parse_csv(text: str) -> list[list[str]]:
     return list(csv.reader(io.StringIO(text)))
+
+
+def _hash(path: Path) -> str:
+    stat = path.stat()
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    if key not in _HASHES:
+        _HASHES[key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return _HASHES[key]

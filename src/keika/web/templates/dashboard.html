@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}今月の仕事 - ケイカ{% endblock %}
+{% block main %}
+<h1>今月の仕事 <small>{{ month }}</small></h1>
+<div class="tabs">
+  <a href="/" class="{{ 'on' if not cm }}">全員</a>
+  {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
+</div>
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>利用者</th><th>要介護度</th><th>認定の期限</th><th>計画の期限</th><th>今月の訪問</th><th>お知らせ</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a></td>
+      <td>{{ r.user.data.get('care_level', '—') }}</td>
+      <td>{{ r.cert_end }}</td>
+      <td>{{ r.plan_end }}</td>
+      <td><span class="pill {{ 'ok' if r.visit == '済' else 'todo' }}">{{ r.visit }}</span></td>
+      <td>
+        {% if r.findings %}<span class="pill finding">確認 {{ r.findings }}</span>{% endif %}
+        {% if r.unknowns %}<span class="pill unknown">不明 {{ r.unknowns }}</span>{% endif %}
+        {% if r.nudges %}<span class="pill nudge">先回り {{ r.nudges }}</span>{% endif %}
+        {% if not (r.findings or r.unknowns or r.nudges) %}<span class="muted">なし</span>{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">この担当の利用者はいません。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

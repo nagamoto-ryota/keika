@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ケイカ{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {% if as_of %}<div class="demo">デモ基準日 {{ as_of }}（架空データで動いています）</div>{% endif %}
+  <header class="top">
+    <a class="logo" href="/">ケイカ</a>
+    <nav>
+      <a href="/">今月の仕事</a>
+      <a href="/ledger">台帳</a>
+    </nav>
+  </header>
+  <main>{% block main %}{% endblock %}</main>
+  <footer>お知らせはすべて「確認してください」という形です。法的助言や監査の代わりではありません。最終判断は事業所と保険者にあります。</footer>
+</body>
+</html>
