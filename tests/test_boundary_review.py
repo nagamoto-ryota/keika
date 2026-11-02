@@ -2,8 +2,8 @@
 import pytest
 from test_intake import entry, env, run  # noqa: F401
 
-from keika.claude_checks import crosses_line
-from keika.findings import Finding
+from keika.claude_checks import crosses_line, validate_finding
+from keika.findings import Evidence, Finding
 from keika.intake import invented_terms, open_reviews
 from keika.med_names import candidates, decide_keep, open_checks, register_checks
 from keika.records import RecordIn, add_record, list_records, mark_checked
@@ -132,3 +132,38 @@ def test_non_medicine_words_are_not_candidates(env):  # noqa: F811
     s, c = _drive(env)
     assert candidates(c, s, "U04", "デイサービズ") == []
 
+
+
+TALK = "本人より、薬を飲むとふらつくため、もうやめたいとの話があった。"
+
+
+def _talk_finding(message):
+    return Finding(rule_id="R11", user_id="U04", kind="finding", period="2026-11", message=message,
+                   evidence=[Evidence(file="支援経過", page=0, quote="もうやめたいとの話があった", record_date="2026-11-02")])
+
+
+@pytest.mark.parametrize("message", [
+    "11/2の記録に、本人から薬を「もうやめたい」との話があります。主治医等への情報提供を検討済みか確認してください。",
+    "11/2の記録に、本人から服薬についての話（ふらつく、やめたい）があります。関係者への確認を検討済みか確認してください。",
+])
+def test_person_wish_in_the_quote_can_be_passed_on(message):
+    assert validate_finding(_talk_finding(message), {"支援経過": TALK}) is not None
+
+
+@pytest.mark.parametrize("message", [
+    "本人が薬をやめたいとの話です。薬を中止することを検討してください。",
+    "本人は薬をやめたいとのことなので、やめた方がよいようです。",
+    "本人が薬を減らしたいとの話です。減らすべきです。",
+])
+def test_advice_next_to_the_wish_is_still_stopped(message):
+    assert validate_finding(_talk_finding(message), {"支援経過": TALK}) is None
+
+
+def test_wish_not_in_the_quote_is_still_stopped():
+    other = _talk_finding("本人が薬をやめたいとの話です。確認してください。").model_copy(
+        update={"evidence": [Evidence(file="支援経過", page=0, quote="ふらつくため", record_date="2026-11-02")]})
+    assert validate_finding(other, {"支援経過": TALK}) is None
+
+
+def test_wish_added_by_shaping_is_still_caught():
+    assert invented_terms("薬を飲んでいる", "本人は薬をやめたいとのこと。")

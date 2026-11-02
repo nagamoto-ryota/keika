@@ -75,7 +75,7 @@ def main() -> int:
     findings = []
     for f in run.findings:
         text = " ".join(filter(None, [f.message, f.todo, f.suggestion]))
-        hit = [w for w in words if w in text] + line_crossings(text)
+        hit = [w for w in words if w in text] + line_crossings(text, " ".join(e.quote or "" for e in f.evidence))
         bad += bool(hit)
         findings.append({"rule": f.rule_id, "message": f.message, "todo": f.todo, "suggestion": f.suggestion, "crossed": hit})
         print(("NG " if hit else "OK ") + f.rule_id, f.message)

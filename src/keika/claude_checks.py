@@ -43,14 +43,17 @@ _MEDICAL = re.compile(
 )
 DISEASE = r"(?:[一-龥ァ-ヶー]{0,10}(?:症(?!状)|病(?![院棟室気])|炎|不全|がん|癌|疾患|梗塞)|うつ病|パーキンソン|高血圧|低血圧|貧血|糖尿|脱水|不整脈|狭心)"
 _DISEASE_GUESS = re.compile(DISEASE + r"(?:の症状)?(?:かもしれ|と思われ|のよう|の疑い|の可能性|が進んで)")
+_WISH = re.compile(r"やめたい|減らしたい|増やしたい|飲みたくない")
 _DRUG_ACTION = re.compile(r"中止|減量|増量|休薬|断薬|量を見直|減ら|増や")
 _ADVICE = re.compile(r"検討|すべき|した方が|してください|必要")
 _DRUG_WORD = re.compile(r"薬|錠|[ァ-ヶー]{3,}")
 _NOT_DRUG = re.compile(r"サービス|ヘルパー|デイ|ケア|プラン|レンタル|ベッド|ショート|リハビリ|モニタリング|アセスメント|マネ|ステーション")
 
 
-def line_crossings(text: str) -> list[str]:
-    """医療の判断や推測に踏み込む箇所を返す。薬の中止や変更の助言は、薬名が何であっても止める。"""
+def line_crossings(text: str, said: str = "") -> list[str]:
+    """医療の判断や推測に踏み込む箇所を返す。薬の中止や変更の助言は、薬名が何であっても止める。
+    said は根拠の引用。本人の願いとして引用にある語は助言ではないので、その語だけ除いて見る。"""
+    text = _WISH.sub(lambda m: "" if m[0] in said else m[0], text)
     found = [m[0] for m in _MEDICAL.finditer(text)] + [m[0] for m in _DISEASE_GUESS.finditer(text)]
     for sentence in re.split(r"[。\n]", text):
         if _DRUG_ACTION.search(sentence) and _ADVICE.search(sentence) and _DRUG_WORD.search(_NOT_DRUG.sub("", sentence)):
@@ -58,8 +61,8 @@ def line_crossings(text: str) -> list[str]:
     return found
 
 
-def crosses_line(text: str | None) -> bool:
-    return bool(text) and bool(line_crossings(text))
+def crosses_line(text: str | None, said: str = "") -> bool:
+    return bool(text) and bool(line_crossings(text, said))
 _BACKDATE = re.compile(r"過去の日付|さかのぼ|遡って|遡り|前日付|\d+月\d+日付|\d+月の日付|\d{4}[-/]\d{1,2}[-/]\d{1,2}付")
 MIN_QUOTE = 2  # 1文字の引用はどの原文にも当たるので根拠にならない
 MIN_CLOSING_QUOTE = 4  # 指摘を消す時はもっと確かな語句を求める
@@ -87,10 +90,11 @@ def validate_finding(f: Finding, texts: dict[str, str | None]) -> Finding | None
     ]
     if not good and (f.evidence or not f.searched_scope):  # 無い引用を、探した範囲で言い逃れさせない
         return None
-    if crosses_line(f.message) or crosses_line(f.todo) or crosses_line(f.searched_scope):
+    said = " ".join(e.quote or "" for e in good)
+    if crosses_line(f.message, said) or crosses_line(f.todo, said) or crosses_line(f.searched_scope):
         return None
     suggestion = f.suggestion
-    if suggestion and (crosses_line(suggestion) or _BACKDATE.search(suggestion)):
+    if suggestion and (crosses_line(suggestion, said) or _BACKDATE.search(suggestion)):
         suggestion = None
     message = f.message if "確認" in f.message or f.kind == "nudge" else f.message + "確認してください。"
     return f.model_copy(update={"evidence": good, "suggestion": suggestion, "message": message})
