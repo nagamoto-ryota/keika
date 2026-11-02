@@ -303,3 +303,13 @@ def test_user_filter_skips_office(env):
     s, conn = env
     put(s, conn, "感染.txt", committee("2020-01-01"), "事業所")
     assert of(run_machine_checks(conn, s, "U01"), "R24") == []
+
+
+def test_same_kind_written_and_read_is_not_described_as_a_mismatch(env):
+    s, conn = env
+    visit(conn, "2026-09-20")
+    visit(conn, "2026-10-08", kind_read="事業所訪問", kind_written="事業所訪問", body="デイで面会。")
+    visit(conn, "2026-10-20", kind_read="電話", kind_written="訪問", body="電話で確認。")
+    f = of(run_machine_checks(conn, s, "U01"), "R06", "finding", "2026-10")[0]
+    assert "2026-10-20" in f.message and "2026-10-08 は種別" not in f.message
+    assert "デイで面会。" in [e.quote for e in f.evidence]

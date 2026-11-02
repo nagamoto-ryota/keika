@@ -50,7 +50,7 @@ def current_findings(conn, s: Settings, user_id: str) -> tuple[list[Finding], Ch
 
 def _blanks(text: str | None) -> Markup:
     """書き足し案の「〇〇」の空欄を強調する。"""
-    return Markup(re.sub("(〇+)", r'<mark class="blank"></mark>', str(escape(text or ""))))
+    return Markup(re.sub("〇+", lambda m: f'<mark class="blank">{m[0]}</mark>', str(escape(text or ""))))
 
 
 def _mark_quote(text: str | None, quote: str | None) -> Markup:

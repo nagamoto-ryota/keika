@@ -199,3 +199,8 @@ def test_respond_history_noted_adds_todays_record(client, conn):
 
 def test_respond_unknown_finding_gives_404(client):
     assert client.post("/users/U04/respond", data={"fp": "nope", "kind": "done"}).status_code == 404
+
+
+def test_blank_marks_keep_the_blank_characters(client, conn):
+    save_run(conn, "U04", CheckRun(findings=[_claude()]))
+    assert '<mark class="blank">〇〇</mark>月' in client.get("/users/U04").text

@@ -86,7 +86,8 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
                                message=f"{month}の記録に、接触の種類を読み取れないものがあります。居宅訪問だったか確認してください。"))
         else:
             written = [r for r in rows if "訪問" in r.kind_written]
-            detail = "".join(f"{r.event_date} は種別が「{r.kind_written}」ですが、本文は「{r.kind_read}」と読めます。" for r in written)
+            detail = "".join(f"{r.event_date} は種別が「{r.kind_written}」ですが、本文は「{r.kind_read}」と読めます。"
+                             for r in written if r.kind_read != r.kind_written)
             out.append(Finding(rule_id="R06", user_id=user.id, kind="finding", period=month, searched_scope=scope,
                                evidence=[_record_evidence(r) for r in (written or rows)],
                                message=f"{month}に居宅を訪問しての面接の記録が見当たりません。{detail}"

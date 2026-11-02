@@ -312,6 +312,7 @@ def test_suggestion_rule_forbids_invented_actions():
 def test_record_quote_under_wrong_file_name_is_pointed_to_the_real_source(env):
     # Claude がファイル名を取り違えても、日付と語句で記録が特定できれば本来の出どころに直す
     s, c = env
+    (s.drive_root / "利用者" / "U01_杉森ハル" / "経過.csv").write_text("日付,本文\n2026-09-12,夜中に転んだ。\n", encoding="utf-8")
     add_record(c, RecordIn(user_id="U01", event_date="2026-09-12", body="夜中に転んだ。", source="csv:利用者/U01_杉森ハル/経過.csv"))
     e = dict(file="支援経過（アプリの記録）", page=0, quote="夜中に転んだ", record_date="2026-09-12")
     run = run_claude_checks(c, Scripted(msg(report(rule_id="R11", evidence=[e])), END), s, "U01")
