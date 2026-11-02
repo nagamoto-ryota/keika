@@ -201,7 +201,7 @@ def app_client(s, wire):
 def test_new_record_page_has_voice_button_and_notice(env):
     s, c = env
     body = TestClient(create_app(s)).get("/records/new").text
-    assert "speech.js" in body and "話す" in body and "音声" in body
+    assert "speech.js" in body and "Win + H" in body and "音声" in body
 
 
 def test_new_record_post_shows_result(env):
