@@ -22,6 +22,7 @@ from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
 from keika.legal_texts import basis_for
+from keika.med_names import decide_fix, decide_keep, decisions, message as med_message, open_checks, unconfirmed_record_ids
 from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, to_review
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
@@ -149,6 +150,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["sample"] = sample
     templates.env.globals["legal"] = basis_for
+    templates.env.globals["med_message"] = med_message
     templates.env.filters["blanks"] = _blanks
     templates.env.filters["mark_quote"] = _mark_quote
     templates.env.filters["hdate_full"] = lambda text: (text or "").replace("-", "/")
@@ -196,6 +198,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return templates.TemplateResponse(request, "dashboard.html", {
             "board": board, "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn),
             "reviews": _reviews_for(cm), "office": _office_for(cm),
+            "med_checks": [] if cm == OFFICE_TAB else open_checks(conn, s, cm=cm),
         })
 
     def _check_in_background(user_id: str) -> None:
@@ -253,7 +256,23 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     @app.get("/records/{record_id}/history")
     def record_history(request: Request, record_id: int):
         names = {u.id: u.name for u in list_users(conn)}
-        return templates.TemplateResponse(request, "history.html", {"r": _record_or_404(record_id), "versions": history(conn, record_id), "names": names, "original": original_of(conn, record_id)})
+        return templates.TemplateResponse(request, "history.html", {"r": _record_or_404(record_id), "versions": history(conn, record_id), "names": names, "original": original_of(conn, record_id), "med_decisions": decisions(conn, record_id)})
+
+    @app.post("/med/{check_id}/fix")
+    def med_fix(check_id: int, chosen: str = Form(""), editor: str = Form("")):
+        try:
+            decide_fix(conn, s, check_id, chosen, editor)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return RedirectResponse("/#kusuri", status_code=303)
+
+    @app.post("/med/{check_id}/keep")
+    def med_keep(check_id: int, editor: str = Form("")):
+        try:
+            decide_keep(conn, check_id, editor)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return RedirectResponse("/#kusuri", status_code=303)
 
     @app.post("/records/{record_id}/checked")
     def record_checked(record_id: int):
@@ -297,7 +316,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         rows = [_dashboard_row(conn, s, u, month) for u in list_users(conn, cm=cm)]
         staff = list_people(conn, "staff")
         summary = _summary(conn, staff, rows) if not cm else []
-        return templates.TemplateResponse(request, "board.html", {"rows": rows, "staff": staff, "cm": cm, "summary": summary, "steps": STEPS})
+        return templates.TemplateResponse(request, "board.html", {"rows": rows, "staff": staff, "cm": cm, "summary": summary, "steps": STEPS, "med_waiting_users": {m.record.user_id for m in open_checks(conn, s)}})
 
     @app.get("/users/{user_id}")
     def user_page(request: Request, user_id: str):
@@ -310,6 +329,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         year = today(s).year
         facts = stored_facts(conn, user_refs(conn, s, user))
         return templates.TemplateResponse(request, "user.html", {
+            "med_waiting": unconfirmed_record_ids(conn, s),
             "user": user,
             "findings": [_view(s, i, records, year) for i in parts.open],
             "noted": [_view(s, i, records, year) for i in parts.noted],

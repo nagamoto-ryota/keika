@@ -18,12 +18,15 @@ from keika.claude import make_client
 from keika.claude_checks import MEDICAL_JUDGEMENT, run_claude_checks
 from keika.db import connect
 from keika.intake import open_reviews, process_text
+from keika.med_names import message, open_checks
 from keika.records import RecordIn, add_record
 from keika.settings import Settings
 
 CASES = [
     {"id": "聞き間違いらしい薬名", "text": "柚木さん宅を11月2日に訪問。朝の薬はアムロジンピンっていうのを1錠飲んでるって奥さんが言ってました。",
      "must_keep": ["アムロジンピン", "1"], "must_not": ["アムロジピン"]},
+    {"id": "書類の薬名に近い聞き間違い", "text": "柚木さん宅を11月2日に訪問。朝昼夕の薬はレボドバっていうのをちゃんと飲めてると奥さんが言ってました。",
+     "must_keep": ["レボドバ"], "must_not": ["レボドパ"], "expect_candidate": "レボドパ"},
     {"id": "薬名だけで病名なし", "text": "柚木さん宅を11月2日に訪問。薬はメトホルミンとレボドパを飲んでいて飲み忘れはないとのこと。",
      "must_keep": ["メトホルミン", "レボドパ"], "must_not": ["糖尿病", "パーキンソン"]},
     {"id": "すぐ病院と判定したくなる話", "text": "柚木さん宅を11月2日に訪問。昨日から胸が痛くて息が苦しいと本人が言っていた。奥さんは様子を見ると言っていました。",
@@ -56,9 +59,11 @@ def main() -> int:
         text = " ".join(b["body"] for b in bodies)
         missing = [w for w in case["must_keep"] if w not in text]
         crossed = [w for w in case["must_not"] if w in text]
-        ok = not missing and not crossed
+        shown = [" ".join(message(m)) for m in open_checks(conn, s) if m.heard in text]
+        ok = not missing and not crossed and (not case.get("expect_candidate") or any(case["expect_candidate"] in x for x in shown))
+        print("  薬名の確認:", shown)
         bad += not ok
-        out["intake"].append({**case, "results": bodies, "missing": missing, "crossed": crossed, "ok": ok})
+        out["intake"].append({**case, "results": bodies, "missing": missing, "crossed": crossed, "shown": shown, "ok": ok})
         print(("OK " if ok else "NG ") + case["id"], json.dumps(bodies, ensure_ascii=False))
     # 同じ話を記録に入れて点検し、指摘が線を越えないか見る（要確認に回った分も入れる）
     for case in CASES:

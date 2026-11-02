@@ -47,6 +47,7 @@
         <strong>{{ r.event_date|hdate }}</strong>
         <span class="muted">{{ r.kind_read or r.kind_written }}{% if r.partner %}・{{ r.partner }}{% endif %}</span>
         {% if r.unchecked %}<span class="pill todo">未確認</span>{% endif %}
+        {% if r.id in med_waiting %}<span class="pill finding">薬名未確認</span>{% endif %}
         {% if r.kind_read and r.kind_written and r.kind_read not in r.kind_written and '訪問' in r.kind_written %}<span class="pill finding">種別は「{{ r.kind_written }}」</span>{% endif %}
       </div>
       <p>{{ r.body }}</p>

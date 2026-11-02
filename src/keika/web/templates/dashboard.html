@@ -7,12 +7,19 @@
   <a href="/?cm=office" class="{{ 'on' if cm == 'office' }}">事業所</a>
 </div>
 
-<h1 class="big">やること <span class="count">{{ board.total + reviews|length + office|length }}</span></h1>
+<h1 class="big">やること <span class="count">{{ board.total + reviews|length + office|length + med_checks|length }}</span></h1>
 
 {% if reviews %}
 <section class="person" id="kakunin">
   <h2>記録の確認 <span class="muted small">{{ reviews|length }}件</span></h2>
   {% for it in reviews %}{% include "_review_card.html" %}{% endfor %}
+</section>
+{% endif %}
+
+{% if med_checks %}
+<section class="person" id="kusuri">
+  <h2>薬の名前の確認 <span class="muted small">{{ med_checks|length }}件</span></h2>
+  {% for m in med_checks %}{% include "_med_check.html" %}{% endfor %}
 </section>
 {% endif %}
 
@@ -48,7 +55,7 @@
 </section>
 {% endif %}
 
-{% if not (board.total or reviews or office) %}<p class="clear">やることはありません。</p>{% endif %}
+{% if not (board.total or reviews or office or med_checks) %}<p class="clear">やることはありません。</p>{% endif %}
 
 {% set quiet = board.people|rejectattr('tasks')|list %}
 {% if quiet %}

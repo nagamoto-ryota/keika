@@ -10,6 +10,9 @@
     <p>{{ v.body }}</p>
   </article>
 {% endfor %}
+{% for d in med_decisions %}
+<p class="small muted">薬名の確認 {{ d.decided_at[:16].replace('T', ' ') }} {{ d.editor }}: {% if d.status == 'fixed' %}「{{ d.heard }}」を「{{ d.chosen }}」に直しました{% elif d.status == 'kept' %}「{{ d.heard }}」をそのままにしました{% else %}本文の直しで「{{ d.heard }}」が無くなりました{% endif %}</p>
+{% endfor %}
 {% if original %}<details class="fold"><summary>話した元の文</summary><p class="original small">{{ original }}</p></details>{% endif %}
 <p><a href="/users/{{ r.user_id }}">戻る</a></p>
 {% endblock %}

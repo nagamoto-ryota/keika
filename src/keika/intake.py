@@ -19,6 +19,7 @@ from keika.ledger import find_person, get_user, list_people, list_users, squash
 from keika.records import KindRead, Record, RecordIn, add_record
 from keika.settings import Settings, now_real, today
 from keika.claude_checks import MEDICAL_JUDGEMENT
+from keika.med_names import register_checks
 
 _KATAKANA = re.compile(r"[ァ-ヶー]{3,}")
 _MEDICINE_SENTENCE = re.compile(r"薬|錠|服|処方|mg|ミリ|カプセル|貼付|軟膏|点眼|インスリン")
@@ -61,7 +62,7 @@ SYSTEM = """日本の介護支援専門員が話した内容（音声入力や�
 守ること:
 - 話していない事実を足さない。数字、日付、人名、薬、受診は、話に出てきたものだけを書く。推測で補わない。
 - 話し言葉を、記録の文章に直す（です・ます調ではなく「〜した」「〜とのこと」）。繰り返しや言いよどみは整える。話の中身は削らない。
-- 薬の名前と量は話のとおりに残す。聞き間違いに見えても推測で直さない。怪しい薬名や、整えてよいか迷う語は、話のとおり本文に残して unsure_words に書く。
+- 薬の名前と量は話のとおりに残す。聞き間違いに見えても推測で直さない。怪しい薬名は、話のとおり本文に残して unsure_words に書く。正しい名前の候補は書かない。
 - 薬から病名を推測しない。話に出ていない病名を書かない。
 - 緊急度や受診の要否を判定しない。「すぐ受診」のような判断は、話した人がそう言った時に、その人の言葉として書くだけにする。
 - 1回の話に複数の利用者や複数の出来事があれば、分けて複数の記録にする。
@@ -222,19 +223,17 @@ def process_text(
         warnings = invented_terms(text + " " + fixed, entry.body, names)
         note = entry.ambiguity_note
         problem = not get_user(conn, entry.user_id) or entry.ambiguous or not _calls_this_user(conn, entry.spoken_name, entry.user_id, entry.name_fixes)
-        if problem or warnings or entry.unsure_words:
+        if problem or warnings:
             if problem and not note:
                 note = f"「{entry.spoken_name}」が誰か確かめてください"
             if warnings:
                 note = (note + " " if note else "") + UNSPOKEN_NOTE
-            if entry.unsure_words:
-                words = "".join(f"「{w}」" for w in entry.unsure_words)
-                note = (note + " " if note else "") + f"{words}は聞き間違いかもしれません。話のとおり残しているので確かめてください。"
             results.append(IntakeResult(review_id=to_review(conn, text, source, entry.model_dump(), warnings, note), warnings=warnings))
             continue
         record = _save_entry(conn, s, entry, source)
         conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, text))
         conn.commit()
+        register_checks(conn, s, record, entry.unsure_words)
         results.append(IntakeResult(record=record))
         if entry.user_id not in saved:
             saved.append(entry.user_id)
@@ -296,4 +295,6 @@ def resolve_review(conn: sqlite3.Connection, review_id: int, *, user_id: str | N
     conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, row["original"]))
     conn.execute("UPDATE review_items SET status = 'resolved' WHERE id = ?", (review_id,))
     conn.commit()
+    if s:
+        register_checks(conn, s, record, entry.get("unsure_words") or [])
     return record

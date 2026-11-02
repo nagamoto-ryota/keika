@@ -59,14 +59,11 @@ def test_spoken_plan_to_go_to_hospital_passes():
     assert invented_terms("息が苦しいと言うので家族が病院へ連れて行くとのこと", "息苦しさの訴えあり。家族が病院へ連れて行くとのこと。") == []
 
 
-def test_unsure_word_goes_to_a_person_and_keeps_the_body(env):  # noqa: F811
+def test_unsure_word_is_saved_as_spoken_not_stopped(env):  # noqa: F811
     s, c = env
     body = "朝はアムロジンピンを1錠内服しているとのこと。"
     run(s, c, "柚木さん、朝の薬はアムロジンピンを1錠", entry(body=body, unsure_words=["アムロジンピン"]))
-    assert list_records(c, "U04") == []
-    item = open_reviews(c)[0]
-    assert item["entry"]["body"] == body
-    assert "「アムロジンピン」" in item["note"] and "聞き間違い" in item["note"] and "確かめて" in item["note"]
+    assert list_records(c, "U04")[0].body == body and open_reviews(c) == []
 
 
 def test_guessing_finding_is_blocked():

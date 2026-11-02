@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS intake_originals (record_id INTEGER PRIMARY KEY, orig
 CREATE TABLE IF NOT EXISTS office_declarations (
   id INTEGER PRIMARY KEY AUTOINCREMENT, rule_id TEXT NOT NULL, who TEXT NOT NULL, basis TEXT NOT NULL, at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS med_checks (
+    id INTEGER PRIMARY KEY, record_id INTEGER NOT NULL, heard TEXT NOT NULL, status TEXT NOT NULL,
+    chosen TEXT, editor TEXT, created_at TEXT NOT NULL, decided_at TEXT
+);
+CREATE TRIGGER IF NOT EXISTS med_checks_no_delete BEFORE DELETE ON med_checks
+BEGIN SELECT RAISE(ABORT, '薬名の確認の結果は消せません'); END;
 -- 履歴は消せない。記録も消せない。記入日時は変えられない。
 CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON record_versions
 BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;

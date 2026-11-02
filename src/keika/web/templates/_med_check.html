@@ -1,0 +1,12 @@
+{# 薬名の確認の1件。m は MedCheck。聞こえた言葉と記載を並べるだけで、どちらが正しいかは言わない #}
+<article class="card unknown">
+  <p class="small muted"><a href="/users/{{ m.record.user_id }}">{{ m.user_name }}</a> {{ m.record.event_date|hdate }} の記録</p>
+  {% for line in med_message(m) %}<p class="todo-line">{{ line }}</p>{% endfor %}
+  <p class="small">{% for c in m.candidates if c.doc_path %}<a href="/doc?path={{ c.doc_path|urlencode }}" target="_blank" rel="noopener">{{ c.where }}を開く</a> {% endfor %}<a href="/records/{{ m.record.id }}/edit">記録を開いて直す</a></p>
+  <div class="write-actions">
+    {% for c in m.candidates %}
+    <form method="post" action="/med/{{ m.id }}/fix"><input type="hidden" name="chosen" value="{{ c.name }}"><input type="hidden" name="editor" value="{{ m.record.author or '' }}"><button class="plain">「{{ c.name }}」に直す</button></form>
+    {% endfor %}
+    <form method="post" action="/med/{{ m.id }}/keep"><input type="hidden" name="editor" value="{{ m.record.author or '' }}"><button class="plain">このままにする</button></form>
+  </div>
+</article>

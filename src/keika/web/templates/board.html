@@ -26,7 +26,7 @@
   <tbody>
   {% for r in rows %}
     <tr>
-      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a></td>
+      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a>{% if r.user.id in med_waiting_users %} <span class="pill finding">薬名未確認</span>{% endif %}</td>
       {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status == 'todo' %}まだ{% elif c.status == 'check' %}確認{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</td>{% endfor %}
       <td>{{ r.plan_end|hdate_full }}</td>
       <td>{{ r.cert_end|hdate_full }}</td>
