@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 import pytest
@@ -66,7 +67,7 @@ def test_every_page_shows_demo_banner_and_final_judgment_note(client):
 def test_dashboard_shows_cert_end_and_month_visit_status(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-11-02", kind_read="居宅訪問", body="訪問した。"))
     body = client.get("/", params={"cm": "CM02"}).text
-    assert "2027-11-30" in body
+    assert "2027/11/30" in body
     assert "済" in body
 
 
@@ -139,12 +140,62 @@ def test_dismissed_candidate_is_hidden_and_shown_as_a_note(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-08-05", kind_read="居宅訪問", body="訪問。"))
     add_record(conn, RecordIn(user_id="U04", event_date="2026-09-10", kind_read="電話", kind_written="電話", body="入院中のため訪問できず。"))
     add_record(conn, RecordIn(user_id="U04", event_date="2026-10-05", kind_read="居宅訪問", body="訪問。"))
-    assert "2026-09 に居宅を訪問" in client.get("/users/U04").text
+    assert "9月に居宅を訪問" in client.get("/users/U04").text
     save_run(conn, "U04", CheckRun(dismissed=[Dismissal("R06", "2026-09", "入院中", "2026-09-10", "入院中のため")]))
     body = client.get("/users/U04").text
-    assert "2026-09 に居宅を訪問" not in body and "読み直して取り下げました" in body and "入院中" in body
+    assert "9月に居宅を訪問" not in body and "読み直して取り下げました" in body and "入院中" in body
 
 
 def test_failed_check_is_shown_as_not_run(client, conn):
     save_run(conn, "U04", CheckRun(not_run=True, error="APIConnectionError"))
     assert "未実施" in client.get("/users/U04").text
+
+
+def _one_finding(conn):
+    save_run(conn, "U04", CheckRun(findings=[_claude(evidence=[Evidence(file="利用者/U04_柚木茂/担当者変更のお知らせ_2026-07-01.docx", quote="担当")])]))
+
+
+def test_evidence_opens_original_on_click(client, conn):
+    add_record(conn, RecordIn(user_id="U04", event_date="2026-10-08", kind_read="事業所訪問", kind_written="訪問", body="デイで面会した。全文はここまで。"))
+    save_run(conn, "U04", CheckRun(findings=[_claude(evidence=[Evidence(file="支援経過（アプリの記録）", record_date="2026-10-08", quote="デイで面会")])]))
+    body = client.get("/users/U04").text
+    assert "<details" in body and "支援経過 10/8" in body and "全文はここまで" in body
+
+
+def test_card_hides_file_names_and_long_dates(client, conn):
+    _one_finding(conn)
+    body = client.get("/users/U04").text
+    card = re.sub(r"<[^>]+>", "", body[body.index('class="card'):body.index("</article>")])
+    assert ".docx" not in card and "2026-07-01" not in card
+
+
+def test_doc_route_opens_inside_and_refuses_outside(client):
+    assert client.get("/doc", params={"path": "利用者/U04_柚木茂/契約書_2024-02-15.pdf"}).status_code == 200
+    assert client.get("/doc", params={"path": "../ledger.json"}).status_code == 403
+    assert client.get("/doc", params={"path": "利用者/無い.pdf"}).status_code == 404
+
+
+def test_respond_off_target_hides_finding_and_lists_it(client, conn):
+    from keika.findings import fingerprint
+    _one_finding(conn)
+    fp = fingerprint(_claude(evidence=[Evidence(file="利用者/U04_柚木茂/担当者変更のお知らせ_2026-07-01.docx", quote="担当")]))
+    r = client.post("/users/U04/respond", data={"fp": fp, "kind": "off_target"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert "週2回のままです" not in client.get("/users/U04").text
+    assert "週2回のままです" in client.get("/silenced").text
+
+
+def test_respond_history_noted_adds_todays_record(client, conn):
+    from keika.findings import fingerprint
+    _one_finding(conn)
+    fp = fingerprint(_claude(evidence=[Evidence(file="利用者/U04_柚木茂/担当者変更のお知らせ_2026-07-01.docx", quote="担当")]))
+    client.post("/users/U04/respond", data={"fp": fp, "kind": "history_noted", "note": "今日、経緯を確認した。"})
+    body = client.get("/users/U04").text
+    assert "今日、経緯を確認した。" in body and "経緯あり" in body
+    assert client.post("/users/U04/respond", data={"fp": fp, "kind": "history_noted", "note": " "}).status_code == 400
+    from keika.records import list_records
+    assert [r.event_date for r in list_records(conn, "U04") if r.kind_written == "経緯"] == ["2026-11-04"]
+
+
+def test_respond_unknown_finding_gives_404(client):
+    assert client.post("/users/U04/respond", data={"fp": "nope", "kind": "done"}).status_code == 404

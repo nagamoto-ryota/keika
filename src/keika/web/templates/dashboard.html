@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}今月の仕事 - ケイカ{% endblock %}
 {% block main %}
-<h1>今月の仕事 <small>{{ month }}</small></h1>
+<h1>今月の仕事 <small>{{ month|hdate }}</small></h1>
 <div class="tabs">
   <a href="/" class="{{ 'on' if not cm }}">全員</a>
   {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
@@ -16,8 +16,8 @@
     <tr>
       <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a></td>
       <td>{{ r.user.data.get('care_level', '—') }}</td>
-      <td>{{ r.cert_end }}</td>
-      <td>{{ r.plan_end }}</td>
+      <td>{{ r.cert_end|hdate_full }}</td>
+      <td>{{ r.plan_end|hdate_full }}</td>
       <td><span class="pill {{ 'ok' if r.visit == '済' else 'todo' }}">{{ r.visit }}</span></td>
       <td>
         {% if r.findings %}<span class="pill finding">確認 {{ r.findings }}</span>{% endif %}

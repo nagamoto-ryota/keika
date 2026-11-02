@@ -276,3 +276,34 @@ def test_failed_run_is_latest_so_old_results_are_not_shown_silently(env):
 
 def test_no_run_yet_returns_none(env):
     assert latest_run(env[1], "U01") is None
+
+
+def test_consent_candidate_can_be_dismissed_too(env):
+    s, c = env
+    plan = DocFacts(doc_type="居宅サービス計画書", period_start="2026-08-01", period_end="2027-07-31", consent_date="2026-08-05")
+    _save(c, scan(s)[0], plan)
+    add_record(c, RecordIn(user_id="U01", event_date="2026-08-05", body="本日説明し同意を得た。サービス開始は8/6から。"))
+    dismiss = tool("dismiss_candidate", dict(rule_id="R10", period="2026-08-01", reason="開始は同意の後", record_date="2026-08-05", quote="サービス開始は8/6から"))
+    assert run_claude_checks(c, Scripted(msg(dismiss), END), s, "U01").dismissed[0].rule_id == "R10"
+
+
+def test_dismiss_of_non_candidate_is_refused(env):
+    s, c = env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-09-10", kind_read="居宅訪問", body="入院中。"))
+    dismiss = tool("dismiss_candidate", dict(rule_id="R06", period="2026-09", reason="入院中", record_date="2026-09-10", quote="入院中"))
+    run = run_claude_checks(c, Scripted(msg(dismiss), END), s, "U01")
+    assert run.dismissed == [] and run.dropped[0]["why"] == "候補に無い"
+
+
+def test_confirmed_findings_are_told_to_claude(env):
+    s, c = env
+    from keika.responses import respond
+    respond(c, s, f(message="人が問題なしとした指摘です。確認してください。"), "off_target")
+    client = Scripted(END)
+    run_claude_checks(c, client, s, "U01")
+    assert "人が問題なしとした指摘です" in str(client.calls[0]["messages"][0]["content"])
+
+
+def test_suggestion_rule_forbids_invented_actions():
+    from keika.claude_checks import COMMON
+    assert "記録や書類に無い行動" in COMMON

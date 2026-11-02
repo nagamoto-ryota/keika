@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS imported_files (
 CREATE TABLE IF NOT EXISTS check_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, run_at TEXT NOT NULL, payload TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS finding_responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL, user_id TEXT, kind TEXT NOT NULL, record_id INTEGER,
+  evidence_hash TEXT NOT NULL, run_id INTEGER NOT NULL, who TEXT NOT NULL DEFAULT '', at TEXT NOT NULL, finding TEXT NOT NULL
+);
 -- 履歴は消せない。記録も消せない。記入日時は変えられない。
 CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON record_versions
 BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;

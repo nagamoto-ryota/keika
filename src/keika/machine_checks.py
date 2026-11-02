@@ -83,13 +83,13 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
         elif any(r.kind_read is None for r in rows):
             out.append(Finding(rule_id="R06", user_id=user.id, kind="unknown", period=month, searched_scope=scope,
                                evidence=[_record_evidence(r) for r in rows if r.kind_read is None],
-                               message=f"{month} の記録に、接触の種類を読み取れないものがあります。居宅訪問だったか確認してください。"))
+                               message=f"{month}の記録に、接触の種類を読み取れないものがあります。居宅訪問だったか確認してください。"))
         else:
             written = [r for r in rows if "訪問" in r.kind_written]
             detail = "".join(f"{r.event_date} は種別が「{r.kind_written}」ですが、本文は「{r.kind_read}」と読めます。" for r in written)
             out.append(Finding(rule_id="R06", user_id=user.id, kind="finding", period=month, searched_scope=scope,
                                evidence=[_record_evidence(r) for r in (written or rows)],
-                               message=f"{month} に居宅を訪問しての面接の記録が見当たりません。{detail}"
+                               message=f"{month}に居宅を訪問しての面接の記録が見当たりません。{detail}"
                                        "特段の事情があれば、その記録があるか確認してください。"))
     return out
 
@@ -144,10 +144,10 @@ def _signatures(user: User, facts: list[tuple[DocRef, DocFacts]], on: date) -> l
         ev = [_doc_evidence(ref.rel_path, f.signature_source)]
         if f.signature_present is False:
             out.append(Finding(rule_id="R13", user_id=user.id, kind="finding", period=f.target_month, evidence=ev,
-                               message=f"{f.target_month} の利用票の署名欄が空のようです。署名をいただいているか確認してください。"))
+                               message=f"{f.target_month}の利用票の署名欄が空のようです。署名をいただいているか確認してください。"))
         elif f.signature_present is None:
             out.append(Finding(rule_id="R13", user_id=user.id, kind="unknown", period=f.target_month, evidence=ev,
-                               message=f"{f.target_month} の利用票の署名の有無を読み取れませんでした。原本を確認してください。"))
+                               message=f"{f.target_month}の利用票の署名の有無を読み取れませんでした。原本を確認してください。"))
     return out
 
 

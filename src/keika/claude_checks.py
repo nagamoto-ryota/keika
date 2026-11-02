@@ -24,6 +24,7 @@ from keika.ledger import find_person, get_user
 from keika.machine_checks import run_machine_checks, user_refs
 from keika.reading import stored_facts
 from keika.records import list_records
+from keika.responses import silenced_for_prompt
 from keika.rules import active_rules
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
 
@@ -110,6 +111,7 @@ COMMON = """あなたは日本の介護支援専門員（ケアマネジャー�
 
 ## 書き足し案（suggestion）
 - 必要な時だけ、支援経過に書き足す文の案を出す。事実を作らない。ケアマネしか知らないことは「〇〇」の空欄で残す。
+- 記録や書類に無い行動（訪問した、説明した、確認した、など）を書かない。これからすることや、ケアマネがしたかどうか分からないことは、すべて「〇〇」にする。
 - 過去の漏れには「今日の日付で経緯を残す」案だけを出す。過去の日付で書き足す案、後から署名をもらって日付を合わせる案は出さない。署名や同意は「今日の日付で取得し、経緯を残す」に限る。
 
 ## 書類の扱い
@@ -219,12 +221,14 @@ def _first_message(conn: sqlite3.Connection, s: Settings, user_id: str, refs: li
     known = {ref.rel_path for ref, _ in stored_facts(conn, refs)}
     files = [{"ファイル": r.rel_path, "読み取り済み": r.rel_path in known} for r in refs]
     dumped = [{"rule_id": c.rule_id, "period": c.period, "内容": c.message} for c in candidates]
+    confirmed = silenced_for_prompt(conn, user_id)
     return (
         f"今日は {today(s).isoformat()} です。\n\n## 利用者\n{json.dumps(info, ensure_ascii=False)}\n\n"
         f"## フォルダの書類\n{json.dumps(files, ensure_ascii=False)}\n\n"
         f"## 支援経過（全文）\n{json.dumps(records, ensure_ascii=False)}\n\n"
         f"## 読み取った書類の要点\n{json.dumps(facts, ensure_ascii=False)}\n\n"
         f"## 機械の点検の候補（読み直して、事情があれば dismiss_candidate）\n{json.dumps(dumped, ensure_ascii=False)}\n\n"
+        f"## 人が確認して問題なしとしたもの（同じことを出さない）\n{json.dumps(confirmed, ensure_ascii=False)}\n\n"
         "点検項目を順に確かめ、必要なものを report_finding で報告してください。終わったら一言で終えてください。"
     )
 
@@ -272,7 +276,7 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
     rules = active_rules(on)
     allowed = {r.id for r in rules if r.judge == "claude"}
     rules_text = "\n".join(f"- {r.id} {r.title}: {r.plain}（済みの目安: {r.done_when}）" for r in rules if r.judge == "claude")
-    candidates = [c for c in run_machine_checks(conn, s, user_id) if c.rule_id == "R06" and c.kind == "finding"]
+    candidates = [c for c in run_machine_checks(conn, s, user_id) if c.kind == "finding"]
     texts = source_texts(conn, s, user_id)
     all_bodies: dict[str, list[str]] = {}
     for r in list_records(conn, user_id):
@@ -303,14 +307,14 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
             messages.append({"role": "assistant", "content": message.content})
             results = []
             for block in (b for b in message.content if b.type == "tool_use"):
-                results.append(_run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run))
+                results.append(_run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run, candidates))
             messages.append({"role": "user", "content": results})
         raise RuntimeError("手順が長くなりすぎました")
     except (anthropic.APIError, RuntimeError, ValueError) as e:
         return CheckRun(not_run=True, error=f"{type(e).__name__}: {e}", cost=METER.cost_usd - before)
 
 
-def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: CheckRun) -> dict:
+def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: CheckRun, candidates: list[Finding]) -> dict:
     result = {"type": "tool_result", "tool_use_id": block.id}
     try:
         if block.name == "read_document":
@@ -320,7 +324,7 @@ def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: Ch
         elif block.name == "report_finding":
             result["content"] = _accept_finding(block.input, user_id, allowed, texts, run)
         elif block.name == "dismiss_candidate":
-            result["content"] = _accept_dismissal(block.input, all_bodies, run)
+            result["content"] = _accept_dismissal(block.input, all_bodies, run, candidates)
         else:
             raise ValueError(f"知らない道具です: {block.name}")
     except (ValueError, KeyError, OutsideRootError) as e:
@@ -341,7 +345,10 @@ def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, ru
     return "受け付けました。"
 
 
-def _accept_dismissal(data: dict, all_bodies: dict[str, list[str]], run: CheckRun) -> str:
+def _accept_dismissal(data: dict, all_bodies: dict[str, list[str]], run: CheckRun, candidates: list[Finding]) -> str:
+    if not any(c.rule_id == data["rule_id"] and c.period == data["period"] for c in candidates):
+        run.dropped.append({**data, "why": "候補に無い"})
+        return "受け付けませんでした: その候補はありません。rule_id と period を候補のとおりに指定してください。"
     bodies = all_bodies.get(data["record_date"], [])
     if not any(_squeeze(data["quote"]) in _squeeze(b) for b in bodies) or not data["quote"]:
         run.dropped.append({**data, "why": "取り下げの根拠が記録に無い"})
