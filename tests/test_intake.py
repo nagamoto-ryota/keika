@@ -106,6 +106,12 @@ def test_time_written_as_clock_is_not_invented():
     assert invented_terms("2時から", "15:00より") == ["15"]
 
 
+def test_time_written_in_kanji_form_is_not_invented():
+    assert invented_terms("今日2時から", "14時より") == []
+    assert invented_terms("午後1時半から", "13時30分より") == []
+    assert invented_terms("2時から", "15時より") == ["15"]
+
+
 def test_plain_word_turned_formal_is_not_invented():
     assert invented_terms("ふらついて転んではいない", "転倒はしていない") == []
     assert invented_terms("薬はそのまま飲んでいる", "服薬は変わらない") == []

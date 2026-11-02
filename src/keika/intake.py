@@ -86,14 +86,14 @@ def _without_spoken_clocks(original: str, shaped: str) -> str:
     half = "半" in original
 
     def keep_or_drop(m: re.Match) -> str:
-        hour, minute = int(m[1]), m[2]
+        hour, minute = int(m[1]), (m[2] or m[3] or "00").zfill(2)
         hour_ok = str(hour) in said or str(hour - 12) in said
         minute_ok = minute == "00" or minute in said or (minute == "30" and half)
         if hour_ok and minute_ok:
             return " "
         return m[1] if minute_ok else m[0]
 
-    return re.sub(r"(\d{1,2}):(\d{2})", keep_or_drop, _normal(shaped))
+    return re.sub(r"(\d{1,2})(?::(\d{2})|時(?:(\d{1,2})分)?)", keep_or_drop, _normal(shaped))
 
 
 def _hira(text: str) -> str:
