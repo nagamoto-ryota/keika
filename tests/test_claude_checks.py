@@ -398,3 +398,26 @@ def test_resolution_is_saved_and_loaded(env):
     s, c = env
     save_run(c, "U01", CheckRun(resolved=[Resolution("R11", "2026-10", "転倒", "見直した", "2026-11-04", "見直した")]))
     assert latest_run(c, "U01")[0].resolved[0].reason == "見直した"
+
+
+def _progress(**kw):
+    data = dict(step="delivery", status="done", date="2026-08-03", note="", file=REL, quote="週2回")
+    return tool("report_progress", {"marks": [data | kw]})
+
+
+def test_progress_is_kept_with_evidence(env):
+    s, c = env
+    run = run_claude_checks(c, Scripted(msg(_progress()), END), s, "U01")
+    assert run.progress[0].status == "done" and run.progress[0].step == "delivery"
+
+
+def test_progress_done_without_real_quote_becomes_unknown(env):
+    s, c = env
+    run = run_claude_checks(c, Scripted(msg(_progress(quote="作り話")), END), s, "U01")
+    assert run.progress[0].status == "unknown" and len(run.dropped) == 1
+
+
+def test_progress_todo_needs_no_quote(env):
+    s, c = env
+    run = run_claude_checks(c, Scripted(msg(_progress(status="todo", quote="", file="")), END), s, "U01")
+    assert run.progress[0].status == "todo"

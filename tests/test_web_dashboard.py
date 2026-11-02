@@ -68,7 +68,7 @@ def test_dashboard_shows_cert_end_and_month_visit_status(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-11-02", kind_read="居宅訪問", body="訪問した。"))
     body = client.get("/", params={"cm": "CM02"}).text
     assert "2027/11/30" in body
-    assert "済" in body
+    assert "11/2" in body
 
 
 def test_ledger_add_and_edit(client, conn):

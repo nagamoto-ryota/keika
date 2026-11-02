@@ -19,6 +19,12 @@
 {% block main %}
 <h1>{{ user.name }} <small>{{ user.data.get('care_level', '') }}</small></h1>
 
+<div class="steps">
+  {% for c in cells %}
+    <div class="step {{ c.status }}" title="{{ c.note }}"><span class="small">{{ c.label }}</span><strong>{% if c.status == 'done' %}{{ c.date|hdate or '済' }}{% elif c.status == 'todo' %}まだ{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</strong>{% if c.note and c.status == 'todo' %}<span class="small">{{ c.note }}</span>{% endif %}</div>
+  {% endfor %}
+</div>
+
 <section>
   <h2>お知らせ <small class="muted">{{ findings|length }}件</small></h2>
   {% if run and run.not_run %}<p class="notice">文章の点検は未実施です（通信の失敗など）。記録は失われていません。日付の点検だけを出しています。</p>{% endif %}

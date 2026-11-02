@@ -13,7 +13,7 @@ a { color: var(--accent); }
 .top { display: flex; align-items: center; gap: 24px; padding: 12px 24px; background: var(--paper); border-bottom: 1px solid var(--line); }
 .logo { font-size: 22px; font-weight: 700; text-decoration: none; letter-spacing: .1em; }
 nav a { margin-right: 16px; text-decoration: none; }
-main { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 48px; }
 footer { max-width: 1000px; margin: 0 auto; padding: 16px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
 h1 { font-size: 26px; margin: 0 0 16px; }
 h1 small { font-size: 16px; font-weight: 400; color: var(--muted); margin-left: 8px; }
@@ -29,6 +29,19 @@ table { width: 100%; border-collapse: collapse; background: var(--paper); border
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 th { font-size: 14px; color: var(--muted); font-weight: 500; }
 .summary { margin-bottom: 16px; font-size: 15px; }
+.board th, .board td { padding: 8px 10px; font-size: 15px; }
+.cell { text-align: center; }
+.cell.done { color: var(--accent); }
+.cell.todo { background: var(--finding-soft); color: var(--finding); font-weight: 600; }
+.cell.unknown { color: var(--unknown); }
+.cell.na { color: var(--line); }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.step { display: flex; flex-direction: column; min-width: 84px; padding: 6px 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; line-height: 1.4; }
+.step.done strong { color: var(--accent); }
+.step.todo { background: var(--finding-soft); border-color: var(--finding); max-width: 190px; }
+.step.todo strong { color: var(--finding); }
+.step.unknown strong { color: var(--unknown); }
+.step.na strong { color: var(--muted); }
 .pill { display: inline-block; padding: 0 10px; border-radius: 999px; font-size: 14px; }
 .pill.ok { background: var(--accent-soft); color: var(--accent); }
 .pill.todo { background: var(--nudge-soft); color: var(--nudge); }

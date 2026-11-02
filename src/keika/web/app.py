@@ -16,6 +16,7 @@ from keika.db import connect
 from keika.findings import Finding, fingerprint
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
+from keika.progress import STEPS, user_progress
 from keika.reading import stored_facts
 from keika.records import RecordIn, add_record, list_records
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
@@ -34,6 +35,7 @@ class Row:
     cert_end: str
     plan_end: str
     visit: str
+    cells: list
     findings: int
     unknowns: int
     nudges: int
@@ -74,6 +76,7 @@ def _dashboard_row(conn, s: Settings, user: User, month: str) -> Row:
         cert_end=cert[1] or "—",
         plan_end=max((f.period_end for f in plans), default="—"),
         visit="済" if visited else "まだ",
+        cells=user_progress(conn, s, user),
         findings=sum(f.kind == "finding" for f in found),
         unknowns=sum(f.kind == "unknown" for f in found),
         nudges=sum(f.kind == "nudge" for f in found),
@@ -127,7 +130,7 @@ def create_app(s: Settings) -> FastAPI:
         rows = [_dashboard_row(conn, s, u, month) for u in list_users(conn, cm=cm)]
         staff = list_people(conn, "staff")
         summary = _summary(conn, staff, rows) if not cm else []
-        return templates.TemplateResponse(request, "dashboard.html", {"rows": rows, "staff": staff, "cm": cm, "month": month, "summary": summary})
+        return templates.TemplateResponse(request, "dashboard.html", {"rows": rows, "staff": staff, "cm": cm, "month": month, "summary": summary, "steps": STEPS})
 
     @app.get("/users/{user_id}")
     def user_page(request: Request, user_id: str):
@@ -147,6 +150,7 @@ def create_app(s: Settings) -> FastAPI:
             "docs": [{"name": r.rel_path.rsplit("/", 1)[-1], "facts": f} for r, f in facts],
             "records": list(reversed(records)),
             "unread": len(user_refs(s, user)) - len(facts),
+            "cells": user_progress(conn, s, user),
         })
 
     def _find(user_id: str, fp: str) -> Finding:
