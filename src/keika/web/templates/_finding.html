@@ -32,10 +32,6 @@
       <button>残す</button>
     </form>
   </details>
-  <details class="more">
-    <summary>根拠の条文</summary>
-    <p class="small"><strong>{{ v.title }}</strong> {{ v.plain }}</p>
-    <p class="small">{{ v.basis }}</p>
-    {% if v.f.searched_scope %}<p class="small muted">探した範囲: {{ v.f.searched_scope|hdate }}</p>{% endif %}
-  </details>
+  {% with rule_id = v.f.rule_id, basis_label = v.basis %}{% include "_basis.html" %}{% endwith %}
+  {% if v.f.searched_scope %}<p class="small muted">探した範囲: {{ v.f.searched_scope|hdate }}</p>{% endif %}
 </div>

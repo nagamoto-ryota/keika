@@ -1,0 +1,30 @@
+{# 根拠の原文。rule_id を渡す #}
+{% set b = legal(rule_id) %}
+<details class="more">
+  <summary>根拠の条文</summary>
+  <div class="law">
+    {% for s in b.kyotaku %}
+    <h4>{{ s.label }}</h4>
+    <p class="law-text">{{ s.text }}</p>
+    {% else %}
+    <p class="small muted">{{ basis_label }}</p>
+    {% endfor %}
+    {% for n in b.notices %}
+    <h4>{{ n.doc }} {{ n.where }}</h4>
+    <p class="law-text">{{ n.quote }}</p>
+    <p class="small"><a href="{{ n.url }}" target="_blank" rel="noopener noreferrer">公式の文書を開く</a></p>
+    {% endfor %}
+    {% if b.notices %}<p class="small muted">解釈通知は改正ごとの新旧対照表から引いています。番号は版で変わることがあるので、最新の版でも確かめてください。</p>{% endif %}
+    {% if b.kyotaku %}<p class="small"><a href="{{ b.kyotaku[0].url }}" target="_blank" rel="noopener noreferrer">e-Gov で基準の全文を開く</a></p>{% endif %}
+    {% if b.yobo %}
+    <details class="more">
+      <summary>介護予防支援の場合</summary>
+      {% for s in b.yobo %}
+      <h4>{{ s.label }}</h4>
+      <p class="law-text">{{ s.text }}</p>
+      {% endfor %}
+      <p class="small"><a href="{{ b.yobo[0].url }}" target="_blank" rel="noopener noreferrer">e-Gov で基準の全文を開く</a></p>
+    </details>
+    {% endif %}
+  </div>
+</details>
