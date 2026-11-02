@@ -18,6 +18,32 @@ CREATE TABLE IF NOT EXISTS people (
 CREATE TABLE IF NOT EXISTS doc_facts (
   sha256 TEXT PRIMARY KEY, rel_path TEXT NOT NULL, facts TEXT NOT NULL, read_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL, event_date TEXT NOT NULL, event_time TEXT NOT NULL DEFAULT '',
+  kind_written TEXT NOT NULL DEFAULT '', kind_read TEXT, monitoring INTEGER, partner TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL, author TEXT NOT NULL DEFAULT '',
+  first_written_at TEXT,  -- CSV 由来は NULL（「不明（取り込み）」と表示する）
+  source TEXT NOT NULL, source_key TEXT UNIQUE, unchecked INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS record_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  record_id INTEGER NOT NULL, version INTEGER NOT NULL, snapshot TEXT NOT NULL,
+  editor TEXT NOT NULL, edited_at TEXT NOT NULL, UNIQUE (record_id, version)
+);
+CREATE TABLE IF NOT EXISTS imported_files (
+  sha256 TEXT PRIMARY KEY, rel_path TEXT NOT NULL, rows INTEGER NOT NULL, imported_at TEXT NOT NULL
+);
+-- 履歴は消せない。記録も消せない。記入日時は変えられない。
+CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON record_versions
+BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;
+CREATE TRIGGER IF NOT EXISTS versions_no_update BEFORE UPDATE ON record_versions
+BEGIN SELECT RAISE(ABORT, '履歴は変えられません'); END;
+CREATE TRIGGER IF NOT EXISTS records_no_delete BEFORE DELETE ON records
+BEGIN SELECT RAISE(ABORT, '記録は消せません'); END;
+CREATE TRIGGER IF NOT EXISTS records_written_at_fixed BEFORE UPDATE OF first_written_at ON records
+WHEN OLD.first_written_at IS NOT NEW.first_written_at
+BEGIN SELECT RAISE(ABORT, '記入日時は変えられません'); END;
 """
 
 
