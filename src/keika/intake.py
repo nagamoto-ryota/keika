@@ -23,6 +23,8 @@ from keika.med_names import KATAKANA, MEDICINE_SENTENCE, register_checks
 
 _DISEASE = re.compile(DISEASE)
 _DOSE = re.compile(r"(?:\d+|半)\s*(?:錠|mg|ミリグラム|ミリ|グラム|g|包|カプセル|単位|滴)")
+_JA = r"ぁ-ゖァ-ヺー一-龠々"
+_SPOKEN_GAP = re.compile(rf"(?<=[{_JA}])[ 　]+(?=[{_JA}\d])|(?<=\d)[ 　]+(?=[{_JA}])")
 _NOT_TAKEN = re.compile(r"(?:飲め|飲ん|服用|内服)[^。]{0,6}ない|飲み忘れ")
 _VISIT_WORDS = re.compile(r"訪問|行っ|行き|伺|お宅|宅|家")
 _WHEN_WORDS = re.compile(r"昨日|一昨日|おととい|先週|先日|前回|曜")
@@ -81,6 +83,11 @@ class IntakeResult:
     record: Record | None = None
     review_id: int | None = None
     warnings: list[str] = field(default_factory=list)
+
+
+def join_spoken(text: str) -> str:
+    """音声認識が単語の間に入れる空白を外す。残すと話した語や分量を検査が見つけられない。"""
+    return _SPOKEN_GAP.sub("", text)
 
 
 def _normal(text: str) -> str:
@@ -233,6 +240,7 @@ def process_text(
     conn: sqlite3.Connection, client: Any, s: Settings, text: str, source: str, *,
     date_hint: str | None = None, on_saved: Callable[[str], None] | None = None,
 ) -> list[IntakeResult]:
+    text = join_spoken(text)
     prompt = (
         f"今日は {today(s).isoformat()} です。\n"
         + (f"この資料の日付の手がかり: {date_hint}\n" if date_hint else "")
