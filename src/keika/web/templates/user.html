@@ -33,7 +33,6 @@
         <form method="post" action="/users/{{ user.id }}/respond">
           <input type="hidden" name="fp" value="{{ v.fp }}">
           <button name="kind" value="off_target" class="plain">確認した・問題なし</button>
-          <button name="kind" value="done" class="plain">対応した</button>
         </form>
         <details class="more">
           <summary>今日の日付で経緯を残す</summary>
@@ -60,6 +59,11 @@
     {% for v in noted %}
       <p class="small">{{ v.f.message|hdate }}{% if v.changed %} <span class="notice">根拠の書類が変更されました</span>{% endif %}</p>
     {% endfor %}
+    </details>
+  {% endif %}
+  {% if run and run.resolved %}
+    <details class="fold"><summary>記録で確認して閉じました {{ run.resolved|length }}件</summary>
+    {% for r in run.resolved %}<p class="small">{{ r.message|hdate }}<br><span class="muted">{{ r.reason }}{% if r.record_date %}（{{ r.record_date|hdate }} の記録{% else %}（{% endif %}「{{ r.quote }}」）</span></p>{% endfor %}
     </details>
   {% endif %}
   {% if run and run.dismissed %}

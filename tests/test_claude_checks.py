@@ -5,7 +5,7 @@ import anthropic
 import httpx
 import pytest
 
-from keika.claude_checks import CheckRun, Dismissal, latest_run, load_skills, run_claude_checks, save_run, source_texts, validate_finding
+from keika.claude_checks import CheckRun, Dismissal, Resolution, latest_run, load_skills, run_claude_checks, save_run, source_texts, validate_finding
 from keika.db import connect
 from keika.findings import Evidence, Finding
 from keika.ledger import User, upsert_user
@@ -326,3 +326,75 @@ def test_record_quote_not_in_that_date_is_still_dropped(env):
     e = dict(file="支援経過（アプリの記録）", page=0, quote="作り話", record_date="2026-09-12")
     run = run_claude_checks(c, Scripted(msg(report(rule_id="R11", evidence=[e])), END), s, "U01")
     assert run.findings == [] and len(run.dropped) == 1
+
+
+# --- 記録を読んで AI が指摘を閉じる ---
+
+
+def _prior(c):
+    save_run(c, "U01", CheckRun(findings=[f(rule_id="R11", message="転倒後の見直しを確認してください。")]))
+
+
+def test_prior_findings_are_told_to_claude(env):
+    s, c = env
+    _prior(c)
+    client = Scripted(END)
+    run_claude_checks(c, client, s, "U01")
+    assert "転倒後の見直しを確認してください。" in str(client.calls[0]["messages"][0]["content"])
+    assert "P1" in str(client.calls[0]["messages"][0]["content"])
+
+
+def test_prior_finding_closes_when_record_shows_the_response(env):
+    s, c = env
+    _prior(c)
+    add_record(c, RecordIn(user_id="U01", event_date="2026-11-04", body="担当者会議を開き計画を見直した。"))
+    close = tool("resolve_finding", dict(prior_id="P1", reason="見直しの記録あり", evidence=[dict(file="支援経過（アプリの記録）", page=0, quote="計画を見直した", record_date="2026-11-04")]))
+    run = run_claude_checks(c, Scripted(msg(close), END), s, "U01")
+    assert run.findings == []
+    assert [(r.rule_id, r.reason) for r in run.resolved] == [("R11", "見直しの記録あり")]
+    assert "転倒後の見直し" in run.resolved[0].message and "計画を見直した" in run.resolved[0].quote
+
+
+def test_close_with_invented_evidence_is_refused_and_finding_stays(env):
+    s, c = env
+    _prior(c)
+    close = tool("resolve_finding", dict(prior_id="P1", reason="見直した", evidence=[dict(file="支援経過（アプリの記録）", page=0, quote="作り話", record_date="2026-11-04")]))
+    run = run_claude_checks(c, Scripted(msg(close), END), s, "U01")
+    assert run.resolved == [] and [x.rule_id for x in run.findings] == ["R11"] and len(run.dropped) == 1
+
+
+def test_prior_finding_not_mentioned_is_carried_over_not_lost(env):
+    s, c = env
+    _prior(c)
+    run = run_claude_checks(c, Scripted(END), s, "U01")
+    assert [x.rule_id for x in run.findings] == ["R11"]
+
+
+def test_prior_finding_reported_again_is_not_doubled(env):
+    s, c = env
+    _prior(c)
+    again = report(rule_id="R11", message="転倒後の見直しを確かめてください。確認してください。")
+    run = run_claude_checks(c, Scripted(msg(again), END), s, "U01")
+    assert len(run.findings) == 1
+
+
+def test_finding_silenced_by_person_is_not_carried_over(env):
+    s, c = env
+    from keika.responses import respond
+    _prior(c)
+    respond(c, s, f(rule_id="R11", message="転倒後の見直しを確認してください。"), "off_target")
+    assert run_claude_checks(c, Scripted(END), s, "U01").findings == []
+
+
+def test_failed_run_keeps_prior_findings(env):
+    s, c = env
+    _prior(c)
+    err = anthropic.APIConnectionError(request=httpx.Request("POST", "https://example.invalid"))
+    run = run_claude_checks(c, FakeClient(err), s, "U01")
+    assert run.not_run is True and [x.rule_id for x in run.findings] == ["R11"]
+
+
+def test_resolution_is_saved_and_loaded(env):
+    s, c = env
+    save_run(c, "U01", CheckRun(resolved=[Resolution("R11", "2026-10", "転倒", "見直した", "2026-11-04", "見直した")]))
+    assert latest_run(c, "U01")[0].resolved[0].reason == "見直した"

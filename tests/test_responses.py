@@ -2,7 +2,6 @@ import pytest
 
 from keika.db import connect
 from keika.findings import Evidence, Finding, fingerprint
-from keika.claude_checks import CheckRun, save_run
 from keika.records import RecordIn, add_record
 from keika.responses import evidence_hash, respond, silenced_list, sort_findings
 from keika.settings import Settings
@@ -58,23 +57,6 @@ def test_silenced_findings_can_be_listed_for_the_manager(env):
     assert len(rows) == 1 and rows[0]["who"] == "真柴" and rows[0]["rule_id"] == "R10" and rows[0]["message"]
 
 
-def test_done_hides_until_the_next_check_then_reappears_if_still_detected(env):
-    s, c = env
-    one = f()
-    respond(c, s, one, "done")
-    assert sort_findings(c, s, "U01", [one]).open == []
-    save_run(c, "U01", CheckRun())
-    assert len(sort_findings(c, s, "U01", [one]).open) == 1
-
-
-def test_done_finding_no_longer_detected_stays_gone(env):
-    s, c = env
-    one = f()
-    respond(c, s, one, "done")
-    save_run(c, "U01", CheckRun())
-    assert sort_findings(c, s, "U01", []).open == []
-
-
 def test_history_noted_requires_record_link(env):
     s, c = env
     with pytest.raises(ValueError):
@@ -102,17 +84,17 @@ def test_changed_evidence_file_shows_notice(env):
 def test_latest_response_wins(env):
     s, c = env
     one = f()
+    rec = add_record(c, RecordIn(user_id="U01", event_date="2026-11-04", body="経緯。"))
     respond(c, s, one, "off_target")
-    respond(c, s, one, "done")
-    save_run(c, "U01", CheckRun())
-    assert len(sort_findings(c, s, "U01", [one]).open) == 1
+    respond(c, s, one, "history_noted", record_id=rec.id)
+    assert len(sort_findings(c, s, "U01", [one]).noted) == 1
 
 
 def test_responses_are_kept_as_history(env):
     s, c = env
     one = f()
     respond(c, s, one, "off_target")
-    respond(c, s, one, "done")
+    respond(c, s, one, "off_target")
     n = c.execute("SELECT COUNT(*) AS n FROM finding_responses WHERE fingerprint = ?", (fingerprint(one),)).fetchone()["n"]
     assert n == 2
 
@@ -126,3 +108,9 @@ def test_unknown_kind_is_refused(env):
     s, c = env
     with pytest.raises(ValueError):
         respond(c, s, f(), "delete")
+
+
+def test_people_do_not_press_done():
+    # 対応したかどうかは、記録を読んで AI が判断する
+    from keika.responses import KINDS
+    assert "done" not in KINDS

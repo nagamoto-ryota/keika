@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import SAMPLE
-from keika.claude_checks import CheckRun, Dismissal, save_run
+from keika.claude_checks import CheckRun, Dismissal, Resolution, save_run
 from keika.db import connect
 from keika.findings import Evidence, Finding
 from keika.files import scan
@@ -204,3 +204,29 @@ def test_respond_unknown_finding_gives_404(client):
 def test_blank_marks_keep_the_blank_characters(client, conn):
     save_run(conn, "U04", CheckRun(findings=[_claude()]))
     assert '<mark class="blank">〇〇</mark>月' in client.get("/users/U04").text
+
+
+def test_user_page_shows_closed_findings_with_the_record(client, conn):
+    save_run(conn, "U04", CheckRun(resolved=[Resolution("R11", "2026-10", "転倒後の見直しを確認してください。", "見直しの記録あり", "2026-11-04", "計画を見直した")]))
+    body = client.get("/users/U04").text
+    assert "記録で確認して閉じました" in body and "転倒後の見直し" in body and "計画を見直した" in body
+
+
+def test_no_done_button(client, conn):
+    save_run(conn, "U04", CheckRun(findings=[_claude()]))
+    body = client.get("/users/U04").text
+    assert "対応した" not in body and "確認した・問題なし" in body
+
+
+def test_dashboard_summary_per_person_in_charge(client, conn):
+    from keika.responses import respond
+    from keika.settings import Settings
+    s = Settings(drive_root=SAMPLE / "drive", db_path=conn.execute("PRAGMA database_list").fetchone()["file"])
+    one, two = _claude(), _claude(period="2026-10", message="別の指摘です。確認してください。")
+    save_run(conn, "U04", CheckRun(findings=[one, two], resolved=[Resolution("R11", "2026-08", "前の指摘", "直った", "2026-11-04", "直した")]))
+    respond(conn, s, two, "off_target", who="井波")
+    body = client.get("/").text
+    row = body[body.index('class="summary"'):body.index("</table>")]
+    assert "井波 拓真" in row
+    i = row.index("井波 拓真")
+    assert "問題なし 1" in row[i:] and "閉じた 1" in row[i:]

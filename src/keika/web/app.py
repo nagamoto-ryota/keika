@@ -18,7 +18,7 @@ from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
 from keika.reading import stored_facts
 from keika.records import RecordIn, add_record, list_records
-from keika.responses import Item, respond, silenced_list, sort_findings
+from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
 from keika.settings import OutsideRootError, Settings, safe_path, today
 from keika.views import evidence_view, hdate
@@ -37,6 +37,7 @@ class Row:
     findings: int
     unknowns: int
     nudges: int
+    closed: int = 0
 
 
 def current_findings(conn, s: Settings, user_id: str) -> tuple[list[Finding], CheckRun | None]:
@@ -66,6 +67,7 @@ def _dashboard_row(conn, s: Settings, user: User, month: str) -> Row:
     plans = [f for _, f in stored_facts(conn, user_refs(s, user)) if f.doc_type in PLAN_TYPES and f.period_end]
     found, _ = current_findings(conn, s, user.id)
     found = [i.finding for i in sort_findings(conn, s, user.id, found).open]
+    latest = latest_run(conn, user.id)
     cert = user.data.get("cert_period") or ["", ""]
     return Row(
         user=user,
@@ -75,6 +77,7 @@ def _dashboard_row(conn, s: Settings, user: User, month: str) -> Row:
         findings=sum(f.kind == "finding" for f in found),
         unknowns=sum(f.kind == "unknown" for f in found),
         nudges=sum(f.kind == "nudge" for f in found),
+        closed=len(latest[0].resolved) if latest else 0,
     )
 
 
@@ -86,6 +89,20 @@ def _view(s: Settings, item: Item, records: list, year: int) -> dict:
         "label": KIND_LABEL[f.kind], "title": rule.title, "plain": rule.plain, "basis": basis_text(rule),
         "evidence": [evidence_view(s, e, records, year) for e in f.evidence],
     }
+
+
+def _summary(conn, staff: list, rows: list[Row]) -> list[dict]:
+    """管理者が一目で見る、担当者ごとの集計。"""
+    silenced = silenced_counts(conn)
+    out = []
+    for person in staff:
+        mine = [r for r in rows if r.user.cm == person.id]
+        if mine:
+            out.append({
+                "name": person.name, "open": sum(r.findings for r in mine),
+                "silenced": sum(silenced.get(r.user.id, 0) for r in mine), "closed": sum(r.closed for r in mine),
+            })
+    return out
 
 
 def _next_user_id(conn) -> str:
@@ -109,7 +126,8 @@ def create_app(s: Settings) -> FastAPI:
         month = today(s).isoformat()[:7]
         rows = [_dashboard_row(conn, s, u, month) for u in list_users(conn, cm=cm)]
         staff = list_people(conn, "staff")
-        return templates.TemplateResponse(request, "dashboard.html", {"rows": rows, "staff": staff, "cm": cm, "month": month})
+        summary = _summary(conn, staff, rows) if not cm else []
+        return templates.TemplateResponse(request, "dashboard.html", {"rows": rows, "staff": staff, "cm": cm, "month": month, "summary": summary})
 
     @app.get("/users/{user_id}")
     def user_page(request: Request, user_id: str):

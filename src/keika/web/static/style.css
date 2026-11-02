@@ -28,6 +28,7 @@ h3 { font-size: 16px; margin: 12px 0 4px; }
 table { width: 100%; border-collapse: collapse; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 th { font-size: 14px; color: var(--muted); font-weight: 500; }
+.summary { margin-bottom: 16px; font-size: 15px; }
 .pill { display: inline-block; padding: 0 10px; border-radius: 999px; font-size: 14px; }
 .pill.ok { background: var(--accent-soft); color: var(--accent); }
 .pill.todo { background: var(--nudge-soft); color: var(--nudge); }
