@@ -22,15 +22,15 @@ def by_name(refs, name) -> DocRef:
     return next(r for r in refs if Path(r.rel_path).name == name)
 
 
-def test_scan_finds_126_files_in_sample(sample_settings):
+def test_scan_finds_127_files_in_sample(sample_settings):
     refs = scan(sample_settings)
-    assert len(refs) == 126
+    assert len(refs) == 127
     assert Counter(r.ext for r in refs) == {"pdf": 82, "docx": 24, "csv": 8, "xlsx": 7, "txt": 5}
 
 
 def test_scan_sets_scope_and_user_folder(sample_settings):
     refs = scan(sample_settings)
-    assert Counter(r.scope for r in refs) == {"user": 98, "office": 23, "inbox": 5}
+    assert Counter(r.scope for r in refs) == {"user": 99, "office": 23, "inbox": 5}
     user_doc = next(r for r in refs if r.scope == "user")
     assert user_doc.user_folder.startswith("U01_")
     assert next(r for r in refs if r.scope == "office").user_folder is None
