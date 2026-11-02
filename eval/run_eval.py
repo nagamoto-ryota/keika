@@ -29,7 +29,7 @@ from keika.db import connect  # noqa: E402
 from keika.files import scan  # noqa: E402
 from keika.findings import Finding  # noqa: E402
 from keika.ledger import list_users, seed_from_json  # noqa: E402
-from keika.machine_checks import run_machine_checks  # noqa: E402
+from keika.office import office_findings  # noqa: E402
 from keika.reading import read_docs  # noqa: E402
 from keika.records import import_csv  # noqa: E402
 from keika.settings import Settings  # noqa: E402
@@ -120,7 +120,7 @@ def main() -> int:
         runs = list(pool.map(lambda uid: check_user(s, client, uid), targets))
     findings = [f for _, found, _ in runs for f in found]
     if not users:
-        findings += [f for f in run_machine_checks(conn, s) if f.user_id is None]
+        findings += office_findings(conn, s)
     table = load_judge_table(REPO / "eval" / "judge_table.yaml")
     if users:
         table = [i for i in table if set(i["利用者ID"] if isinstance(i["利用者ID"], list) else [i["利用者ID"]]) & set(users)]

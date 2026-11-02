@@ -70,6 +70,9 @@ nav a.primary { background: var(--accent); color: #fff; padding: 4px 14px; borde
 .spacer { flex: 1; }
 .record-links { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
 .record-links form { margin: 0; }
+.dot.unknown { background: var(--unknown); }
+.declare { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 8px 0; font-size: 14px; }
+.done-row { margin: 4px 0; }
 .pill { display: inline-block; padding: 0 10px; border-radius: 999px; font-size: 14px; }
 .pill.ok { background: var(--accent-soft); color: var(--accent); }
 .pill.todo { background: var(--nudge-soft); color: var(--nudge); }

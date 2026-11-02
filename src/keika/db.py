@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS review_items (
 CREATE TABLE IF NOT EXISTS intake_files (
   sha256 TEXT PRIMARY KEY, rel_path TEXT NOT NULL, taken_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS office_declarations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, rule_id TEXT NOT NULL, who TEXT NOT NULL, basis TEXT NOT NULL, at TEXT NOT NULL
+);
 -- 履歴は消せない。記録も消せない。記入日時は変えられない。
 CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON record_versions
 BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;

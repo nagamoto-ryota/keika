@@ -19,6 +19,7 @@ from keika.findings import Finding, fingerprint
 from keika.intake import open_reviews, process_text, resolve_review
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
+from keika.office import declare, office_rows
 from keika.progress import STEPS, user_progress
 from keika.reading import stored_facts
 from keika.records import RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
@@ -137,7 +138,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client) -> 
             records = list_records(conn, person.user.id)
             for task in person.tasks:
                 task.view = _view(s, task.item, records, year) if task.item else None
-        return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm, "reviews": len(open_reviews(conn))})
+        return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm, "reviews": len(open_reviews(conn)), "office_todo": sum(r.status == "todo" for r in office_rows(conn, s))})
 
     def _check_in_background(user_id: str) -> None:
         """記録が保存されたら、その利用者だけ点検し直す。失敗しても記録は失わない。"""
@@ -199,6 +200,21 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client) -> 
         record = _record_or_404(record_id)
         mark_checked(conn, record_id, editor=record.author or "画面")
         return RedirectResponse(f"/users/{record.user_id}", status_code=303)
+
+    @app.get("/office")
+    def office_page(request: Request):
+        rows = office_rows(conn, s)
+        for row in rows:
+            row.basis = basis_text(row.rule)
+        return templates.TemplateResponse(request, "office.html", {"rows": rows, "todo": sum(r.status == "todo" for r in rows)})
+
+    @app.post("/office/{rule_id}/declare")
+    def office_declare(rule_id: str, who: str = Form(""), basis: str = Form("")):
+        try:
+            declare(conn, rule_id, who, basis)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return RedirectResponse("/office", status_code=303)
 
     @app.get("/review")
     def review(request: Request):
