@@ -15,7 +15,7 @@
   {% endfor %}
 </div>
 {% endif %}
-{% if v.f.suggestion %}<div class="suggest"><span class="muted small">書き足し案</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
+{% if v.f.suggestion %}<div class="suggest"><span class="muted small">書き足し案。実際に行った事だけを残してください。</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
 <div class="actions">
   <form method="post" action="/users/{{ uid }}/respond">
     <input type="hidden" name="fp" value="{{ v.fp }}">

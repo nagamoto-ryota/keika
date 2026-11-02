@@ -44,7 +44,7 @@ def env(tmp_path):
 
 
 def entry(**kw):
-    data = dict(user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-02", event_time="", kind_read="居宅訪問",
+    data = dict(user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-04", event_time="", kind_read="居宅訪問",
                 monitoring=True, partner="本人", body="訪問した。", name_fixes=[], unsure_words=[])
     return WireEntry(**(data | kw))
 
@@ -291,7 +291,7 @@ def test_misheard_name_not_listed_goes_to_review_box(env):
 
 def test_two_callings_in_spoken_name_are_accepted(env):
     s, c = env
-    assert intake(s, c, "訪問した。", entry(user_id="U03", spoken_name="わたぬきさん／キヨさん"))[0].record
+    assert intake(s, c, "わたぬきさん宅を訪問した。", entry(user_id="U03", spoken_name="わたぬきさん／キヨさん"))[0].record
 
 
 def test_no_entries_goes_to_review_box(env):

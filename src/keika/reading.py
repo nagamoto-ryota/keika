@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from keika.claude import METER, StructuredError, ask_structured, make_client
+from keika.claude import model_for, METER, StructuredError, ask_structured, make_client
 from keika.files import UNREADABLE, DocRef, Payload, scan, to_payload
 from keika.settings import Settings, load_settings, now_real
 
@@ -236,7 +236,7 @@ def _ask(client: Any, s: Settings, ref: DocRef) -> tuple[DocFacts, bool]:
         # 使用中で開けなかっただけの時は、保存せず次に読み直す
         return DocFacts.unknown(f"開けませんでした（{payload.reason}）"), not ref.sha256.startswith(UNREADABLE)
     try:
-        return ask_structured(client, SYSTEM, _content(ref, payload), WireFacts).to_facts(), True
+        return ask_structured(client, SYSTEM, _content(ref, payload), WireFacts, model=model_for("READ")).to_facts(), True
     except StructuredError as e:
         return DocFacts.unknown(str(e)), False
 

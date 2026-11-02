@@ -16,7 +16,7 @@ from test_reading import FakeClient, answer
 
 def wire():
     return WireIntake(entries=[WireEntry(
-        user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-02", event_time="",
+        user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-04", event_time="",
         kind_read="居宅訪問", monitoring=True, partner="本人", body="訪問した。", name_fixes=[], unsure_words=[])])
 
 
@@ -31,7 +31,7 @@ def env(tmp_path):
     c.close()
 
 
-def drop(s, name="口述.txt", text="訪問した。", age=60):
+def drop(s, name="口述.txt", text="柚木さん宅を訪問した。", age=60):
     path = s.drive_root / "入口" / name
     path.write_text(text, encoding="utf-8")
     old = time.time() - age
@@ -60,7 +60,7 @@ def test_original_file_is_never_deleted(env):
     s, c = env
     path = drop(s)
     handle_file(c, FakeClient(answer(wire())), s, path)
-    assert path.is_file() and path.read_text(encoding="utf-8") == "訪問した。"
+    assert path.is_file() and path.read_text(encoding="utf-8") == "柚木さん宅を訪問した。"
 
 
 def test_file_still_syncing_is_not_read_until_stable(env):

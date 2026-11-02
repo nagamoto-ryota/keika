@@ -69,7 +69,7 @@
     {% for d in docs %}
       <details class="doc">
         <summary>{{ d.name }}</summary>
-        <p>{{ d.facts.summary }}</p>
+        <p>{% if not crosses_line(d.facts.summary) %}{{ d.facts.summary }}{% endif %}</p>
         {% if d.facts.period_start %}<p>期間: {{ d.facts.period_start|hdate }} 〜 {{ d.facts.period_end|hdate }} {{ src(d.facts.period_source) }}</p>{% endif %}
         {% if d.facts.signature_present is not none %}<p>署名: {{ 'あり' if d.facts.signature_present else '空欄' }} {{ src(d.facts.signature_source) }}</p>{% endif %}
         {% if d.facts.consent_date %}<p>同意日: {{ d.facts.consent_date|hdate }} {{ src(d.facts.consent_source) }}</p>{% endif %}

@@ -25,7 +25,7 @@ def env(tmp_path):
 
 
 def entry(**kw):
-    data = dict(user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-02", event_time="", kind_read="居宅訪問",
+    data = dict(user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-04", event_time="", kind_read="居宅訪問",
                 monitoring=True, partner="本人", body="柚木様宅を訪問した。変わりなし。", name_fixes=[], unsure_words=[])
     return WireEntry(**(data | kw))
 
@@ -81,7 +81,7 @@ def test_misheard_name_corrected_from_ledger(env):
 
 def test_kind_read_from_text(env):
     s, c = env
-    run(s, c, "電話で確認。", entry(kind_read="電話", body="電話で確認した。"))
+    run(s, c, "柚木さんに電話で確認。", entry(kind_read="電話", body="電話で確認した。"))
     assert list_records(c, "U04")[0].kind_read == "電話"
 
 
@@ -136,21 +136,21 @@ def test_record_with_invented_terms_is_flagged_not_saved_silently(env):
 def test_name_fix_is_not_flagged_as_invented(env):
     s, c = env
     fix = [WireFix(heard="くるしま", fixed="久留島")]
-    results, _ = run(s, c, "くるしま先生に電話。", entry(body="久留島医師に電話した。", name_fixes=fix))
+    results, _ = run(s, c, "柚木さんの件でくるしま先生に電話。", entry(kind_read="電話", body="久留島医師に電話した。", name_fixes=fix))
     assert results[0].record is not None
 
 
 def test_saved_record_is_unchecked_and_triggers_check(env):
     s, c = env
     called = []
-    run(s, c, "訪問した。", entry(body="訪問した。"), on_saved=called.append)
+    run(s, c, "柚木さん宅を訪問した。", entry(body="訪問した。"), on_saved=called.append)
     assert called == ["U04"]
 
 
 def test_check_is_triggered_once_per_user(env):
     s, c = env
     called = []
-    run(s, c, "訪問。電話。", entry(body="訪問。"), entry(body="電話。", kind_read="電話"), on_saved=called.append)
+    run(s, c, "柚木さん宅を訪問。電話。", entry(body="訪問。"), entry(body="電話。", kind_read="電話"), on_saved=called.append)
     assert called == ["U04"]
 
 
@@ -163,7 +163,7 @@ def test_api_failure_keeps_the_text_in_review_box(env):
 
 def test_bad_date_falls_back_to_today_with_a_warning(env):
     s, c = env
-    results, _ = run(s, c, "訪問。", entry(event_date="", body="訪問。"))
+    results, _ = run(s, c, "柚木さん宅を訪問。", entry(event_date="", body="訪問。"))
     assert results[0].record.event_date == "2026-11-04"
 
 
@@ -206,7 +206,7 @@ def test_new_record_page_has_voice_button_and_notice(env):
 
 def test_new_record_post_shows_result(env):
     s, c = env
-    body = app_client(s, WireIntake(entries=[entry(body="訪問した。")])).post("/records/new", data={"text": "訪問した。", "mode": "shape"}).text
+    body = app_client(s, WireIntake(entries=[entry(body="訪問した。")])).post("/records/new", data={"text": "柚木さん宅を訪問した。", "mode": "shape"}).text
     assert "訪問した。" in body and "柚木 茂" in body
 
 

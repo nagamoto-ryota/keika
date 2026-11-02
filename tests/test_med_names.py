@@ -46,7 +46,7 @@ def test_saved_as_spoken_without_stopping(env):
     s, c = env
     doc(s)
     body = f"朝は{HEARD}を1錠内服しているとのこと。"
-    results, _ = run(s, c, f"柚木さん、朝の薬は{HEARD}を1錠", entry(body=body, unsure_words=[HEARD]))
+    results, _ = run(s, c, f"柚木さん宅を訪問、朝の薬は{HEARD}を1錠", entry(body=body, unsure_words=[HEARD]))
     assert results[0].record is not None
     assert list_records(c, "U04")[0].body == body  # 自動で直っていない
     assert [m.heard for m in open_checks(c, s)] == [HEARD]
@@ -208,5 +208,5 @@ def test_decisions_cannot_be_deleted(env):
 
 def test_process_text_runs_without_a_document(env):
     s, c = env
-    results, _ = run(s, c, f"柚木さん、薬は{HEARD}", entry(body=f"{HEARD}を内服。", unsure_words=[HEARD]))
+    results, _ = run(s, c, f"柚木さん宅を訪問、薬は{HEARD}", entry(body=f"{HEARD}を内服。", unsure_words=[HEARD]))
     assert results[0].record and message(open_checks(c, s)[0])[1] == "薬の名前を確かめてください。"

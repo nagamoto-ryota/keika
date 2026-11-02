@@ -21,6 +21,7 @@ from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
+from keika.claude_checks import crosses_line
 from keika.legal_texts import basis_for
 from keika.med_names import decide_fix, decide_keep, decisions, message as med_message, open_checks, unconfirmed_record_ids
 from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, to_review
@@ -151,6 +152,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates.env.globals["sample"] = sample
     templates.env.globals["legal"] = basis_for
     templates.env.globals["med_message"] = med_message
+    templates.env.globals["crosses_line"] = crosses_line
     templates.env.filters["blanks"] = _blanks
     templates.env.filters["mark_quote"] = _mark_quote
     templates.env.filters["hdate_full"] = lambda text: (text or "").replace("-", "/")

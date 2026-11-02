@@ -74,7 +74,7 @@ def check_user(s: Settings, client, user_id: str) -> tuple[str, list[Finding], d
     found, _ = current_findings(conn, s, user_id)
     conn.close()
     return user_id, found, {"seconds": round(time.time() - started), "cost": round(run.cost, 3), "not_run": run.not_run,
-                            "dropped": len(run.dropped), "dismissed": [asdict(d) for d in run.dismissed]}
+                            "error": run.error, "dropped": len(run.dropped), "dismissed": [asdict(d) for d in run.dismissed]}
 
 
 def summarize(sc: Score) -> str:

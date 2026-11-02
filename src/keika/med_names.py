@@ -17,8 +17,9 @@ from keika.machine_checks import user_refs
 from keika.records import Record, edit_record, get_record, list_records
 from keika.settings import Settings, now_real
 
-_KATAKANA = re.compile(r"[ァ-ヶー]{3,}")
-_MEDICINE_SENTENCE = re.compile(r"薬|錠|服|処方|mg|ミリ|カプセル|貼付|軟膏|点眼|インスリン")
+KATAKANA = re.compile(r"[ァ-ヶー]{3,}")
+MEDICINE_SENTENCE = re.compile(r"薬|錠|服|飲|処方|mg|ミリ|カプセル|貼付|軟膏|点眼|インスリン")
+_NOT_DRUG = re.compile(r"サービス|ヘルパー|デイ|ケア|プラン|レンタル|ベッド|ショート|リハビリ|モニタリング|アセスメント|マネ|ステーション|カレンダー|タクシー|セット")
 NEAR = 0.6  # これより文字が近い語だけを並べる
 MAX_CANDIDATES = 3
 
@@ -73,10 +74,13 @@ def _sources(conn: sqlite3.Connection, s: Settings, user_id: str) -> list[tuple[
 
 def candidates(conn: sqlite3.Connection, s: Settings, user_id: str, heard: str) -> list[Candidate]:
     heard = _katakana(heard)
+    kept = {r["heard"] for r in conn.execute("SELECT heard FROM med_checks WHERE status = 'kept'")}
     scored: dict[str, tuple[float, Candidate]] = {}
     for where, path, text in _sources(conn, s, user_id):
-        for word in set(_KATAKANA.findall(text)):
+        for word in set(KATAKANA.findall(text)):
             score = SequenceMatcher(None, heard, word).ratio()
+            if word in kept or _NOT_DRUG.search(word):  # 確かめずに残した語と、薬でない語は候補にしない
+                continue
             if word != heard and score >= NEAR and (word not in scored or score > scored[word][0]):
                 scored[word] = (score, Candidate(word, where, path))
     best = sorted(scored.values(), key=lambda x: -x[0])[:MAX_CANDIDATES]
@@ -84,15 +88,15 @@ def candidates(conn: sqlite3.Connection, s: Settings, user_id: str, heard: str) 
 
 
 def _written_exactly(conn: sqlite3.Connection, s: Settings, user_id: str, heard: str) -> bool:
-    return any(_katakana(heard) in text for _, _, text in _sources(conn, s, user_id))
+    return any(_katakana(heard) in KATAKANA.findall(text) for _, _, text in _sources(conn, s, user_id))
 
 
 def register_checks(conn: sqlite3.Connection, s: Settings, record: Record, unsure_words: list[str]) -> None:
     """Claude が迷った語と、薬の文の中で書類の語に近い語を、確認の対象にする。保存は止めない。"""
     words = [w for w in unsure_words if w in record.body]
     for sentence in re.split(r"[。\n]", record.body):
-        if _MEDICINE_SENTENCE.search(sentence):
-            words += [w for w in _KATAKANA.findall(sentence) if candidates(conn, s, record.user_id, w)]
+        if MEDICINE_SENTENCE.search(sentence):
+            words += [w for w in KATAKANA.findall(sentence) if candidates(conn, s, record.user_id, w)]
     with conn:
         for word in dict.fromkeys(words):
             if not _written_exactly(conn, s, record.user_id, word):

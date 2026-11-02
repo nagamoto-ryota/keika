@@ -13,7 +13,16 @@ from pydantic import BaseModel
 MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 # 1M トークンあたりの米ドル（入力、出力、キャッシュ読み、キャッシュ書き）
-PRICE = (4.00, 20.00, 0.20, 5.00)
+PRICES = {
+    "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.20, 2.50),
+    "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),  # 10万トークン以下の時の値段
+}
+
+
+def model_for(task: str) -> str:
+    """用途ごとのモデル。測定で比べるために環境変数で変えられる。task は READ / INTAKE。"""
+    return os.environ.get(f"KEIKA_MODEL_{task}", MODEL)
 
 
 class StructuredError(Exception):
@@ -27,22 +36,22 @@ class UsageMeter:
     output_tokens: int = 0
     cache_read: int = 0
     cache_write: int = 0
+    cost_usd: float = 0.0
 
     def __post_init__(self):
         self._lock = threading.Lock()
 
-    def add(self, usage: Any) -> None:
+    def add(self, usage: Any, model: str = MODEL) -> None:
+        i, o, r, w = PRICES[model]
         with self._lock:
+            self.cost_usd += ((usage.input_tokens or 0) * i + (usage.output_tokens or 0) * o
+                              + (getattr(usage, "cache_read_input_tokens", 0) or 0) * r
+                              + (getattr(usage, "cache_creation_input_tokens", 0) or 0) * w) / 1_000_000
             self.calls += 1
             self.input_tokens += usage.input_tokens or 0
             self.output_tokens += usage.output_tokens or 0
             self.cache_read += getattr(usage, "cache_read_input_tokens", 0) or 0
             self.cache_write += getattr(usage, "cache_creation_input_tokens", 0) or 0
-
-    @property
-    def cost_usd(self) -> float:
-        i, o, r, w = PRICE
-        return (self.input_tokens * i + self.output_tokens * o + self.cache_read * r + self.cache_write * w) / 1_000_000
 
 
 METER = UsageMeter()
@@ -74,13 +83,14 @@ def ask_structured(
     *,
     effort: str = "medium",
     max_tokens: int = 16000,
+    model: str = MODEL,
 ) -> BaseModel:
     """決まった形で答えを受け取る。形が崩れたら1回だけやり直し、だめなら StructuredError。"""
     last: Exception | None = None
     for _ in range(2):
         try:
             with client.beta.messages.stream(
-                model=MODEL,
+                model=model,
                 max_tokens=max_tokens,
                 thinking={"type": "adaptive"},
                 output_config={"effort": effort},
@@ -96,7 +106,7 @@ def ask_structured(
             continue
         except Exception as e:  # 外部との境界。ストリームの途中の切断は SDK の型に包まれない
             raise StructuredError(f"API の失敗: {type(e).__name__}") from e
-        METER.add(message.usage)
+        METER.add(message.usage, model)
         if message.stop_reason == "refusal":
             raise StructuredError("Claude が読み取りを断った")
         if message.parsed_output is None:

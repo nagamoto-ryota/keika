@@ -62,7 +62,7 @@ def test_spoken_plan_to_go_to_hospital_passes():
 def test_unsure_word_is_saved_as_spoken_not_stopped(env):  # noqa: F811
     s, c = env
     body = "朝はアムロジンピンを1錠内服しているとのこと。"
-    run(s, c, "柚木さん、朝の薬はアムロジンピンを1錠", entry(body=body, unsure_words=["アムロジンピン"]))
+    run(s, c, "柚木さん宅を訪問、朝の薬はアムロジンピンを1錠", entry(body=body, unsure_words=["アムロジンピン"]))
     assert list_records(c, "U04")[0].body == body and open_reviews(c) == []
 
 

@@ -14,21 +14,23 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
-from keika.claude import StructuredError, ask_structured
+from keika.claude import model_for, StructuredError, ask_structured
 from keika.ledger import find_person, get_user, list_people, list_users, squash
 from keika.records import KindRead, Record, RecordIn, add_record
 from keika.settings import Settings, now_real, today
-from keika.claude_checks import MEDICAL_JUDGEMENT
-from keika.med_names import register_checks
+from keika.claude_checks import DISEASE, line_crossings
+from keika.med_names import KATAKANA, MEDICINE_SENTENCE, register_checks
 
-_KATAKANA = re.compile(r"[ァ-ヶー]{3,}")
-_MEDICINE_SENTENCE = re.compile(r"薬|錠|服|処方|mg|ミリ|カプセル|貼付|軟膏|点眼|インスリン")
-_DISEASE = re.compile(r"[一-龥ァ-ヶー]{1,10}(?:症(?!状)|病(?![院棟室気])|炎|不全|がん|癌|疾患|梗塞)")
+_DISEASE = re.compile(DISEASE)
+_DOSE = re.compile(r"(?:\d+|半)\s*(?:錠|mg|ミリグラム|ミリ|グラム|g|包|カプセル|単位|滴)")
+_NOT_TAKEN = re.compile(r"(?:飲め|飲ん|服用|内服)[^。]{0,6}ない|飲み忘れ")
+_VISIT_WORDS = re.compile(r"訪問|行っ|行き|伺|お宅|宅|家")
+_WHEN_WORDS = re.compile(r"昨日|一昨日|おととい|先週|先日|前回|曜")
 _KANJI_DIGITS = str.maketrans("〇一二三四五六七八九", "0123456789")
 # 語: 話の中にこのどれかがあれば、平たい言い方を直しただけとみなす
 _CAREFUL_WORDS = {
-    "受診": ("受診", "病院", "先生", "医者", "診"), "入院": ("入院",), "退院": ("退院",), "転倒": ("転倒", "転ん", "転び", "転ぶ", "尻もち", "こけ"),
-    "内服": ("内服", "薬", "飲"), "服薬": ("服薬", "薬", "飲"), "処方": ("処方", "薬"), "診断": ("診断",), "治療": ("治療",),
+    "受診": ("受診", "病院", "診"), "入院": ("入院",), "退院": ("退院",), "転倒": ("転倒", "転ん", "転び", "転ぶ", "尻もち", "こけ"),
+    "内服": ("内服", "薬"), "服薬": ("服薬", "薬"), "処方": ("処方", "薬"), "診断": ("診断",), "治療": ("治療",),
     "手術": ("手術", "オペ"), "点滴": ("点滴",), "骨折": ("骨折",), "薬": ("薬",),
 }
 
@@ -131,11 +133,30 @@ def _beyond_the_line(original: str, shaped: str) -> list[str]:
     spoken = re.sub(r"[ぁ-ゖ]", lambda m: chr(ord(m[0]) + 0x60), original)
     found = []
     for sentence in re.split(r"[。\n]", shaped):
-        if _MEDICINE_SENTENCE.search(sentence):
-            found += [k for k in _KATAKANA.findall(sentence) if k not in spoken]
+        if MEDICINE_SENTENCE.search(sentence):
+            found += [k for k in KATAKANA.findall(sentence) if k not in spoken]
     found += [d for d in _DISEASE.findall(shaped) if d not in original]
-    found += [m[0] for m in MEDICAL_JUDGEMENT.finditer(shaped) if m[0] not in original]
+    found += [w for w in line_crossings(shaped) if w not in original]
+    said = _normal(original)
+    found += [d for d in _DOSE.findall(_normal(shaped)) if d not in said]
+    if _NOT_TAKEN.search(original) and not re.search(r"ない|ず|忘れ", shaped):
+        found.append("飲めている")
     return list(dict.fromkeys(found))
+
+
+def _unspoken_fields(text: str, entry: "WireEntry", s: Settings, date_hint: str | None) -> list[str]:
+    """本文以外の欄も、話に無ければ人に回す。話していない訪問が正式な記録になるのを防ぐ。"""
+    found = []
+    if entry.kind_read == "居宅訪問" and not _VISIT_WORDS.search(text):
+        found.append("居宅訪問")
+    if entry.event_time and invented_terms(text, entry.event_time):
+        found.append(entry.event_time)
+    if _valid_date(entry.event_date) and entry.event_date != today(s).isoformat() and entry.event_date not in (date_hint or ""):
+        month, day = entry.event_date.split("-")[1:]
+        said = _digits(text)
+        if not (str(int(day)) in said and str(int(month)) in said) and not _WHEN_WORDS.search(text):
+            found.append(entry.event_date)
+    return found
 
 
 def _name_parts(conn: sqlite3.Connection) -> list[str]:
@@ -155,6 +176,13 @@ def _roster(conn: sqlite3.Connection) -> str:
 
 _SEPARATORS = re.compile(r"[／/・、,]")
 _HONORIFIC = re.compile(r"(さん|様|さま|ちゃん|くん|君|氏|先生)$")
+
+
+def _name_in_talk(text: str, spoken: str, fixes: list[WireFix]) -> bool:
+    """Claude の言う呼び方が本当に話の中にあるか。無ければ別の人の話かもしれない。"""
+    said = squash(text)
+    names = [_HONORIFIC.sub("", t.strip()) for t in _SEPARATORS.split(spoken)] + [f.heard for f in fixes]
+    return any(squash(n) in said for n in names if n)
 
 
 def _calls_this_user(conn: sqlite3.Connection, spoken: str, user_id: str, fixes: list[WireFix]) -> bool:
@@ -211,7 +239,7 @@ def process_text(
         + f"\n## 台帳\n{_roster(conn)}\n\n## 話した内容\n{text}"
     )
     try:
-        wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireIntake)
+        wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireIntake, model=model_for("INTAKE"))
     except StructuredError as e:
         return [IntakeResult(review_id=to_review(conn, text, source, {}, [], f"整えられませんでした（{e}）"))]
     if not wire.entries:
@@ -219,10 +247,10 @@ def process_text(
     results, saved = [], []
     names = _name_parts(conn)
     for entry in wire.entries:
-        fixed = " ".join(f.fixed for f in entry.name_fixes)
-        warnings = invented_terms(text + " " + fixed, entry.body, names)
+        fixed = " ".join(f.fixed for f in entry.name_fixes if squash(f.heard) in squash(text) and any(part in f.fixed for part in names))
+        warnings = invented_terms(text + " " + fixed, entry.body, names) + _unspoken_fields(text, entry, s, date_hint)
         note = entry.ambiguity_note
-        problem = not get_user(conn, entry.user_id) or entry.ambiguous or not _calls_this_user(conn, entry.spoken_name, entry.user_id, entry.name_fixes)
+        problem = not get_user(conn, entry.user_id) or entry.ambiguous or not _name_in_talk(text, entry.spoken_name, entry.name_fixes) or not _calls_this_user(conn, entry.spoken_name, entry.user_id, entry.name_fixes)
         if problem or warnings:
             if problem and not note:
                 note = f"「{entry.spoken_name}」が誰か確かめてください"
