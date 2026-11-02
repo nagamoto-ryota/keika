@@ -1,6 +1,7 @@
 """画面。ログインや権限は作らない（事業所内の PC で動かす）。"""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,7 +9,9 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
+from keika.claude_checks import CheckRun, latest_run
 from keika.db import connect
 from keika.findings import Finding
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
@@ -34,11 +37,25 @@ class Row:
     nudges: int
 
 
+def current_findings(conn, s: Settings, user_id: str) -> tuple[list[Finding], CheckRun | None]:
+    """機械の点検と最新の Claude の点検を合わせる。Claude が事情を読んで取り下げた候補は外す。"""
+    latest = latest_run(conn, user_id)
+    run = latest[0] if latest else None
+    dismissed = {(d.rule_id, d.period) for d in run.dismissed} if run else set()
+    machine = [f for f in run_machine_checks(conn, s, user_id) if (f.rule_id, f.period) not in dismissed]
+    return sorted(machine + (run.findings if run else []), key=lambda f: KIND_ORDER[f.kind]), run
+
+
+def _blanks(text: str | None) -> Markup:
+    """書き足し案の「〇〇」の空欄を強調する。"""
+    return Markup(re.sub("(〇+)", r'<mark class="blank"></mark>', str(escape(text or ""))))
+
+
 def _dashboard_row(conn, s: Settings, user: User, month: str) -> Row:
     records = list_records(conn, user.id)
     visited = any(r.event_date.startswith(month) and r.kind_read == HOME_VISIT for r in records)
     plans = [f for _, f in stored_facts(conn, user_refs(s, user)) if f.doc_type in PLAN_TYPES and f.period_end]
-    found = run_machine_checks(conn, s, user.id)
+    found, _ = current_findings(conn, s, user.id)
     cert = user.data.get("cert_period") or ["", ""]
     return Row(
         user=user,
@@ -66,6 +83,7 @@ def create_app(s: Settings) -> FastAPI:
     conn = connect(s)
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
+    templates.env.filters["blanks"] = _blanks
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     @app.get("/")
@@ -80,11 +98,12 @@ def create_app(s: Settings) -> FastAPI:
         user = get_user(conn, user_id)
         if user is None:
             raise HTTPException(404, "利用者が見つかりません")
-        found = sorted(run_machine_checks(conn, s, user_id), key=lambda f: KIND_ORDER[f.kind])
+        found, run = current_findings(conn, s, user_id)
         facts = stored_facts(conn, user_refs(s, user))
         return templates.TemplateResponse(request, "user.html", {
             "user": user,
             "findings": [_view(f) for f in found],
+            "run": run,
             "docs": [{"name": r.rel_path.rsplit("/", 1)[-1], "facts": f} for r, f in facts],
             "records": list(reversed(list_records(conn, user_id))),
             "unread": len(user_refs(s, user)) - len(facts),

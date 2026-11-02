@@ -1,10 +1,9 @@
-"""起動の入口。keika serve（画面）、keika sync（Drive の読み取りと支援経過の取り込み）。"""
+"""起動の入口。keika serve（画面）、keika sync（Drive の読み取りと支援経過の取り込み）、keika check（Claude の点検）。"""
 from __future__ import annotations
 
 import argparse
 import sys
 import time
-from pathlib import Path
 
 
 def _seed_if_empty(conn, s) -> None:
@@ -41,6 +40,35 @@ def sync(user_prefix: str | None = None) -> int:
     return 0
 
 
+def check(user_id: str) -> int:
+    from keika.claude import make_client
+    from keika.claude_checks import run_claude_checks, save_run
+    from keika.db import connect
+    from keika.settings import load_settings
+
+    s = load_settings()
+    conn = connect(s)
+    started = time.time()
+    run = run_claude_checks(conn, make_client(), s, user_id)
+    save_run(conn, user_id, run)
+    print(f"{user_id}: 指摘 {len(run.findings)} 件、取り下げ {len(run.dismissed)} 件、落とした {len(run.dropped)} 件、{time.time() - started:.0f} 秒、約 ${run.cost:.2f}")
+    if run.not_run:
+        print(f"未実施: {run.error}")
+    for f in run.findings:
+        print(f"- [{f.rule_id}/{f.kind}] {f.period} {f.message}")
+        for e in f.evidence:
+            print(f"    {e.file.rsplit('/', 1)[-1]} p{e.page} {e.record_date or ''} 「{e.quote}」")
+        if f.searched_scope:
+            print(f"    探した範囲: {f.searched_scope}")
+        if f.suggestion:
+            print(f"    案: {f.suggestion}")
+    for d in run.dismissed:
+        print(f"- 取り下げ [{d.rule_id}] {d.period} {d.reason}（{d.record_date}「{d.quote}」）")
+    for d in run.dropped:
+        print(f"- 落とした: {d.get('why')} {d.get('rule_id')} {str(d.get('message') or d.get('reason'))[:80]}")
+    return 0
+
+
 def serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -66,9 +94,13 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--port", type=int, default=8000)
     p_sync = sub.add_parser("sync", help="Drive の書類を読み、支援経過の CSV を取り込む（Claude を使う）")
     p_sync.add_argument("--user", help="利用者フォルダの先頭（例: U04）")
+    p_check = sub.add_parser("check", help="1人分を Claude で点検する")
+    p_check.add_argument("user_id")
     args = parser.parse_args(argv)
     if args.command == "serve":
         return serve(args.host, args.port)
+    if args.command == "check":
+        return check(args.user_id)
     return sync(args.user)
 
 

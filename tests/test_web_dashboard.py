@@ -4,7 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import SAMPLE
+from keika.claude_checks import CheckRun, Dismissal, save_run
 from keika.db import connect
+from keika.findings import Evidence, Finding
 from keika.files import scan
 from keika.ledger import get_user, seed_from_json
 from keika.reading import DocFacts, Source, TextFact, _save
@@ -114,3 +116,35 @@ def test_unknown_user_gives_404(client):
 def test_html_is_escaped(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-11-01", body="<script>alert(1)</script>"))
     assert "<script>alert(1)" not in client.get("/users/U04").text
+
+
+def _claude(**kw):
+    data = dict(rule_id="R11", user_id="U04", kind="finding", period="2026-09", source="claude", message="週2回のままです。確認してください。",
+                evidence=[Evidence(file="利用者/U04_柚木茂/利用票.pdf", page=1, quote="月・水・木")], suggestion="〇〇月〇〇日に経緯を確認した。")
+    return Finding(**(data | kw))
+
+
+def test_user_page_shows_claude_finding_with_suggestion_blank(client, conn):
+    save_run(conn, "U04", CheckRun(findings=[_claude()]))
+    body = client.get("/users/U04").text
+    assert "週2回のままです" in body and "月・水・木" in body and "書き足し案" in body and 'class="blank"' in body
+
+
+def test_dashboard_counts_claude_findings(client, conn):
+    save_run(conn, "U04", CheckRun(findings=[_claude()]))
+    assert "確認 1" in client.get("/", params={"cm": "CM02"}).text
+
+
+def test_dismissed_candidate_is_hidden_and_shown_as_a_note(client, conn):
+    add_record(conn, RecordIn(user_id="U04", event_date="2026-08-05", kind_read="居宅訪問", body="訪問。"))
+    add_record(conn, RecordIn(user_id="U04", event_date="2026-09-10", kind_read="電話", kind_written="電話", body="入院中のため訪問できず。"))
+    add_record(conn, RecordIn(user_id="U04", event_date="2026-10-05", kind_read="居宅訪問", body="訪問。"))
+    assert "2026-09 に居宅を訪問" in client.get("/users/U04").text
+    save_run(conn, "U04", CheckRun(dismissed=[Dismissal("R06", "2026-09", "入院中", "2026-09-10", "入院中のため")]))
+    body = client.get("/users/U04").text
+    assert "2026-09 に居宅を訪問" not in body and "読み直して取り下げました" in body and "入院中" in body
+
+
+def test_failed_check_is_shown_as_not_run(client, conn):
+    save_run(conn, "U04", CheckRun(not_run=True, error="APIConnectionError"))
+    assert "未実施" in client.get("/users/U04").text

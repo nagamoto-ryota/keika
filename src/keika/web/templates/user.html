@@ -6,6 +6,8 @@
 
 <section>
   <h2>お知らせ</h2>
+  {% if run and run.not_run %}<p class="notice">Claude の点検は未実施です（通信の失敗など）。記録は失われていません。機械の点検だけを出しています。</p>{% endif %}
+  {% if not run %}<p class="muted">Claude の点検はまだ走っていません。機械の点検だけを出しています。</p>{% endif %}
   {% for v in findings %}
     <article class="card {{ v.f.kind }}">
       <div class="head"><span class="pill {{ v.f.kind }}">{{ v.label }}</span> <strong>{{ v.title }}</strong> {% if v.f.period %}<span class="muted">{{ v.f.period }}</span>{% endif %}</div>
@@ -17,12 +19,17 @@
         {% endfor %}
         </ul>
       {% endif %}
+      {% if v.f.suggestion %}<div class="suggest"><span class="muted small">書き足し案（採用するかはご自身で）</span><p>{{ v.f.suggestion|blanks }}</p></div>{% endif %}
       {% if v.f.searched_scope %}<p class="muted">探した範囲: {{ v.f.searched_scope }}</p>{% endif %}
       <p class="muted">根拠: {{ v.basis }}</p>
     </article>
   {% else %}
     <p class="muted">今のところお知らせはありません。</p>
   {% endfor %}
+  {% if run and run.dismissed %}
+    <div class="dismissed"><p class="muted small">読み直して取り下げました</p>
+    {% for d in run.dismissed %}<p class="small">{{ d.period }}: {{ d.reason }}（{{ d.record_date }} の記録「{{ d.quote }}」）</p>{% endfor %}</div>
+  {% endif %}
 </section>
 
 <section>
