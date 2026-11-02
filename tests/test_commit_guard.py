@@ -54,7 +54,7 @@ def test_key_added_in_the_same_command_is_blocked(repo):
 
 
 def test_real_looking_phone_number_is_blocked(repo):
-    (repo / "bad.csv").write_text("連絡先 0857-22-1234", encoding="utf-8")
+    (repo / "bad.csv").write_text("連絡先 " + "01" + "-2345-6789", encoding="utf-8")
     git(repo, "add", "bad.csv")
     assert run(repo, 'git commit -m "x"').returncode == 2
 
