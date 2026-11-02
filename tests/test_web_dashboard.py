@@ -107,7 +107,7 @@ def test_user_page_shows_records_with_written_at(client, conn):
 def test_user_page_shows_finding_with_basis_and_confirm_wording(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-09-01", kind_read="電話", kind_written="訪問", body="電話で確認。"))
     body = client.get("/users/U04").text
-    assert "確認してください" in body and "13条14号" in body
+    assert "確認してください" in body and "第13条第14号" in body
 
 
 def test_unknown_user_gives_404(client):

@@ -196,4 +196,4 @@ def test_declare_from_screen(env):
 
 def test_home_links_to_office_with_count(env):
     s, c = env
-    assert "事業所の宿題" in TestClient(create_app(s)).get("/").text
+    assert "事業所のこと" in TestClient(create_app(s)).get("/").text

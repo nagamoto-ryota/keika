@@ -44,7 +44,7 @@ CLAUDE_STEPS = ("meeting", "delivery", "service_plans", "medical")
 class Cell:
     key: str
     label: str
-    status: str  # done / todo / unknown / na
+    status: str  # done / check（あるが中身を確かめる）/ todo（無い）/ unknown / na
     date: str = ""
     note: str = ""
     file: str = ""
@@ -70,7 +70,15 @@ def user_progress(conn: sqlite3.Connection, s: Settings, user: User) -> list[Cel
             cells.append(_from_mark(step, marks.get(step.key)))
         else:
             cells.append(Cell(step.key, step.label, **done[step.key]))
+    _settle_meeting(cells)
     return cells
+
+
+def _settle_meeting(cells: list[Cell]) -> None:
+    """会議録があるなら会議は開かれている。中身の不足は「まだ」でなく「確認」にする。"""
+    by_key = {c.key: c for c in cells}
+    if by_key["meeting"].status == "todo" and by_key["minutes"].status == "done":
+        by_key["meeting"].status = "check"
 
 
 def _from_mark(step: Step, mark: ProgressMark | None) -> Cell:
@@ -114,7 +122,7 @@ def _consent(plan) -> dict:
     if not f.consent_date:
         return {"status": "unknown", "note": "同意日を読み取れませんでした", "file": ref.rel_path}
     if f.consent_date > f.period_start:
-        return {"status": "todo", "date": f.consent_date, "note": "計画の開始より後の同意日です", "file": ref.rel_path}
+        return {"status": "check", "date": f.consent_date, "note": "計画の開始より後の同意日です", "file": ref.rel_path}
     return {"status": "done", "date": f.consent_date, "file": ref.rel_path}
 
 

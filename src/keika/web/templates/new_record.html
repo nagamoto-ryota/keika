@@ -2,7 +2,7 @@
 {% block title %}記録する - ケイカ{% endblock %}
 {% block main %}
 <h1 class="big">記録する</h1>
-<p class="muted">話した内容を支援経過の文章に整えます。誰の話かは Claude が判定し、迷ったら要確認箱へ回します。話していないことは足しません。</p>
+<p class="muted">AI（Claude）が、話した内容を支援経過の下書きに整えます。誰の話か迷った時は、やることの「記録の確認」に回します。内容を確かめて決めるのはご本人です。</p>
 <form method="post" action="/records/new" class="write">
   <textarea id="text" name="text" rows="9" required placeholder="例: 今日〇〇さんのお宅に行ってきました。変わりなしで、来月もこのままでとのことです。"></textarea>
   <div class="write-actions">

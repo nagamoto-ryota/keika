@@ -73,7 +73,7 @@ def _person(conn: sqlite3.Connection, s: Settings, user: User, days_left: int, b
             deadline = f.period if f.rule_id in DEADLINE_RULES else None
             person.tasks.append(Task(f.todo or get_rule(f.rule_id).title, item, deadline))
     for cell in person.cells:
-        if cell.status == "todo" and cell.key != "visit" and STEP_RULE[cell.key] not in covered:
+        if cell.status in ("todo", "check") and cell.key != "visit" and STEP_RULE[cell.key] not in covered:
             person.tasks.append(Task(cell.note or f"{cell.label}がまだです", note=cell.note))
     person.tasks.sort(key=lambda t: (t.deadline is None, t.deadline or ""))
     return person

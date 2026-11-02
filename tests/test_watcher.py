@@ -17,7 +17,7 @@ from test_reading import FakeClient, answer
 def wire():
     return WireIntake(entries=[WireEntry(
         user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-02", event_time="",
-        kind_read="居宅訪問", monitoring=True, partner="本人", body="訪問した。", name_fixes=[])])
+        kind_read="居宅訪問", monitoring=True, partner="本人", body="訪問した。", name_fixes=[], unsure_words=[])])
 
 
 @pytest.fixture

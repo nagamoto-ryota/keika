@@ -26,7 +26,7 @@ def env(tmp_path):
 
 def entry(**kw):
     data = dict(user_id="U04", spoken_name="柚木さん", ambiguous=False, ambiguity_note="", event_date="2026-11-02", event_time="", kind_read="居宅訪問",
-                monitoring=True, partner="本人", body="柚木様宅を訪問した。変わりなし。", name_fixes=[])
+                monitoring=True, partner="本人", body="柚木様宅を訪問した。変わりなし。", name_fixes=[], unsure_words=[])
     return WireEntry(**(data | kw))
 
 
@@ -89,7 +89,7 @@ def test_invented_terms_detects_new_number_date_name_drug():
     assert invented_terms("訪問した", "週3回訪問した") == ["3"]
     assert invented_terms("訪問した", "11月2日に訪問した") == ["11", "2"]
     assert invented_terms("訪問した", "久留島医師に伝えた", names=["久留島"]) == ["久留島"]
-    assert invented_terms("訪問した", "内服を確認し受診を勧めた") == ["内服", "受診"]
+    assert invented_terms("訪問した", "内服を確認し受診を勧めた") == ["内服", "受診", "受診を勧め"]
 
 
 def test_invented_terms_allows_what_was_said():
@@ -230,4 +230,4 @@ def test_review_page_lists_and_resolves(env):
 def test_home_shows_review_count(env):
     s, c = env
     run(s, c, "洋子さんから電話。", entry(user_id="", spoken_name="洋子さん"))
-    assert "要確認 1" in TestClient(create_app(s)).get("/").text
+    assert "記録の確認" in TestClient(create_app(s)).get("/").text

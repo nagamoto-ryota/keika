@@ -1,35 +1,10 @@
 {% extends "base.html" %}
-{% block title %}事業所の宿題 - ケイカ{% endblock %}
+{% block title %}事業所の備え - ケイカ{% endblock %}
 {% block main %}
-<h1 class="big">事業所の宿題 <span class="count">{{ todo }}</span></h1>
+{% with tab = 'office' %}{% include "_list_tabs.html" %}{% endwith %}
 <p class="muted">Drive の事業所のフォルダを読んだ結果です。紙で保管している物は読めません。別の場所にあれば、ご自身で確かめてください。</p>
 
-{% for r in rows if r.status == 'todo' %}
-<details class="task">
-  <summary><span class="dot"></span><span class="title">{{ r.rule.title }}</span></summary>
-  <div class="task-body">
-    <p class="msg">{{ r.next_step|hdate }}</p>
-    <p class="small muted">{{ r.rule.plain }}</p>
-    {% if r.evidence_rel_path %}<p class="small"><a href="/doc?path={{ r.evidence_rel_path|urlencode }}" target="_blank" rel="noopener">{{ r.evidence_rel_path.rsplit('/', 1)[-1] }} を開く</a></p>{% endif %}
-    <details class="more"><summary>根拠の条文</summary><p class="small">{{ r.basis }}</p></details>
-  </div>
-</details>
-{% endfor %}
-
-{% for r in rows if r.status == 'unknown' %}
-<details class="task">
-  <summary><span class="dot unknown"></span><span class="title">{{ r.rule.title }}</span><span class="due">分からない</span></summary>
-  <div class="task-body">
-    <p class="msg">{{ r.next_step }}</p>
-    <form method="post" action="/office/{{ r.rule.id }}/declare" class="declare">
-      <label>確かめた人 <input name="who" required></label>
-      <label>何で確かめたか <input name="basis" required placeholder="例: 法人のホームページで確認した"></label>
-      <button class="plain">済みと申告する</button>
-    </form>
-    <details class="more"><summary>根拠の条文</summary><p class="small">{{ r.basis }}</p></details>
-  </div>
-</details>
-{% endfor %}
+{% include "_office_tasks.html" %}
 
 <h2>済んでいるもの</h2>
 {% for r in rows if r.status in ('done', 'declared') %}

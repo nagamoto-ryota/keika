@@ -82,11 +82,11 @@ def test_minutes_todo_when_all_read_and_none(env):
     assert cell(s, c, "minutes").status == "todo"
 
 
-def test_consent_after_start_is_todo(env):
+def test_consent_after_start_is_flagged(env):
     s, c = env
     put(s, c, "計画.txt", plan(consent_date="2026-08-05"))
     x = cell(s, c, "consent")
-    assert x.status == "todo" and x.date == "2026-08-05"
+    assert x.status == "check" and x.date == "2026-08-05"
 
 
 def test_consent_before_start_is_done(env):

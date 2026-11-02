@@ -112,3 +112,8 @@ textarea { font: inherit; width: 100%; padding: 6px; border: 1px solid var(--lin
 input, select { font: inherit; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; max-width: 170px; }
 button { font: inherit; padding: 2px 14px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 4px; cursor: pointer; }
 @media (max-width: 600px) { body { font-size: 16px; } .top { padding: 12px 16px; } }
+
+.law { border-left: 3px solid var(--line); padding: 4px 0 4px 12px; margin-top: 6px; }
+.law h4 { margin: 10px 0 2px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.law-text { margin: 0 0 6px; white-space: pre-line; font-size: 15px; line-height: 1.7; }
+.list-tabs { margin-bottom: 14px; }

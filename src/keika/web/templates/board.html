@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}工程の一覧 - ケイカ{% endblock %}
 {% block main %}
-<h1>工程の一覧</h1>
-<p class="muted">今の計画について、どの工程まで済んだかの一覧です。普段は「やること」だけ見れば足ります。</p>
+{% with tab = 'board' %}{% include "_list_tabs.html" %}{% endwith %}
+<p class="muted">今の計画の進み具合です。「まだ」は書類が無い、「確認」は書類はあるが中身を確かめる物です。</p>
 <div class="tabs">
   <a href="/board" class="{{ 'on' if not cm }}">全員</a>
   {% for p in staff %}<a href="/board?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
@@ -27,7 +27,7 @@
   {% for r in rows %}
     <tr>
       <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a></td>
-      {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status == 'todo' %}まだ{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</td>{% endfor %}
+      {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status == 'todo' %}まだ{% elif c.status == 'check' %}確認{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</td>{% endfor %}
       <td>{{ r.plan_end|hdate_full }}</td>
       <td>{{ r.cert_end|hdate_full }}</td>
     </tr>

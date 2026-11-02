@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}台帳 - ケイカ{% endblock %}
 {% block main %}
+{% with tab = 'ledger' %}{% include "_list_tabs.html" %}{% endwith %}
 <h1>台帳</h1>
 <p class="muted">名前の補正、記録の振り分け、交付先の点検の土台になります。</p>
 

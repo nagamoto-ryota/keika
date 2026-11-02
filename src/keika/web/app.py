@@ -21,6 +21,7 @@ from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
+from keika.legal_texts import basis_for
 from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, to_review
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
@@ -71,6 +72,9 @@ def _mark_quote(text: str | None, quote: str | None) -> Markup:
     body = str(escape(text or ""))
     needle = str(escape(quote or ""))
     return Markup(body.replace(needle, f"<mark>{needle}</mark>", 1) if needle else body)
+
+
+OFFICE_TAB = "office"
 
 
 def _dashboard_row(conn, s: Settings, user: User, month: str) -> Row:
@@ -144,6 +148,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["sample"] = sample
+    templates.env.globals["legal"] = basis_for
     templates.env.filters["blanks"] = _blanks
     templates.env.filters["mark_quote"] = _mark_quote
     templates.env.filters["hdate_full"] = lambda text: (text or "").replace("-", "/")
@@ -162,16 +167,36 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
+    def _reviews_for(cm: str | None) -> list[dict]:
+        """担当の絞り込み中は、その人の分と、誰の話か決まっていない分を出す。"""
+        if cm == OFFICE_TAB:
+            return []
+        mine = {u.id for u in list_users(conn, cm=cm)} if cm else None
+        return [it for it in open_reviews(conn) if mine is None or not it["entry"].get("user_id") or it["entry"]["user_id"] in mine]
+
+    def _office_for(cm: str | None) -> list:
+        if cm and cm != OFFICE_TAB:
+            return []
+        rows = [r for r in office_rows(conn, s) if r.status in ("todo", "unknown")]
+        for row in rows:
+            row.basis = basis_text(row.rule)
+        return rows
+
     @app.get("/")
     def dashboard(request: Request, cm: str | None = None):
         month = today(s).isoformat()[:7]
-        board = build_board(conn, s, cm=cm)
+        board = build_board(conn, s, cm=None if cm == OFFICE_TAB else cm)
+        if cm == OFFICE_TAB:
+            board.people, board.visit_waiting, board.unknowns = [], [], []
         year = today(s).year
         for person in board.people:
             records = list_records(conn, person.user.id)
             for task in person.tasks:
                 task.view = _view(s, task.item, records, year) if task.item else None
-        return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm, "reviews": len(open_reviews(conn)), "office_todo": sum(r.status == "todo" for r in office_rows(conn, s))})
+        return templates.TemplateResponse(request, "dashboard.html", {
+            "board": board, "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn),
+            "reviews": _reviews_for(cm), "office": _office_for(cm),
+        })
 
     def _check_in_background(user_id: str) -> None:
         """記録が保存されたら、その利用者だけ点検し直す。失敗しても記録は失わず「未実施」と出す。"""
@@ -253,7 +278,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.get("/review")
     def review(request: Request):
-        return templates.TemplateResponse(request, "review.html", {"items": open_reviews(conn), "users": list_users(conn)})
+        return RedirectResponse("/#kakunin", status_code=303)
 
     @app.post("/review/{review_id}")
     def post_review(review_id: int, background: BackgroundTasks, user_id: str = Form(""), body: str = Form(""), action: str = Form("save")):
@@ -264,7 +289,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(404, str(e)) from None
         if record:
             background.add_task(_check_in_background, record.user_id)
-        return RedirectResponse("/review", status_code=303)
+        return RedirectResponse("/#kakunin", status_code=303)
 
     @app.get("/board")
     def board_page(request: Request, cm: str | None = None):
