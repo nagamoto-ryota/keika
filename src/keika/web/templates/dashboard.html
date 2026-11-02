@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}今月の仕事 - ケイカ{% endblock %}
+{% block title %}進捗 - ケイカ{% endblock %}
 {% block main %}
 <h1>進捗 <small>{{ month|hdate }}</small></h1>
 <div class="tabs">
@@ -26,7 +26,7 @@
   {% for r in rows %}
     <tr>
       <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a><br><span class="muted small">{{ r.user.data.get('care_level', '') }}</span></td>
-      {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.note }}">{{ {'done': (c.date|hdate or '済'), 'todo': 'まだ', 'unknown': '?', 'na': '—'}[c.status] }}</td>{% endfor %}
+      {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.note }}">{% if c.status == 'done' %}{{ c.date|hdate or '済' }}{% elif c.status == 'todo' %}まだ{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</td>{% endfor %}
       <td>{{ r.plan_end|hdate_full }}</td>
       <td>{{ r.cert_end|hdate_full }}</td>
       <td>
@@ -38,50 +38,6 @@
     </tr>
   {% else %}
     <tr><td colspan="13" class="muted">この担当の利用者はいません。</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% endblock %}
-{% block main %}
-<h1>進捗 <small>{{ month|hdate }}</small></h1>
-<div class="tabs">
-  <a href="/" class="{{ 'on' if not cm }}">全員</a>
-  {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
-</div>
-{% if summary %}
-<div class="scroll">
-<table class="summary">
-  <tbody>
-  {% for x in summary %}
-    <tr><td>{{ x.name }}</td><td>未対応 {{ x.open }}</td><td><a href="/silenced">問題なし {{ x.silenced }}</a></td><td>閉じた {{ x.closed }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% endif %}
-<div class="scroll">
-<table>
-  <thead>
-    <tr><th>利用者</th><th>要介護度</th><th>認定の期限</th><th>計画の期限</th><th>今月の訪問</th><th>お知らせ</th></tr>
-  </thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a></td>
-      <td>{{ r.user.data.get('care_level', '—') }}</td>
-      <td>{{ r.cert_end|hdate_full }}</td>
-      <td>{{ r.plan_end|hdate_full }}</td>
-      <td><span class="pill {{ 'ok' if r.visit == '済' else 'todo' }}">{{ r.visit }}</span></td>
-      <td>
-        {% if r.findings %}<span class="pill finding">確認 {{ r.findings }}</span>{% endif %}
-        {% if r.unknowns %}<span class="pill unknown">不明 {{ r.unknowns }}</span>{% endif %}
-        {% if r.nudges %}<span class="pill nudge">先回り {{ r.nudges }}</span>{% endif %}
-        {% if not (r.findings or r.unknowns or r.nudges) %}<span class="muted">なし</span>{% endif %}
-      </td>
-    </tr>
-  {% else %}
-    <tr><td colspan="6" class="muted">この担当の利用者はいません。</td></tr>
   {% endfor %}
   </tbody>
 </table>

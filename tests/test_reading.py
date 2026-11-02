@@ -236,3 +236,10 @@ def test_unreadable_answer_from_claude_is_kept_as_not_readable(env):
     s, conn = env
     facts = read_doc(conn, FakeClient(answer(wire(readable=False, read_note="白紙"))), s, only_ref(s))
     assert facts.readable is False and facts.read_note == "白紙"
+
+
+def test_make_client_has_short_timeout(tmp_path, monkeypatch):
+    # 応答が止まった時に10分待たない
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    client = make_client(tmp_path)
+    assert client.timeout == 240.0 and client.max_retries == 1

@@ -421,3 +421,13 @@ def test_progress_todo_needs_no_quote(env):
     s, c = env
     run = run_claude_checks(c, Scripted(msg(_progress(status="todo", quote="", file="")), END), s, "U01")
     assert run.progress[0].status == "todo"
+
+
+def test_time_limit_marks_check_not_run(env, monkeypatch):
+    from keika import claude_checks
+    s, c = env
+    _prior(c)
+    monkeypatch.setattr(claude_checks, "TIME_LIMIT_SECONDS", -1)
+    client = Scripted(msg(tool("lookup_ledger", {"name": "杉森"})), msg(tool("lookup_ledger", {"name": "杉森"})), END)
+    run = run_claude_checks(c, client, s, "U01")
+    assert run.not_run is True and "時間" in run.error and [x.rule_id for x in run.findings] == ["R11"]

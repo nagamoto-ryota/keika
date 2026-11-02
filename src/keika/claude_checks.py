@@ -10,6 +10,7 @@ import io
 import json
 import re
 import sqlite3
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ from keika.settings import OutsideRootError, Settings, now_real, safe_path, toda
 SKILLS_DIR = Path(__file__).parent / "skills"
 APP_RECORDS = "支援経過（アプリの記録）"
 MAX_TURNS = 30
+TIME_LIMIT_SECONDS = 360  # 応答が止まっても画面を待たせない
 
 _MEDICAL = re.compile(r"(薬|服薬|内服).{0,12}(減ら|増や|中止|やめ|変更すべき|飲まな)|受診が必要|受診してください|受診すべき|診断|治療(を|が|すべき)|処方(を|す)")
 _BACKDATE = re.compile(r"過去の日付|さかのぼ|遡って|遡り|前日付|\d+月\d+日付|\d{4}[-/]\d{1,2}[-/]\d{1,2}付")
@@ -372,7 +374,10 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
     messages: list[dict] = [{"role": "user", "content": _first_message(conn, s, user_id, refs, candidates, prior)}]
     before = METER.cost_usd
     try:
+        started = time.monotonic()
         for _ in range(MAX_TURNS):
+            if time.monotonic() - started > TIME_LIMIT_SECONDS:
+                raise RuntimeError("時間がかかりすぎました")
             with client.beta.messages.stream(
                 model=MODEL,
                 max_tokens=32000,

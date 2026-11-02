@@ -63,7 +63,7 @@ def make_client(base: Path | None = None) -> anthropic.Anthropic:
     key = load_api_key(base)
     if not key:
         raise RuntimeError("API キーがありません。アプリのフォルダの .env に ANTHROPIC_API_KEY=... を書いてください。")
-    return anthropic.Anthropic(api_key=key)
+    return anthropic.Anthropic(api_key=key, timeout=240.0, max_retries=1)
 
 
 def ask_structured(
