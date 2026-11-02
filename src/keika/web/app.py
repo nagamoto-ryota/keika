@@ -118,11 +118,12 @@ def _next_user_id(conn) -> str:
     return f"U{max(numbers, default=0) + 1:02d}"
 
 
-def create_app(s: Settings, client_factory: Callable[[], Any] = make_client) -> FastAPI:
+def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False) -> FastAPI:
     app = FastAPI(title="ケイカ")
     conn = connect(s)
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
+    templates.env.globals["sample"] = sample
     templates.env.filters["blanks"] = _blanks
     templates.env.filters["mark_quote"] = _mark_quote
     templates.env.filters["hdate_full"] = lambda text: (text or "").replace("-", "/")
@@ -156,6 +157,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client) -> 
 
     @app.post("/records/new")
     def post_record(request: Request, background: BackgroundTasks, text: str = Form(...), mode: str = Form("shape")):
+        if sample:
+            raise HTTPException(403, "見本モードでは記録できません。API キーを設定して keika serve で起動してください。")
         if not text.strip():
             raise HTTPException(400, "文章を入れてください")
         try:

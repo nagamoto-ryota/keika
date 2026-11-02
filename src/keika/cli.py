@@ -2,8 +2,37 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import time
+from datetime import date
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+SNAPSHOT = REPO / "demo" / "snapshot" / "keika.db"
+
+
+def sample_settings(db_path: Path):
+    """見本モードの設定。同梱の結果をコピーして使う（同梱の物は変えない）。"""
+    from keika.settings import Settings
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(SNAPSHOT, db_path)
+    return Settings(drive_root=REPO / "sample_data" / "drive", db_path=db_path, as_of=date(2026, 11, 4))
+
+
+def serve_sample(host: str, port: int) -> int:
+    import uvicorn
+
+    from keika.web.app import create_app
+
+    def no_claude():
+        raise RuntimeError("見本モードでは Claude を呼びません")
+
+    s = sample_settings(REPO / "data" / "sample.db")
+    print(f"見本モードで起動します（API キー不要）: http://{host}:{port}")
+    uvicorn.run(create_app(s, client_factory=no_claude, sample=True), host=host, port=port, log_level="warning")
+    return 0
 
 
 def _seed_if_empty(conn, s) -> None:
@@ -113,12 +142,15 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--host", default="127.0.0.1", help="事業所内の他の PC から見る時は 0.0.0.0")
     p_serve.add_argument("--port", type=int, default=8000)
     p_serve.add_argument("--no-watch", action="store_true", help="入口のフォルダを見張らない")
+    p_serve.add_argument("--sample", action="store_true", help="同梱の架空データの結果を、API キーなしで表示する")
     sub.add_parser("intake", help="入口のファイルを今すぐ取り込む")
     p_sync = sub.add_parser("sync", help="Drive の書類を読み、支援経過の CSV を取り込む（Claude を使う）")
     p_sync.add_argument("--user", help="利用者フォルダの先頭（例: U04）")
     p_check = sub.add_parser("check", help="1人分を Claude で点検する")
     p_check.add_argument("user_id")
     args = parser.parse_args(argv)
+    if args.command == "serve" and args.sample:
+        return serve_sample(args.host, args.port)
     if args.command == "serve":
         return serve(args.host, args.port, watch=not args.no_watch)
     if args.command == "intake":
