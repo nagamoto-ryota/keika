@@ -307,3 +307,21 @@ def test_confirmed_findings_are_told_to_claude(env):
 def test_suggestion_rule_forbids_invented_actions():
     from keika.claude_checks import COMMON
     assert "記録や書類に無い行動" in COMMON
+
+
+def test_record_quote_under_wrong_file_name_is_pointed_to_the_real_source(env):
+    # Claude がファイル名を取り違えても、日付と語句で記録が特定できれば本来の出どころに直す
+    s, c = env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-09-12", body="夜中に転んだ。", source="csv:利用者/U01_杉森ハル/経過.csv"))
+    e = dict(file="支援経過（アプリの記録）", page=0, quote="夜中に転んだ", record_date="2026-09-12")
+    run = run_claude_checks(c, Scripted(msg(report(rule_id="R11", evidence=[e])), END), s, "U01")
+    assert run.dropped == []
+    assert run.findings[0].evidence[0].file == "利用者/U01_杉森ハル/経過.csv"
+
+
+def test_record_quote_not_in_that_date_is_still_dropped(env):
+    s, c = env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-09-12", body="夜中に転んだ。", source="csv:利用者/U01_杉森ハル/経過.csv"))
+    e = dict(file="支援経過（アプリの記録）", page=0, quote="作り話", record_date="2026-09-12")
+    run = run_claude_checks(c, Scripted(msg(report(rule_id="R11", evidence=[e])), END), s, "U01")
+    assert run.findings == [] and len(run.dropped) == 1

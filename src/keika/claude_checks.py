@@ -23,7 +23,7 @@ from keika.findings import Evidence, Finding
 from keika.ledger import find_person, get_user
 from keika.machine_checks import run_machine_checks, user_refs
 from keika.reading import stored_facts
-from keika.records import list_records
+from keika.records import Record, list_records
 from keika.responses import silenced_for_prompt
 from keika.rules import active_rules
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
@@ -322,7 +322,7 @@ def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: Ch
         elif block.name == "lookup_ledger":
             result["content"] = _lookup(conn, block.input["name"])
         elif block.name == "report_finding":
-            result["content"] = _accept_finding(block.input, user_id, allowed, texts, run)
+            result["content"] = _accept_finding(block.input, user_id, allowed, texts, run, list_records(conn, user_id))
         elif block.name == "dismiss_candidate":
             result["content"] = _accept_dismissal(block.input, all_bodies, run, candidates)
         else:
@@ -333,11 +333,23 @@ def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: Ch
     return result
 
 
-def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, run: CheckRun) -> str:
+def _point_to_record_source(f: Finding, records: list[Record]) -> Finding:
+    """支援経過の引用は、日付と語句で記録を特定し、本来の出どころを根拠にする。"""
+    fixed = []
+    for e in f.evidence:
+        hit = next((r for r in records if e.record_date and r.event_date == e.record_date and e.quote
+                    and _squeeze(e.quote) in _squeeze(r.body)), None)
+        if hit:
+            e = e.model_copy(update={"file": hit.source.removeprefix("csv:") if hit.source.startswith("csv:") else APP_RECORDS})
+        fixed.append(e)
+    return f.model_copy(update={"evidence": fixed})
+
+
+def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, run: CheckRun, records: list[Record]) -> str:
     if data.get("rule_id") not in allowed:
         run.dropped.append({**data, "why": "点検項目が違う"})
         return "受け付けませんでした: この点検項目は Claude の対象ではありません。"
-    checked = validate_finding(_to_finding(data, user_id), texts)
+    checked = validate_finding(_point_to_record_source(_to_finding(data, user_id), records), texts)
     if checked is None:
         run.dropped.append({**data, "why": "検査で落ちた"})
         return "受け付けませんでした: 引用が原文に無いか、箇所がないか、医療の判断に踏み込んでいます。直すなら原文を確かめて報告し直してください。"
