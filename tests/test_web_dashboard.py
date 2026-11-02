@@ -66,9 +66,9 @@ def test_every_page_shows_demo_banner_and_final_judgment_note(client):
 
 def test_dashboard_shows_cert_end_and_month_visit_status(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-11-02", kind_read="居宅訪問", body="訪問した。"))
-    body = client.get("/", params={"cm": "CM02"}).text
+    body = client.get("/board", params={"cm": "CM02"}).text
     assert "2027/11/30" in body
-    assert "11/2" in body
+    assert "✓" in body
 
 
 def test_ledger_add_and_edit(client, conn):
@@ -133,7 +133,7 @@ def test_user_page_shows_claude_finding_with_suggestion_blank(client, conn):
 
 def test_dashboard_counts_claude_findings(client, conn):
     save_run(conn, "U04", CheckRun(findings=[_claude()]))
-    assert "確認 1" in client.get("/", params={"cm": "CM02"}).text
+    assert "週2回のままです" in client.get("/", params={"cm": "CM02"}).text
 
 
 def test_dismissed_candidate_is_hidden_and_shown_as_a_note(client, conn):
@@ -225,7 +225,7 @@ def test_dashboard_summary_per_person_in_charge(client, conn):
     one, two = _claude(), _claude(period="2026-10", message="別の指摘です。確認してください。")
     save_run(conn, "U04", CheckRun(findings=[one, two], resolved=[Resolution("R11", "2026-08", "前の指摘", "直った", "2026-11-04", "直した")]))
     respond(conn, s, two, "off_target", who="井波")
-    body = client.get("/").text
+    body = client.get("/board").text
     row = body[body.index('class="summary"'):body.index("</table>")]
     assert "井波 拓真" in row
     i = row.index("井波 拓真")

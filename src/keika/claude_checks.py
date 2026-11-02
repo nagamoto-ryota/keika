@@ -118,7 +118,7 @@ COMMON = """あなたは日本の介護支援専門員（ケアマネジャー�
 
 ## 前回の指摘
 - 前回の指摘（P1 など）を1件ずつ読み直す。支援経過や書類に対応が確認できれば resolve_finding で閉じる。根拠の記録か書類の原文を必ず添える。
-- 対応が確認できない時は閉じない。まだ当てはまるなら、新しい事情があれば report_finding で出し直す。人に対応を尋ねない。
+- 対応が確認できない時は閉じない。まだ当てはまるなら report_finding の replaces に番号を書いて出し直す。人に対応を尋ねない。
 
 ## 進捗の報告
 - 最後に report_progress で、今の計画の工程の進み具合を1回だけ報告する。人が一覧で見る。
@@ -167,12 +167,14 @@ TOOLS = [
                 "rule_id": {"type": "string", "description": "点検項目の ID（例 R02）"},
                 "kind": {"type": "string", "enum": ["finding", "unknown"]},
                 "period": {"type": "string", "description": "対象の月や計画の期間。無ければ空文字"},
+                "todo": {"type": "string", "description": "一覧に出す「何をするか」の一行。12〜24字で、動詞で終える。例「主治医への計画の交付を確かめる」「週3回の変更を計画に反映する」"},
                 "message": {"type": "string", "description": "断定しない短い文。「確認してください」で終える"},
+                "replaces": {"type": "string", "description": "前回の指摘を出し直す時はその番号（P1 など）。新しい指摘は空文字"},
                 "suggestion": {"type": "string", "description": "書き足し案。〇〇の空欄を使う。無ければ空文字"},
                 "searched_scope": {"type": "string", "description": "「無い」時に探した範囲。無ければ空文字"},
                 "evidence": {"type": "array", "items": _EVIDENCE_SCHEMA},
             },
-            "required": ["rule_id", "kind", "period", "message", "suggestion", "searched_scope", "evidence"],
+            "required": ["rule_id", "kind", "period", "todo", "message", "replaces", "suggestion", "searched_scope", "evidence"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -276,6 +278,7 @@ class CheckRun:
     findings: list[Finding] = field(default_factory=list)
     dismissed: list[Dismissal] = field(default_factory=list)
     resolved: list[Resolution] = field(default_factory=list)
+    replaced: list[str] = field(default_factory=list)  # 出し直された前回の指摘の番号
     dropped: list[dict] = field(default_factory=list)  # 検査で落とした指摘。原因を調べるために残す
     not_run: bool = False
     error: str | None = None
@@ -351,7 +354,7 @@ def _to_finding(data: dict, user_id: str) -> Finding:
         for e in data.get("evidence", [])
     ]
     return Finding(
-        rule_id=data["rule_id"], user_id=user_id, kind=data["kind"], period=data.get("period", ""), message=data["message"],
+        rule_id=data["rule_id"], user_id=user_id, kind=data["kind"], period=data.get("period", ""), message=data["message"], todo=data.get("todo") or None,
         evidence=evidence, searched_scope=data.get("searched_scope") or None, suggestion=data.get("suggestion") or None, source="claude",
     )
 
@@ -453,6 +456,8 @@ def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, ru
         run.dropped.append({**data, "why": "検査で落ちた"})
         return "受け付けませんでした: 引用が原文に無いか、箇所がないか、医療の判断に踏み込んでいます。直すなら原文を確かめて報告し直してください。"
     run.findings.append(checked)
+    if data.get("replaces"):
+        run.replaced.append(data["replaces"])
     return "受け付けました。"
 
 
@@ -478,9 +483,8 @@ def _accept_resolution(data: dict, user_id: str, texts: dict, run: CheckRun, pri
 def _carry_over(run: CheckRun, prior: list[Finding]) -> None:
     """閉じても出し直してもいない前回の指摘は、黙って消さずに残す。"""
     closed = {(r.rule_id, r.period, r.message) for r in run.resolved}
-    reported = {(f.rule_id, f.period) for f in run.findings}
-    for f in prior:
-        if (f.rule_id, f.period, f.message) not in closed and (f.rule_id, f.period) not in reported:
+    for i, f in enumerate(prior, start=1):
+        if (f.rule_id, f.period, f.message) not in closed and f"P{i}" not in run.replaced:
             run.findings.append(f)
 
 

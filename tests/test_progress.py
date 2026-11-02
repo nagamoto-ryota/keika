@@ -141,7 +141,7 @@ def test_failed_run_does_not_erase_last_good_marks(env):
 def test_dashboard_shows_progress_board(env):
     s, c = env
     put(s, c, "計画.txt", plan())
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/board").text
     for label in ("アセス", "会議", "会議録", "同意", "交付", "個別計画", "医療系", "今月の訪問", "利用票"):
         assert label in body
     assert "杉森 ハル" in body

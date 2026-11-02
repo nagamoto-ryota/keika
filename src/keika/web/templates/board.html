@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}工程の一覧 - ケイカ{% endblock %}
+{% block main %}
+<h1>工程の一覧</h1>
+<p class="muted">今の計画について、どの工程まで済んだかの一覧です。普段は「やること」だけ見れば足ります。</p>
+<div class="tabs">
+  <a href="/board" class="{{ 'on' if not cm }}">全員</a>
+  {% for p in staff %}<a href="/board?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
+</div>
+{% if summary %}
+<div class="scroll">
+<table class="summary">
+  <tbody>
+  {% for x in summary %}
+    <tr><td>{{ x.name }}</td><td>未対応 {{ x.open }}</td><td><a href="/silenced">問題なし {{ x.silenced }}</a></td><td>閉じた {{ x.closed }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<div class="scroll">
+<table class="board">
+  <thead>
+    <tr><th>利用者</th>{% for st in steps %}<th>{{ st.label }}</th>{% endfor %}<th>計画の期限</th><th>認定の期限</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a></td>
+      {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status == 'todo' %}まだ{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</td>{% endfor %}
+      <td>{{ r.plan_end|hdate_full }}</td>
+      <td>{{ r.cert_end|hdate_full }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -78,7 +78,7 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
         scope = f"{month} の支援経過"
         if month == this_month:
             left = calendar.monthrange(on.year, on.month)[1] - on.day
-            out.append(Finding(rule_id="R06", user_id=user.id, kind="nudge", period=month, searched_scope=scope,
+            out.append(Finding(rule_id="R06", user_id=user.id, kind="nudge", period=month, searched_scope=scope, todo="今月の居宅訪問",
                                message=f"{user.name}さんの今月の居宅訪問はまだのようです。今月はあと{left}日です。"))
         elif any(r.kind_read is None for r in rows):
             out.append(Finding(rule_id="R06", user_id=user.id, kind="unknown", period=month, searched_scope=scope,
@@ -88,7 +88,7 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
             written = [r for r in rows if "訪問" in r.kind_written]
             detail = "".join(f"{r.event_date} は種別が「{r.kind_written}」ですが、本文は「{r.kind_read}」と読めます。"
                              for r in written if r.kind_read != r.kind_written)
-            out.append(Finding(rule_id="R06", user_id=user.id, kind="finding", period=month, searched_scope=scope,
+            out.append(Finding(rule_id="R06", user_id=user.id, kind="finding", period=month, searched_scope=scope, todo=f"{month}の居宅訪問の記録を確かめる",
                                evidence=[_record_evidence(r) for r in (written or rows)],
                                message=f"{month}に居宅を訪問しての面接の記録が見当たりません。{detail}"
                                        "特段の事情があれば、その記録があるか確認してください。"))
@@ -117,7 +117,7 @@ def _yobo_visits(user: User, records: list[Record], facts: list[tuple[DocRef, Do
         if any(r.kind_read == HOME_VISIT for r in rows):
             pass
         elif last == this_month:
-            out.append(Finding(rule_id="R06", user_id=user.id, kind="nudge", period=period, searched_scope=scope,
+            out.append(Finding(rule_id="R06", user_id=user.id, kind="nudge", period=period, searched_scope=scope, todo="3か月に1回の訪問",
                                message=f"{user.name}さんの3か月に1回の訪問は、{period} の分がまだのようです。今月が最後の月です。"))
         elif last > this_month:
             pass
@@ -125,7 +125,7 @@ def _yobo_visits(user: User, records: list[Record], facts: list[tuple[DocRef, Do
             out.append(Finding(rule_id="R06", user_id=user.id, kind="unknown", period=period, searched_scope=scope,
                                message=f"{period} の訪問は、この期間の前半の記録が取り込まれていないので分かりません。確認してください。"))
         else:
-            out.append(Finding(rule_id="R06", user_id=user.id, kind="finding", period=period, searched_scope=scope,
+            out.append(Finding(rule_id="R06", user_id=user.id, kind="finding", period=period, searched_scope=scope, todo=f"{period}の居宅訪問の記録を確かめる",
                                evidence=[_record_evidence(r) for r in rows],
                                message=f"{period}（3か月に1回）に居宅を訪問しての面接の記録が見当たりません。"
                                        "特段の事情があれば、その記録があるか確認してください。"))
@@ -144,7 +144,7 @@ def _signatures(user: User, facts: list[tuple[DocRef, DocFacts]], on: date) -> l
             continue
         ev = [_doc_evidence(ref.rel_path, f.signature_source)]
         if f.signature_present is False:
-            out.append(Finding(rule_id="R13", user_id=user.id, kind="finding", period=f.target_month, evidence=ev,
+            out.append(Finding(rule_id="R13", user_id=user.id, kind="finding", period=f.target_month, evidence=ev, todo=f"{f.target_month}の利用票の署名を確かめる",
                                message=f"{f.target_month}の利用票の署名欄が空のようです。署名をいただいているか確認してください。"))
         elif f.signature_present is None:
             out.append(Finding(rule_id="R13", user_id=user.id, kind="unknown", period=f.target_month, evidence=ev,
@@ -162,7 +162,7 @@ def _consent(user: User, facts: list[tuple[DocRef, DocFacts]]) -> list[Finding]:
         return [Finding(rule_id="R10", user_id=user.id, kind="unknown", period=f.period_start, evidence=[ev],
                         message="計画書の同意日を読み取れませんでした。同意日と署名を確認してください。")]
     if f.consent_date > f.period_start:
-        return [Finding(rule_id="R10", user_id=user.id, kind="finding", period=f.period_start, evidence=[ev],
+        return [Finding(rule_id="R10", user_id=user.id, kind="finding", period=f.period_start, evidence=[ev], todo="説明と同意の順番を確かめる",
                         message=f"計画の開始日 {f.period_start} より後の {f.consent_date} が同意日になっているようです。"
                                 "説明と同意の順番を確認してください。")]
     return []
@@ -176,7 +176,7 @@ def _plan_expiry(user: User, facts: list[tuple[DocRef, DocFacts]], on: date) -> 
     left = (_parse(f.period_end) - on).days
     if left > NUDGE_DAYS:
         return []
-    return [Finding(rule_id="R45", user_id=user.id, kind="nudge", period=f.period_end, evidence=[_doc_evidence(ref.rel_path, f.period_source)],
+    return [Finding(rule_id="R45", user_id=user.id, kind="nudge", period=f.period_end, evidence=[_doc_evidence(ref.rel_path, f.period_source)], todo="計画の見直しの準備",
                     message=f"計画の期間が {f.period_end} で終わります。あと{left}日です。見直しの準備を確認してください。")]
 
 
@@ -186,7 +186,7 @@ def _cert_renewal(user: User, on: date) -> list[Finding]:
     if end is None or (end - on).days > NUDGE_DAYS:
         return []
     deadline = end - timedelta(days=30)
-    return [Finding(rule_id="R44", user_id=user.id, kind="nudge", period=end.isoformat(), searched_scope="台帳の認定有効期間",
+    return [Finding(rule_id="R44", user_id=user.id, kind="nudge", period=end.isoformat(), searched_scope="台帳の認定有効期間", todo="認定の更新申請の援助",
                     message=f"認定の有効期間が {end.isoformat()} で終わります。{deadline.isoformat()} までに更新の申請がされるよう、援助を確認してください。")]
 
 
@@ -202,7 +202,7 @@ def _missing_docs(user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocF
     if len(facts) < len(refs):
         return [Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
                         message=f"未読の書類が {len(refs) - len(facts)} 件あるので、{'・'.join(missing)}の有無はまだ分かりません。")]
-    return [Finding(rule_id="R33", user_id=user.id, kind="finding", period=t, searched_scope=scope,
+    return [Finding(rule_id="R33", user_id=user.id, kind="finding", period=t, searched_scope=scope, todo=f"{t}を確かめる",
                     message=f"Drive の {folder}/ に{t}が見当たりません。別の場所にあれば確認してください。") for t in missing]
 
 
@@ -227,7 +227,7 @@ def _infection_committee(facts: list[tuple[DocRef, DocFacts]], on: date) -> list
     for (d0, ref, f), a, b in zip(rows, dates, dates[1:] + [on]):
         if (b - a).days > COMMITTEE_LIMIT_DAYS:
             until = "今日" if b == on else b.isoformat()
-            out.append(Finding(rule_id="R24", user_id=None, kind="finding", period=d0, evidence=[_doc_evidence(ref.rel_path, f.doc_date_source)],
+            out.append(Finding(rule_id="R24", user_id=None, kind="finding", period=d0, evidence=[_doc_evidence(ref.rel_path, f.doc_date_source)], todo="感染症の委員会の開催を確かめる",
                                message=f"感染症対策の委員会は {d0} の次の記録が、{until}までの間に見当たりません（おおむね6か月に1回）。開催と記録を確認してください。"))
     return out
 

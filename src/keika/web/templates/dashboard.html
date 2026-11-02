@@ -1,45 +1,51 @@
 {% extends "base.html" %}
-{% block title %}進捗 - ケイカ{% endblock %}
+{% block title %}やること - ケイカ{% endblock %}
 {% block main %}
-<h1>進捗 <small>{{ month|hdate }}</small></h1>
 <div class="tabs">
   <a href="/" class="{{ 'on' if not cm }}">全員</a>
   {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
 </div>
-{% if summary %}
-<div class="scroll">
-<table class="summary">
-  <tbody>
-  {% for x in summary %}
-    <tr><td>{{ x.name }}</td><td>未対応 {{ x.open }}</td><td><a href="/silenced">問題なし {{ x.silenced }}</a></td><td>閉じた {{ x.closed }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
+
+<h1 class="big">やること <span class="count">{{ board.total }}</span></h1>
+
+{% if board.visit_waiting %}
+<details class="visit-line">
+  <summary>今月の訪問がまだの方 <strong>{{ board.visit_waiting|length }}人</strong><span class="muted">（今月はあと{{ board.days_left }}日）</span></summary>
+  <p>{% for u in board.visit_waiting %}<a href="/users/{{ u.id }}">{{ u.name }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</p>
+</details>
 {% endif %}
-<div class="scroll">
-<table class="board">
-  <thead>
-    <tr><th>利用者</th>{% for st in steps %}<th>{{ st.label }}</th>{% endfor %}<th>計画の期限</th><th>認定の期限</th><th>お知らせ</th></tr>
-  </thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a><br><span class="muted small">{{ r.user.data.get('care_level', '') }}</span></td>
-      {% for c in r.cells %}<td class="cell {{ c.status }}" title="{{ c.note }}">{% if c.status == 'done' %}{{ c.date|hdate or '済' }}{% elif c.status == 'todo' %}まだ{% elif c.status == 'unknown' %}?{% else %}—{% endif %}</td>{% endfor %}
-      <td>{{ r.plan_end|hdate_full }}</td>
-      <td>{{ r.cert_end|hdate_full }}</td>
-      <td>
-        {% if r.findings %}<span class="pill finding">確認 {{ r.findings }}</span>{% endif %}
-        {% if r.unknowns %}<span class="pill unknown">不明 {{ r.unknowns }}</span>{% endif %}
-        {% if r.nudges %}<span class="pill nudge">先回り {{ r.nudges }}</span>{% endif %}
-        {% if not (r.findings or r.unknowns or r.nudges) %}<span class="muted">なし</span>{% endif %}
-      </td>
-    </tr>
-  {% else %}
-    <tr><td colspan="13" class="muted">この担当の利用者はいません。</td></tr>
+
+{% for person in board.people if person.tasks %}
+<section class="person">
+  <h2><a href="/users/{{ person.user.id }}">{{ person.user.name }}</a> <span class="muted small">{{ person.tasks|length }}件</span></h2>
+  {% for t in person.tasks %}
+  <details class="task">
+    <summary><span class="dot"></span><span class="title">{{ t.title|hdate }}</span>{% if t.deadline %}<span class="due">{{ t.deadline|hdate }}まで</span>{% endif %}</summary>
+    <div class="task-body">
+      {% if t.view %}
+        {% with v = t.view, uid = person.user.id, back = '/' ~ ('?cm=' ~ cm if cm else '') %}{% include "_finding.html" %}{% endwith %}
+      {% else %}
+        <p class="muted">利用者のページで記録と書類を確かめられます。 <a href="/users/{{ person.user.id }}">開く</a></p>
+      {% endif %}
+    </div>
+  </details>
   {% endfor %}
-  </tbody>
-</table>
-</div>
+</section>
+{% else %}
+<p class="clear">やることはありません。</p>
+{% endfor %}
+
+{% set quiet = board.people|rejectattr('tasks')|list %}
+{% if quiet %}
+<p class="quiet"><span class="ok-mark">✓</span> 今は何もなし: {% for p in quiet %}<a href="/users/{{ p.user.id }}">{{ p.user.name }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</p>
+{% endif %}
+
+{% if board.unknowns %}
+<details class="fold">
+  <summary>読み取れず確かめきれなかったこと {{ board.unknowns|length }}件</summary>
+  {% for u, item in board.unknowns %}<p class="small"><a href="/users/{{ u.id }}">{{ u.name }}</a>: {{ item.finding.message|hdate }}</p>{% endfor %}
+</details>
+{% endif %}
+
+<p class="small"><a href="/board">工程の一覧を見る</a></p>
 {% endblock %}

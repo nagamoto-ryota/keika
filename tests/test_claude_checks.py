@@ -111,7 +111,7 @@ REL = "利用者/U01_杉森ハル/計画書.txt"
 
 
 def report(**kw):
-    data = dict(rule_id="R03", kind="finding", period="2026-10", message="週2回のままです。確認してください。", suggestion="",
+    data = dict(rule_id="R03", kind="finding", period="2026-10", todo="週3回を計画に反映する", message="週2回のままです。確認してください。", replaces="", suggestion="",
                 searched_scope="", evidence=[dict(file=REL, page=0, quote="週2回", record_date="")])
     return tool("report_finding", data | kw)
 
@@ -373,7 +373,7 @@ def test_prior_finding_not_mentioned_is_carried_over_not_lost(env):
 def test_prior_finding_reported_again_is_not_doubled(env):
     s, c = env
     _prior(c)
-    again = report(rule_id="R11", message="転倒後の見直しを確かめてください。確認してください。")
+    again = report(rule_id="R11", replaces="P1", period="別の書き方", message="転倒後の見直しを確かめてください。確認してください。")
     run = run_claude_checks(c, Scripted(msg(again), END), s, "U01")
     assert len(run.findings) == 1
 
@@ -431,3 +431,15 @@ def test_time_limit_marks_check_not_run(env, monkeypatch):
     client = Scripted(msg(tool("lookup_ledger", {"name": "杉森"})), msg(tool("lookup_ledger", {"name": "杉森"})), END)
     run = run_claude_checks(c, client, s, "U01")
     assert run.not_run is True and "時間" in run.error and [x.rule_id for x in run.findings] == ["R11"]
+
+
+def test_todo_line_comes_back(env):
+    s, c = env
+    assert run_claude_checks(c, Scripted(msg(report()), END), s, "U01").findings[0].todo == "週3回を計画に反映する"
+
+
+def test_new_finding_of_same_rule_does_not_erase_prior(env):
+    s, c = env
+    _prior(c)
+    run = run_claude_checks(c, Scripted(msg(report(rule_id="R11", message="別の指摘です。確認してください。", period="2026-10")), END), s, "U01")
+    assert len(run.findings) == 2

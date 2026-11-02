@@ -20,6 +20,7 @@ class Finding(BaseModel):
     kind: Literal["nudge", "finding", "unknown"]
     period: str = ""  # 対象の月など
     message: str
+    todo: str | None = None  # 一覧に出す「何をするか」の短い一行
     evidence: list[Evidence] = []
     searched_scope: str | None = None  # 「無い」時は、探した範囲を箇所の代わりに示す
     suggestion: str | None = None

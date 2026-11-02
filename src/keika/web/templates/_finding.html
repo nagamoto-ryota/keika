@@ -1,0 +1,40 @@
+{# 指摘の中身。v は _view の結果、uid は利用者 ID、back は押した後に戻る場所 #}
+<p class="msg">{{ v.f.message|hdate }}</p>
+{% if v.changed %}<p class="notice small">根拠の書類が変更されました。もう一度確かめてください。</p>{% endif %}
+{% if v.evidence %}
+<div class="evi">
+  {% for e in v.evidence %}
+  <details class="evi-item">
+    <summary>{{ e.label }}</summary>
+    <div class="evi-body">
+      <p class="original">{{ e.context|mark_quote(e.highlight) }}</p>
+      {% if e.open_url %}<a href="{{ e.open_url }}" target="_blank" rel="noopener">書類を開く</a>{% endif %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+{% if v.f.suggestion %}<div class="suggest"><span class="muted small">書き足し案</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
+<div class="actions">
+  <form method="post" action="/users/{{ uid }}/respond">
+    <input type="hidden" name="fp" value="{{ v.fp }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button name="kind" value="off_target" class="plain">確認した・問題なし</button>
+  </form>
+  <details class="more">
+    <summary>今日の日付で経緯を残す</summary>
+    <form method="post" action="/users/{{ uid }}/respond">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <input type="hidden" name="kind" value="history_noted">
+      <textarea name="note" rows="3" required placeholder="後から直せない漏れは、今日の日付で経緯を残します"></textarea>
+      <button>残す</button>
+    </form>
+  </details>
+  <details class="more">
+    <summary>根拠の条文</summary>
+    <p class="small"><strong>{{ v.title }}</strong> {{ v.plain }}</p>
+    <p class="small">{{ v.basis }}</p>
+    {% if v.f.searched_scope %}<p class="small muted">探した範囲: {{ v.f.searched_scope|hdate }}</p>{% endif %}
+  </details>
+</div>

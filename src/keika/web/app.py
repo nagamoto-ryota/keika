@@ -21,6 +21,7 @@ from keika.reading import stored_facts
 from keika.records import RecordIn, add_record, list_records
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
+from keika.tasks import build_board
 from keika.settings import OutsideRootError, Settings, safe_path, today
 from keika.views import evidence_view, hdate
 
@@ -127,10 +128,21 @@ def create_app(s: Settings) -> FastAPI:
     @app.get("/")
     def dashboard(request: Request, cm: str | None = None):
         month = today(s).isoformat()[:7]
+        board = build_board(conn, s, cm=cm)
+        year = today(s).year
+        for person in board.people:
+            records = list_records(conn, person.user.id)
+            for task in person.tasks:
+                task.view = _view(s, task.item, records, year) if task.item else None
+        return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm})
+
+    @app.get("/board")
+    def board_page(request: Request, cm: str | None = None):
+        month = today(s).isoformat()[:7]
         rows = [_dashboard_row(conn, s, u, month) for u in list_users(conn, cm=cm)]
         staff = list_people(conn, "staff")
         summary = _summary(conn, staff, rows) if not cm else []
-        return templates.TemplateResponse(request, "dashboard.html", {"rows": rows, "staff": staff, "cm": cm, "month": month, "summary": summary, "steps": STEPS})
+        return templates.TemplateResponse(request, "board.html", {"rows": rows, "staff": staff, "cm": cm, "summary": summary, "steps": STEPS})
 
     @app.get("/users/{user_id}")
     def user_page(request: Request, user_id: str):
@@ -161,7 +173,7 @@ def create_app(s: Settings) -> FastAPI:
         return hit
 
     @app.post("/users/{user_id}/respond")
-    def respond_finding(user_id: str, fp: str = Form(...), kind: str = Form(...), note: str = Form("")):
+    def respond_finding(user_id: str, fp: str = Form(...), kind: str = Form(...), note: str = Form(""), back: str = Form("")):
         target = _find(user_id, fp)
         record_id = None
         if kind == "history_noted":
@@ -170,7 +182,8 @@ def create_app(s: Settings) -> FastAPI:
             # 過去の漏れは、今日の日付で経緯を残す。過去の日付では書き足さない
             record_id = add_record(conn, RecordIn(user_id=user_id, event_date=today(s).isoformat(), kind_written="経緯", body=note.strip())).id
         respond(conn, s, target, kind, record_id=record_id)
-        return RedirectResponse(f"/users/{user_id}", status_code=303)
+        safe_back = back if back.startswith("/") and not back.startswith("//") else f"/users/{user_id}"
+        return RedirectResponse(safe_back, status_code=303)
 
     @app.get("/doc")
     def open_doc(path: str):
