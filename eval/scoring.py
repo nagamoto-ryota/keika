@@ -1,5 +1,6 @@
 """採点。当たりは「利用者＋根拠箇所＋理由」がすべて合う時だけ。
 
+書類の中の頁は見ない。標準様式への置き直しで頁が動いたため（書類と日付と理由で照合する）。
 項目番号だけでは照合しない。理由は語の一致を機械で見て、言い換えの可能性があるものは
 reason_review に出し、別の係が判定する（機械で落とさない）。
 """
@@ -48,8 +49,6 @@ def _norm_date(value) -> str | None:
 def _same_place(want: dict, finding: Finding) -> bool:
     for ev in finding.evidence:
         if ev.file != want["file"]:
-            continue
-        if want.get("page") is not None and ev.page not in (None, want["page"]):
             continue
         if want.get("date") is not None and ev.record_date != _norm_date(want["date"]):
             continue

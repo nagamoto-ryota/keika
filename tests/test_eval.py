@@ -35,7 +35,7 @@ def test_score_requires_user_and_location_and_reason():
     table = [item()]
     assert score([finding(user="U02")], table).hits == []
     assert score([finding(file="利用者/b.pdf")], table).hits == []
-    assert score([finding(page=9)], table).hits == []
+    assert score([finding(file="利用者/別.pdf")], table).hits == []
     f = Finding(rule_id="R03", user_id="U01", kind="finding", period="2026-10", message="確認してください。",
                 evidence=[Evidence(file="利用者/a.pdf", page=2, quote="別の語")])
     s = score([f], table)
