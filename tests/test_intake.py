@@ -100,6 +100,25 @@ def test_invented_terms_allows_what_was_said():
     assert invented_terms("薬を飲めていない", "薬を飲めていない") == []
 
 
+def test_time_written_as_clock_is_not_invented():
+    assert invented_terms("今日2時から", "14:00より") == []
+    assert invented_terms("午後1時半から", "13:30より") == []
+    assert invented_terms("2時から", "15:00より") == ["15"]
+
+
+def test_plain_word_turned_formal_is_not_invented():
+    assert invented_terms("ふらついて転んではいない", "転倒はしていない") == []
+    assert invented_terms("薬はそのまま飲んでいる", "服薬は変わらない") == []
+    assert invented_terms("先生に診てもらった", "受診した") == []
+
+
+def test_kana_and_short_form_of_a_ledger_name_is_not_invented():
+    names = ["ぶなの木レンタル", "ヘルパーステーションほたるい", "久留島"]
+    assert invented_terms("ブナの木さんに相談", "ぶなの木レンタルに相談", names=names) == []
+    assert invented_terms("ほたるいの作り置き", "ヘルパーステーションほたるいの作り置き", names=names) == []
+    assert invented_terms("相談した", "ぶなの木レンタルに相談した", names=names) == ["ぶなの木レンタル"]
+
+
 def test_record_with_invented_terms_is_flagged_not_saved_silently(env):
     s, c = env
     results, _ = run(s, c, "訪問した。", entry(body="訪問した。週3回に増やす。"))

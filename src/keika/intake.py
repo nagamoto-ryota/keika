@@ -20,7 +20,12 @@ from keika.records import KindRead, Record, RecordIn, add_record
 from keika.settings import Settings, now_real, today
 
 _KANJI_DIGITS = str.maketrans("〇一二三四五六七八九", "0123456789")
-_CAREFUL_WORDS = ("受診", "入院", "退院", "転倒", "内服", "服薬", "処方", "診断", "治療", "手術", "点滴", "骨折", "薬")
+# 語: 話の中にこのどれかがあれば、平たい言い方を直しただけとみなす
+_CAREFUL_WORDS = {
+    "受診": ("受診", "病院", "先生", "医者", "診"), "入院": ("入院",), "退院": ("退院",), "転倒": ("転倒", "転ん", "転び", "転ぶ", "尻もち", "こけ"),
+    "内服": ("内服", "薬", "飲"), "服薬": ("服薬", "薬", "飲"), "処方": ("処方", "薬"), "診断": ("診断",), "治療": ("治療",),
+    "手術": ("手術", "オペ"), "点滴": ("点滴",), "骨折": ("骨折",), "薬": ("薬",),
+}
 
 
 class WireFix(BaseModel):
@@ -52,7 +57,7 @@ SYSTEM = """日本の介護支援専門員が話した内容（音声入力や�
 - 話していない事実を足さない。数字、日付、人名、薬、受診は、話に出てきたものだけを書く。推測で補わない。
 - 話し言葉を、記録の文章に直す（です・ます調ではなく「〜した」「〜とのこと」）。言い間違いや繰り返しは整える。話の中身は削らない。
 - 1回の話に複数の利用者や複数の出来事があれば、分けて複数の記録にする。
-- 同じ名前の人がいないか台帳で確かめる。利用者本人、家族、職員を取り違えない。誤変換した人名は台帳で直し、name_fixes に書く。
+- 同じ名前の人がいないか台帳で確かめる。利用者本人、家族、職員を取り違えない。誤変換した人名や事業所名は台帳で直し、name_fixes に書く。話に出ていない人や事業所の名前を足さない。
 - 誰の話か迷う時は user_id を空にするか ambiguous を true にする。無理に決めない。
 - 種類は話の中身で判定する。電話なら「電話」、利用者の家を訪ねたなら「居宅訪問」、デイなど事業所で会ったなら「事業所訪問」。
 - 評価や助言を足さない。医療の判断をしない。
@@ -66,20 +71,49 @@ class IntakeResult:
     warnings: list[str] = field(default_factory=list)
 
 
+def _normal(text: str) -> str:
+    return unicodedata.normalize("NFKC", text).translate(_KANJI_DIGITS)
+
+
 def _digits(text: str) -> set[str]:
-    normal = unicodedata.normalize("NFKC", text).translate(_KANJI_DIGITS)
-    return set(re.findall(r"\d+", normal))
+    return set(re.findall(r"\d+", _normal(text)))
+
+
+def _without_spoken_clocks(original: str, shaped: str) -> str:
+    """「2時」を 14:00 と書くのは整文の範囲なので、数字の点検から外す。"""
+    said = _digits(original)
+    half = "半" in original
+
+    def keep_or_drop(m: re.Match) -> str:
+        hour, minute = int(m[1]), m[2]
+        hour_ok = str(hour) in said or str(hour - 12) in said
+        minute_ok = minute == "00" or minute in said or (minute == "30" and half)
+        if hour_ok and minute_ok:
+            return " "
+        return m[1] if minute_ok else m[0]
+
+    return re.sub(r"(\d{1,2}):(\d{2})", keep_or_drop, _normal(shaped))
+
+
+def _hira(text: str) -> str:
+    return "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ン" else c for c in text)
+
+
+def _name_spoken(name: str, original: str) -> bool:
+    """氏名の一部（2文字以上）が話に出ていれば、台帳で正しく直しただけとみなす。"""
+    name, said = _hira(squash(name)), _hira(squash(original))
+    return any(name[i:i + 2] in said for i in range(len(name) - 1))
 
 
 def invented_terms(original: str, shaped: str, names: list[str] | tuple[str, ...] = ()) -> list[str]:
     """整文の後にだけ現れる数字、人名、薬や受診の語を返す。機械の警告で、判断は人が行う。"""
-    found = sorted(_digits(shaped) - _digits(original), key=lambda d: shaped.find(d))
-    flat = squash(original)
+    checked = _without_spoken_clocks(original, shaped)
+    found = sorted(_digits(checked) - _digits(original), key=lambda d: checked.find(d))
     for name in names:
-        if name and name in shaped and name not in flat and name not in found:
+        if name and name in shaped and not _name_spoken(name, original) and name not in found:
             found.append(name)
-    words = sorted((w for w in _CAREFUL_WORDS if w in shaped and w not in original), key=shaped.find)
-    return found + [w for w in words if not any(w in x or x in w for x in found) and not (w == "薬" and "内服" in found)]
+    words = sorted((w for w, plain in _CAREFUL_WORDS.items() if w in shaped and not any(x in original for x in plain)), key=shaped.find)
+    return found + words
 
 
 def _name_parts(conn: sqlite3.Connection) -> list[str]:
