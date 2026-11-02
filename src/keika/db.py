@@ -41,6 +41,13 @@ CREATE TABLE IF NOT EXISTS finding_responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL, user_id TEXT, kind TEXT NOT NULL, record_id INTEGER,
   evidence_hash TEXT NOT NULL, run_id INTEGER NOT NULL, who TEXT NOT NULL DEFAULT '', at TEXT NOT NULL, finding TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS review_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, original TEXT NOT NULL, source TEXT NOT NULL, entry TEXT NOT NULL,
+  warnings TEXT NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS intake_files (
+  sha256 TEXT PRIMARY KEY, rel_path TEXT NOT NULL, taken_at TEXT NOT NULL
+);
 -- 履歴は消せない。記録も消せない。記入日時は変えられない。
 CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON record_versions
 BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;

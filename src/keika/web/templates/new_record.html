@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}記録する - ケイカ{% endblock %}
+{% block main %}
+<h1 class="big">記録する</h1>
+<p class="muted">話した内容を支援経過の文章に整えます。誰の話かは Claude が判定し、迷ったら要確認箱へ回します。話していないことは足しません。</p>
+<form method="post" action="/records/new" class="write">
+  <textarea id="text" name="text" rows="9" required placeholder="例: 今日〇〇さんのお宅に行ってきました。変わりなしで、来月もこのままでとのことです。"></textarea>
+  <div class="write-actions">
+    <button type="button" id="mic" class="plain" hidden>話す</button>
+    <span id="mic-state" class="small muted"></span>
+    <span class="spacer"></span>
+    <button name="mode" value="shape">整えて記録する</button>
+  </div>
+</form>
+<p class="small muted">音声ボタンは、ブラウザの音声認識で文字にします。端末の中で処理できない時は、ブラウザの音声認識サービス（Chrome は Google）へ音声が送られます。送りたくない時は、音声を使わず文字で入力してください。</p>
+<script src="/static/speech.js"></script>
+{% endblock %}

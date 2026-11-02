@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}変更の履歴 - ケイカ{% endblock %}
+{% block main %}
+<h1>変更の履歴</h1>
+<p class="muted">いつ誰がどう変えたかが残ります。履歴は消せません。最初に記入した日時: {{ r.first_written_at[:16].replace('T', ' ') if r.first_written_at else '不明（取り込み）' }}</p>
+{% for v in versions %}
+  <article class="record">
+    <div class="head"><strong>第{{ v.version }}版</strong> <span class="muted">{{ v.edited_at[:16].replace('T', ' ') }} {{ v.editor }}</span></div>
+    <p class="muted small">{{ names.get(v.user_id, v.user_id) }} / 出来事の日 {{ v.event_date|hdate }} {% if v.kind_written %}/ {{ v.kind_written }}{% endif %} {% if v.partner %}/ {{ v.partner }}{% endif %}{% if not v.unchecked %} / 確認済み{% endif %}</p>
+    <p>{{ v.body }}</p>
+  </article>
+{% endfor %}
+<p><a href="/users/{{ r.user_id }}">戻る</a></p>
+{% endblock %}

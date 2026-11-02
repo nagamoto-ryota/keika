@@ -8,6 +8,8 @@
 
 <h1 class="big">やること <span class="count">{{ board.total }}</span></h1>
 
+{% if reviews %}<p class="visit-line"><a href="/review">要確認 {{ reviews }}件</a> <span class="muted">誰の記録か決めてください</span></p>{% endif %}
+
 {% if board.visit_waiting %}
 <details class="visit-line">
   <summary>今月の訪問がまだの方 <strong>{{ board.visit_waiting|length }}人</strong><span class="muted">（今月はあと{{ board.days_left }}日）</span></summary>

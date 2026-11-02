@@ -4,16 +4,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from keika.claude_checks import CheckRun, latest_run
+from keika.claude import make_client
+from keika.claude_checks import CheckRun, latest_run, run_claude_checks, save_run
 from keika.db import connect
 from keika.findings import Finding, fingerprint
+from keika.intake import open_reviews, process_text, resolve_review
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
 from keika.progress import STEPS, user_progress
@@ -114,7 +117,7 @@ def _next_user_id(conn) -> str:
     return f"U{max(numbers, default=0) + 1:02d}"
 
 
-def create_app(s: Settings) -> FastAPI:
+def create_app(s: Settings, client_factory: Callable[[], Any] = make_client) -> FastAPI:
     app = FastAPI(title="ケイカ")
     conn = connect(s)
     templates = Jinja2Templates(directory=HERE / "templates")
@@ -134,7 +137,48 @@ def create_app(s: Settings) -> FastAPI:
             records = list_records(conn, person.user.id)
             for task in person.tasks:
                 task.view = _view(s, task.item, records, year) if task.item else None
-        return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm})
+        return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm, "reviews": len(open_reviews(conn))})
+
+    def _check_in_background(user_id: str) -> None:
+        """記録が保存されたら、その利用者だけ点検し直す。失敗しても記録は失わない。"""
+        own = connect(s)
+        try:
+            save_run(own, user_id, run_claude_checks(own, client_factory(), s, user_id))
+        except RuntimeError:  # API キーが無い時など。記録はそのまま、点検だけ走らない
+            pass
+        finally:
+            own.close()
+
+    @app.get("/records/new")
+    def new_record(request: Request):
+        return templates.TemplateResponse(request, "new_record.html", {})
+
+    @app.post("/records/new")
+    def post_record(request: Request, background: BackgroundTasks, text: str = Form(...), mode: str = Form("shape")):
+        if not text.strip():
+            raise HTTPException(400, "文章を入れてください")
+        try:
+            client = client_factory()
+        except RuntimeError as e:
+            raise HTTPException(503, str(e)) from None
+        results = process_text(conn, client, s, text.strip(), "画面", on_saved=lambda uid: background.add_task(_check_in_background, uid))
+        names = {u.id: u.name for u in list_users(conn)}
+        return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
+
+    @app.get("/review")
+    def review(request: Request):
+        return templates.TemplateResponse(request, "review.html", {"items": open_reviews(conn), "users": list_users(conn)})
+
+    @app.post("/review/{review_id}")
+    def post_review(review_id: int, background: BackgroundTasks, user_id: str = Form(""), body: str = Form(""), action: str = Form("save")):
+        chosen = user_id if action == "save" and user_id else None
+        try:
+            record = resolve_review(conn, review_id, user_id=chosen, body=body or None, s=s)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        if record:
+            background.add_task(_check_in_background, record.user_id)
+        return RedirectResponse("/review", status_code=303)
 
     @app.get("/board")
     def board_page(request: Request, cm: str | None = None):

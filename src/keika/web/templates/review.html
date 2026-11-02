@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}要確認箱 - ケイカ{% endblock %}
+{% block main %}
+<h1 class="big">要確認箱 <span class="count">{{ items|length }}</span></h1>
+{% for it in items %}
+  <article class="card unknown">
+    {% if it.note %}<p class="todo-line">{{ it.note }}</p>{% endif %}
+    {% if it.warnings %}<p class="small">話に無いかもしれない語: <strong>{{ it.warnings|join('、') }}</strong></p>{% endif %}
+    <form method="post" action="/review/{{ it.id }}">
+      <p><select name="user_id" required>
+        <option value="">誰の記録か選ぶ</option>
+        {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if it.entry.get('user_id') == u.id }}>{{ u.name }}</option>{% endfor %}
+      </select></p>
+      <textarea name="body" rows="4">{{ it.entry.get('body') or it.original }}</textarea>
+      <div class="write-actions">
+        <button name="action" value="save">この内容で記録する</button>
+      </div>
+    </form>
+    <form method="post" action="/review/{{ it.id }}">
+      <input type="hidden" name="action" value="set_aside">
+      <input type="hidden" name="user_id" value="">
+      <button class="plain">記録にしない</button>
+    </form>
+    <details class="more"><summary>話した元の文</summary><p class="original small">{{ it.original }}</p></details>
+  </article>
+{% else %}
+  <p class="clear">要確認はありません。</p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}記録を直す - ケイカ{% endblock %}
+{% block main %}
+<h1>記録を直す</h1>
+<p class="muted">普通に直せます。前の版は履歴に残ります。</p>
+<form method="post" action="/records/{{ r.id }}/edit" class="write">
+  <p><label>誰の記録か <select name="user_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == r.user_id }}>{{ u.name }}</option>{% endfor %}</select></label></p>
+  <p><label>出来事の日 <input type="date" name="event_date" value="{{ r.event_date }}" required></label>
+     <label>時刻 <input name="event_time" value="{{ r.event_time }}" size="6"></label>
+     <label>種別 <input name="kind_written" value="{{ r.kind_written }}"></label>
+     <label>相手 <input name="partner" value="{{ r.partner }}"></label></p>
+  <textarea name="body" rows="8" required>{{ r.body }}</textarea>
+  <input type="hidden" name="author" value="{{ r.author }}">
+  <div class="write-actions"><button>保存する</button> <a href="/users/{{ r.user_id }}">戻る</a></div>
+</form>
+{% endblock %}
