@@ -8,7 +8,7 @@ import pytest
 from keika.claude import MODEL, load_api_key, make_client
 from keika.db import connect
 from keika.files import scan
-from keika.reading import DocFacts, read_doc, read_docs
+from keika.reading import WireFacts, read_doc, read_docs
 from keika.settings import Settings
 
 
@@ -41,12 +41,23 @@ class FakeClient:
         return FakeStream(self.results.pop(0) if len(self.results) > 1 else self.results[0])
 
 
-def answer(facts: DocFacts, stop_reason="end_turn"):
+def wire(**kw) -> WireFacts:
+    blank = dict(
+        readable=True, read_note="", doc_type="その他", body_status="不明", summary="", user_name="", doc_date="",
+        doc_date_source=dict(page=0, quote=""), period_start="", period_end="", period_source=dict(page=0, quote=""),
+        target_month="", signature="不明", signature_date="", signature_source=dict(page=0, quote=""),
+        consent_date="", consent_source=dict(page=0, quote=""), consent_persons=[], issues=[], goals=[], services=[],
+        delivered_to=[], attendees=[], activities=[],
+    )
+    return WireFacts(**(blank | kw))
+
+
+def answer(facts, stop_reason="end_turn"):
     usage = SimpleNamespace(input_tokens=1000, output_tokens=100, cache_read_input_tokens=0, cache_creation_input_tokens=0)
     return SimpleNamespace(parsed_output=facts, stop_reason=stop_reason, usage=usage)
 
 
-FACTS = DocFacts(doc_type="その他", summary="読めた")
+FACTS = wire(summary="読めた")
 
 
 @pytest.fixture
@@ -181,3 +192,47 @@ def test_make_client_without_key_gives_clear_error(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="API キー"):
         make_client(Path(tmp_path))
+
+
+def test_wire_schema_fits_structured_output_limits():
+    # 公式の上限: 省略可は合計24、union は合計16。全項目を必須にして union を使わない
+    from anthropic.lib._parse._transform import transform_schema
+
+    schema = transform_schema(WireFacts)
+
+    def walk(node):
+        if isinstance(node, dict):
+            assert "anyOf" not in node and not isinstance(node.get("type"), list)
+            if isinstance(node.get("properties"), dict) and node.get("type") == "object":
+                assert set(node["required"]) == set(node["properties"])
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(schema)
+
+
+def test_wire_converts_blanks_to_none():
+    facts = wire().to_facts()
+    assert facts.doc_date is None and facts.doc_date_source is None and facts.signature_present is None
+
+
+def test_wire_converts_signature_and_sources():
+    facts = wire(
+        signature="なし",
+        signature_source=dict(page=2, quote="署名欄"),
+        services=[dict(name="通所介護", per_week=-1, days="", source=dict(page=0, quote="週2回"))],
+    ).to_facts()
+    assert facts.signature_present is False
+    assert facts.signature_source.page == 2
+    assert facts.services[0].per_week is None and facts.services[0].days is None
+    assert facts.services[0].source.page is None and facts.services[0].source.quote == "週2回"
+    assert wire(signature="あり").to_facts().signature_present is True
+
+
+def test_unreadable_answer_from_claude_is_kept_as_not_readable(env):
+    s, conn = env
+    facts = read_doc(conn, FakeClient(answer(wire(readable=False, read_note="白紙"))), s, only_ref(s))
+    assert facts.readable is False and facts.read_note == "白紙"

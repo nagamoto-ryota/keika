@@ -87,16 +87,116 @@ class DocFacts(BaseModel):
         return cls(readable=False, read_note=note, summary="読めなかった書類")
 
 
+class WireSource(BaseModel):
+    page: int = Field(description="PDF のページ番号（1始まり）。ページの無い書類は 0")
+    quote: str = Field(description="原文からそのまま抜き出した短い語句。無ければ空文字")
+
+    def to_source(self) -> Source | None:
+        return Source(page=self.page or None, quote=self.quote) if self.quote or self.page else None
+
+
+class WireText(BaseModel):
+    text: str
+    source: WireSource
+
+    def to_fact(self) -> TextFact:
+        return TextFact(text=self.text, source=self.source.to_source())
+
+
+class WireService(BaseModel):
+    name: str = Field(description="サービスの種類や事業所名")
+    per_week: float = Field(description="週あたりの回数。書かれていなければ -1")
+    days: str = Field(description="曜日や頻度の書きぶりをそのまま。無ければ空文字")
+    source: WireSource
+
+
+class WireActivity(BaseModel):
+    kind: str = Field(description="委員会、研修、訓練、会議など")
+    date: str = Field(description="実施日 YYYY-MM-DD。無ければ空文字")
+    title: str
+    participants: str = Field(description="参加者。無ければ空文字")
+    source: WireSource
+
+
+class WireFacts(BaseModel):
+    """Claude に返させる形。
+
+    決まった形の出力には公式の上限（省略可は合計24、null を許す項目は合計16）がある。
+    DocFacts のままでは超えるので、全項目を必須にし「無い」は空文字などで表して受け取り、保存の前に直す。
+    """
+
+    readable: bool = Field(description="中身を読めたら true")
+    read_note: str = Field(description="読めなかった部分や迷った点。無ければ空文字")
+    doc_type: DocType
+    body_status: Literal["本文あり", "表紙や目次だけ", "白紙", "不明"] = Field(description="中身が実際に書かれているか")
+    summary: str = Field(description="何の書類かを一文で")
+    user_name: str = Field(description="対象の利用者の氏名。無ければ空文字")
+    doc_date: str = Field(description="作成日または実施日 YYYY-MM-DD。無ければ空文字")
+    doc_date_source: WireSource
+    period_start: str = Field(description="計画期間などの始まり YYYY-MM-DD。無ければ空文字")
+    period_end: str = Field(description="計画期間などの終わり YYYY-MM-DD。無ければ空文字")
+    period_source: WireSource
+    target_month: str = Field(description="利用票など月ごとの書類の対象月 YYYY-MM。無ければ空文字")
+    signature: Literal["あり", "なし", "不明"] = Field(
+        description="利用者または代理人の署名・押印欄に記入があれば あり、欄が空なら なし、欄が無い・判断できないなら 不明"
+    )
+    signature_date: str = Field(description="署名・交付・同意の日付 YYYY-MM-DD。無ければ空文字")
+    signature_source: WireSource
+    consent_date: str = Field(description="計画などへの同意の日付 YYYY-MM-DD。無ければ空文字")
+    consent_source: WireSource
+    consent_persons: list[WireText] = Field(description="同意した人（本人、家族など）")
+    issues: list[WireText] = Field(description="課題、ニーズ")
+    goals: list[WireText] = Field(description="目標")
+    services: list[WireService] = Field(description="サービスと頻度")
+    delivered_to: list[WireText] = Field(description="交付先")
+    attendees: list[WireText] = Field(description="会議の出席者、照会先")
+    activities: list[WireActivity] = Field(description="記録されている委員会・研修・訓練など")
+
+    def to_facts(self) -> DocFacts:
+        return DocFacts(
+            readable=self.readable,
+            read_note=self.read_note or None,
+            doc_type=self.doc_type,
+            body_status=self.body_status,
+            summary=self.summary,
+            user_name=self.user_name or None,
+            doc_date=self.doc_date or None,
+            doc_date_source=self.doc_date_source.to_source(),
+            period_start=self.period_start or None,
+            period_end=self.period_end or None,
+            period_source=self.period_source.to_source(),
+            target_month=self.target_month or None,
+            signature_present={"あり": True, "なし": False, "不明": None}[self.signature],
+            signature_date=self.signature_date or None,
+            signature_source=self.signature_source.to_source(),
+            consent_date=self.consent_date or None,
+            consent_source=self.consent_source.to_source(),
+            consent_persons=[x.to_fact() for x in self.consent_persons],
+            issues=[x.to_fact() for x in self.issues],
+            goals=[x.to_fact() for x in self.goals],
+            services=[
+                ServiceFact(name=x.name, per_week=None if x.per_week < 0 else x.per_week, days=x.days or None, source=x.source.to_source())
+                for x in self.services
+            ],
+            delivered_to=[x.to_fact() for x in self.delivered_to],
+            attendees=[x.to_fact() for x in self.attendees],
+            activities=[
+                ActivityFact(kind=x.kind, date=x.date or None, title=x.title, participants=x.participants or None, source=x.source.to_source())
+                for x in self.activities
+            ],
+        )
+
+
 SYSTEM = """あなたは日本の介護支援専門員（ケアマネジャー）の事業所で、書類の読み取りを担当します。
 渡された書類を1件読み、決まった形で項目を埋めてください。
 
 守ること:
-- 書類に書かれていることだけを書く。推測で埋めない。書かれていない項目は null か空のリストにする。
+- 書類に書かれていることだけを書く。推測で埋めない。書かれていない項目は説明の通り空文字などにする。
 - 様式は事業所ごとに違う。見出しの名前に頼らず、中身で判断する。
 - source.quote は原文からそのまま抜き出す。要約や言い換えをしない。PDF はページ番号も入れる。
 - 日付は YYYY-MM-DD に直す。和暦は西暦に直す（令和8年は2026年）。
-- 署名・押印は目で確かめる。印字された氏名は署名ではない。署名欄が空なら signature_present は false。
-  欄が無い、または読み取れず判断できない時は null にして、read_note に理由を書く。
+- 署名・押印は目で確かめる。印字された氏名は署名ではない。署名欄が空なら signature は「なし」。
+  欄が無い、または読み取れず判断できない時は「不明」にして、read_note に理由を書く。
 - 表紙や目次、見出しだけで本文の無い書類は body_status を「表紙や目次だけ」にする。
 - 複数の日付や版がある時は、書類が示す通りに各項目へ入れ、迷いは read_note に書く。
 - 良し悪しの判定はしない。読み取りだけを行う。"""
@@ -132,7 +232,7 @@ def _ask(client: Any, s: Settings, ref: DocRef) -> tuple[DocFacts, bool]:
     if payload.unreadable:
         return DocFacts.unknown(f"開けませんでした（{payload.reason}）"), True
     try:
-        return ask_structured(client, SYSTEM, _content(ref, payload), DocFacts), True
+        return ask_structured(client, SYSTEM, _content(ref, payload), WireFacts).to_facts(), True
     except StructuredError as e:
         return DocFacts.unknown(str(e)), False
 
