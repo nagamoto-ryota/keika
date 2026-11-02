@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 
 from keika.settings import Settings
 
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS review_items (
 CREATE TABLE IF NOT EXISTS intake_files (
   sha256 TEXT PRIMARY KEY, rel_path TEXT NOT NULL, taken_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS intake_originals (record_id INTEGER PRIMARY KEY, original TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS office_declarations (
   id INTEGER PRIMARY KEY AUTOINCREMENT, rule_id TEXT NOT NULL, who TEXT NOT NULL, basis TEXT NOT NULL, at TEXT NOT NULL
 );
@@ -66,8 +68,30 @@ BEGIN SELECT RAISE(ABORT, '記入日時は変えられません'); END;
 
 def connect(s: Settings) -> sqlite3.Connection:
     s.db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(s.db_path, check_same_thread=False)
+    conn = sqlite3.connect(s.db_path, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     return conn
+
+
+class ThreadConnection:
+    """スレッドごとに別の接続を使う。画面は複数のスレッドで動くので、1本の接続を共有しない。"""
+
+    def __init__(self, s: Settings):
+        self._s = s
+        self._local = threading.local()
+
+    def _conn(self) -> sqlite3.Connection:
+        if not hasattr(self._local, "conn"):
+            self._local.conn = connect(self._s)
+        return self._local.conn
+
+    def __getattr__(self, name: str):
+        return getattr(self._conn(), name)
+
+    def __enter__(self):
+        return self._conn().__enter__()
+
+    def __exit__(self, *exc):
+        return self._conn().__exit__(*exc)

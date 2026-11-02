@@ -8,6 +8,7 @@
   <p><label>出来事の日 <input type="date" name="event_date" value="{{ r.event_date }}" required></label>
      <label>時刻 <input name="event_time" value="{{ r.event_time }}" size="6"></label>
      <label>種別 <input name="kind_written" value="{{ r.kind_written }}"></label>
+     <label>実際の種類 <select name="kind_read"><option value="" {{ 'selected' if not r.kind_read }}></option>{% for k in kinds %}<option value="{{ k }}" {{ 'selected' if r.kind_read == k }}>{{ k }}</option>{% endfor %}</select></label>
      <label>相手 <input name="partner" value="{{ r.partner }}"></label></p>
   <textarea name="body" rows="8" required>{{ r.body }}</textarea>
   <input type="hidden" name="author" value="{{ r.author }}">

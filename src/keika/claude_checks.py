@@ -15,10 +15,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-import anthropic
 import pypdf
 
 from keika.claude import FALLBACK_BETA, METER, MODEL
+from keika.db import connect
 from keika.files import DocRef, to_payload
 from keika.findings import Evidence, Finding
 from keika.ledger import find_person, get_user
@@ -34,8 +34,13 @@ APP_RECORDS = "支援経過（アプリの記録）"
 MAX_TURNS = 30
 TIME_LIMIT_SECONDS = 360  # 応答が止まっても画面を待たせない
 
-_MEDICAL = re.compile(r"(薬|服薬|内服).{0,12}(減ら|増や|中止|やめ|変更すべき|飲まな)|受診が必要|受診してください|受診すべき|診断|治療(を|が|すべき)|処方(を|す)")
-_BACKDATE = re.compile(r"過去の日付|さかのぼ|遡って|遡り|前日付|\d+月\d+日付|\d{4}[-/]\d{1,2}[-/]\d{1,2}付")
+_MEDICAL = re.compile(
+    r"(薬|服薬|内服).{0,12}(減ら|増や|中止|やめ|変更すべき|飲まな)|減薬|増薬|断薬"
+    r"|受診(が必要|してください|すべき|させ|をお?勧め|をおすすめ)|の疑い|診断(を|が|する|すべ)|治療(を|が|すべき)|処方(を|す)"
+)
+_BACKDATE = re.compile(r"過去の日付|さかのぼ|遡って|遡り|前日付|\d+月\d+日付|\d+月の日付|\d{4}[-/]\d{1,2}[-/]\d{1,2}付")
+MIN_QUOTE = 2  # 1文字の引用はどの原文にも当たるので根拠にならない
+MIN_CLOSING_QUOTE = 4  # 指摘を消す時はもっと確かな語句を求める
 _SPACE = re.compile(r"\s+")
 
 
@@ -44,17 +49,23 @@ def _squeeze(text: str) -> str:
 
 
 def _quote_ok(quote: str | None, source: str | None) -> bool:
-    if not quote or source is None:  # 文字の層が無いスキャンなどは機械で確かめられない
+    if not quote:
         return True
-    return _squeeze(quote) in _squeeze(source)
+    needle = _squeeze(quote)
+    if len(needle) < MIN_QUOTE:
+        return False
+    return source is None or needle in _squeeze(source)  # 文字の層が無い書類は機械で確かめられない
 
 
 def validate_finding(f: Finding, texts: dict[str, str | None]) -> Finding | None:
     """画面に出してよい形か検査する。出せなければ None。"""
-    good = [e for e in f.evidence if e.file in texts and _quote_ok(e.quote, texts[e.file])]
-    if not good and not f.searched_scope:
+    good = [
+        e.model_copy(update={"unverified": bool(e.quote) and texts[e.file] is None})
+        for e in f.evidence if e.file in texts and _quote_ok(e.quote, texts[e.file])
+    ]
+    if not good and (f.evidence or not f.searched_scope):  # 無い引用を、探した範囲で言い逃れさせない
         return None
-    if _MEDICAL.search(f.message):
+    if _MEDICAL.search(f.message) or _MEDICAL.search(f.todo or ""):
         return None
     suggestion = f.suggestion
     if suggestion and (_MEDICAL.search(suggestion) or _BACKDATE.search(suggestion)):
@@ -83,7 +94,7 @@ def _ref_text(s: Settings, ref: DocRef) -> str | None:
 def source_texts(conn: sqlite3.Connection, s: Settings, user_id: str) -> dict[str, str | None]:
     """指摘の引用を照らし合わせる原文。"""
     user = get_user(conn, user_id)
-    texts: dict[str, str | None] = {r.rel_path: _ref_text(s, r) for r in user_refs(s, user)}
+    texts: dict[str, str | None] = {r.rel_path: _ref_text(s, r) for r in user_refs(conn, s, user)}
     manual = [r.body for r in list_records(conn, user_id) if not r.source.startswith("csv:")]
     texts[APP_RECORDS] = "\n".join(manual)
     return texts
@@ -276,6 +287,8 @@ class ProgressMark:
 class CheckRun:
     progress: list[ProgressMark] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
+    last_record_id: int = 0  # この回の時点の最新の記録。次の回に閉じる根拠は、これより新しい記録に限る
+    file_hashes: dict[str, str] = field(default_factory=dict)  # この回の時点の書類の中身
     dismissed: list[Dismissal] = field(default_factory=list)
     resolved: list[Resolution] = field(default_factory=list)
     replaced: list[str] = field(default_factory=list)  # 出し直された前回の指摘の番号
@@ -300,7 +313,7 @@ def _first_message(conn: sqlite3.Connection, s: Settings, user_id: str, refs: li
     known = {ref.rel_path for ref, _ in stored_facts(conn, refs)}
     files = [{"ファイル": r.rel_path, "読み取り済み": r.rel_path in known} for r in refs]
     dumped = [{"rule_id": c.rule_id, "period": c.period, "内容": c.message} for c in candidates]
-    confirmed = silenced_for_prompt(conn, user_id)
+    confirmed = silenced_for_prompt(conn, s, user_id)
     return (
         f"今日は {today(s).isoformat()} です。\n\n## 利用者\n{json.dumps(info, ensure_ascii=False)}\n\n"
         f"## フォルダの書類\n{json.dumps(files, ensure_ascii=False)}\n\n"
@@ -322,7 +335,8 @@ def _prior_findings(conn: sqlite3.Connection, s: Settings, user_id: str) -> list
     latest = latest_run(conn, user_id)
     if latest is None:
         return []
-    return [i.finding for i in sort_findings(conn, s, user_id, latest[0].findings).open]
+    parts = sort_findings(conn, s, user_id, latest[0].findings)
+    return [i.finding for i in parts.open + parts.noted]  # 「経緯あり」も次の回に引き継ぐ
 
 
 def _read_document(s: Settings, refs: list[DocRef], rel: str) -> list[dict] | str:
@@ -363,7 +377,7 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
     """失敗しても記録は失わず、点検を「未実施」にする。"""
     run = CheckRun()
     user = get_user(conn, user_id)
-    refs = user_refs(s, user)
+    refs = user_refs(conn, s, user)
     on = today(s)
     rules = active_rules(on)
     allowed = {r.id for r in rules if r.judge == "claude"}
@@ -374,6 +388,11 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
     for r in list_records(conn, user_id):
         all_bodies.setdefault(r.event_date, []).append(r.body)
     prior = _prior_findings(conn, s, user_id)
+    previous = latest_run(conn, user_id)
+    prev = previous[0] if previous else CheckRun()
+    row = conn.execute("SELECT COALESCE(MAX(id), 0) AS n FROM records").fetchone()
+    run.last_record_id = row["n"]
+    run.file_hashes = {r.rel_path: r.sha256 for r in refs}
     messages: list[dict] = [{"role": "user", "content": _first_message(conn, s, user_id, refs, candidates, prior)}]
     before = METER.cost_usd
     try:
@@ -404,15 +423,18 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
             messages.append({"role": "assistant", "content": message.content})
             results = []
             for block in (b for b in message.content if b.type == "tool_use"):
-                results.append(_run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run, candidates, prior))
+                results.append(_run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run, candidates, prior, prev))
             messages.append({"role": "user", "content": results})
         raise RuntimeError("手順が長くなりすぎました")
-    except (anthropic.APIError, RuntimeError, ValueError) as e:
-        # 失敗しても前回の指摘は失わない
-        return CheckRun(findings=prior, not_run=True, error=f"{type(e).__name__}: {e}", cost=METER.cost_usd - before)
+    except Exception as e:  # 外部との境界。ストリームの途中の切断は SDK の型に包まれない
+        # 失敗しても前回の指摘と判定は失わない
+        return CheckRun(
+            findings=prior, dismissed=prev.dismissed, resolved=prev.resolved, progress=prev.progress, last_record_id=prev.last_record_id,
+            file_hashes=prev.file_hashes, not_run=True, error=f"{type(e).__name__}: {e}", cost=METER.cost_usd - before,
+        )
 
 
-def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: CheckRun, candidates: list[Finding], prior: list[Finding]) -> dict:
+def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: CheckRun, candidates: list[Finding], prior: list[Finding], prev: CheckRun) -> dict:
     result = {"type": "tool_result", "tool_use_id": block.id}
     try:
         if block.name == "read_document":
@@ -420,11 +442,11 @@ def _run_tool(block, conn, s, refs, user_id, allowed, texts, all_bodies, run: Ch
         elif block.name == "lookup_ledger":
             result["content"] = _lookup(conn, block.input["name"])
         elif block.name == "report_finding":
-            result["content"] = _accept_finding(block.input, user_id, allowed, texts, run, list_records(conn, user_id))
+            result["content"] = _accept_finding(block.input, user_id, allowed, texts, run, list_records(conn, user_id), prior)
         elif block.name == "report_progress":
             result["content"] = _accept_progress(block.input, texts, run)
         elif block.name == "resolve_finding":
-            result["content"] = _accept_resolution(block.input, user_id, texts, run, prior, list_records(conn, user_id))
+            result["content"] = _accept_resolution(block.input, texts, run, prior, list_records(conn, user_id), prev)
         elif block.name == "dismiss_candidate":
             result["content"] = _accept_dismissal(block.input, all_bodies, run, candidates)
         else:
@@ -439,15 +461,16 @@ def _point_to_record_source(f: Finding, records: list[Record]) -> Finding:
     """支援経過の引用は、日付と語句で記録を特定し、本来の出どころを根拠にする。"""
     fixed = []
     for e in f.evidence:
-        hit = next((r for r in records if e.record_date and r.event_date == e.record_date and e.quote
-                    and _squeeze(e.quote) in _squeeze(r.body)), None)
-        if hit:
-            e = e.model_copy(update={"file": hit.source.removeprefix("csv:") if hit.source.startswith("csv:") else APP_RECORDS})
+        needle = _squeeze(e.quote or "")
+        matches = [r for r in records if len(needle) >= MIN_QUOTE and needle in _squeeze(r.body)] if e.record_date else []
+        hit = next((r for r in matches if r.event_date == e.record_date), matches[0] if matches else None)
+        if hit:  # 語句のある本当の記録を根拠にする（Claude の日付やファイル名の取り違えを直す）
+            e = e.model_copy(update={"file": hit.source.removeprefix("csv:") if hit.source.startswith("csv:") else APP_RECORDS, "record_date": hit.event_date})
         fixed.append(e)
     return f.model_copy(update={"evidence": fixed})
 
 
-def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, run: CheckRun, records: list[Record]) -> str:
+def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, run: CheckRun, records: list[Record], prior: list[Finding]) -> str:
     if data.get("rule_id") not in allowed:
         run.dropped.append({**data, "why": "点検項目が違う"})
         return "受け付けませんでした: この点検項目は Claude の対象ではありません。"
@@ -456,12 +479,25 @@ def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, ru
         run.dropped.append({**data, "why": "検査で落ちた"})
         return "受け付けませんでした: 引用が原文に無いか、箇所がないか、医療の判断に踏み込んでいます。直すなら原文を確かめて報告し直してください。"
     run.findings.append(checked)
-    if data.get("replaces"):
+    # 同じ点検項目の時だけ出し直しと認める。無関係な指摘で前回の指摘を消させない
+    ids = {f"P{i}": f for i, f in enumerate(prior, start=1)}
+    target = ids.get(data.get("replaces", ""))
+    if target is not None and target.rule_id == checked.rule_id:
         run.replaced.append(data["replaces"])
     return "受け付けました。"
 
 
-def _accept_resolution(data: dict, user_id: str, texts: dict, run: CheckRun, prior: list[Finding], records: list[Record]) -> str:
+def _is_new_evidence(e: Evidence, records: list[Record], texts: dict, prev: CheckRun, now_hashes: dict[str, str]) -> bool:
+    """前回の点検の後に増えた記録か、中身が変わった書類だけを、閉じる根拠と認める。"""
+    needle = _squeeze(e.quote or "")
+    if len(needle) < MIN_CLOSING_QUOTE or e.unverified or texts.get(e.file) is None:
+        return False
+    if e.record_date:
+        return any(r.id > prev.last_record_id and r.event_date == e.record_date and needle in _squeeze(r.body) for r in records)
+    return prev.file_hashes.get(e.file) != now_hashes.get(e.file)
+
+
+def _accept_resolution(data: dict, texts: dict, run: CheckRun, prior: list[Finding], records: list[Record], prev: CheckRun) -> str:
     ids = {f"P{i}": f for i, f in enumerate(prior, start=1)}
     target = ids.get(data.get("prior_id", ""))
     probe = None
@@ -472,10 +508,11 @@ def _accept_resolution(data: dict, user_id: str, texts: dict, run: CheckRun, pri
         ]
         probe = _point_to_record_source(target.model_copy(update={"evidence": evidence, "searched_scope": None}), records)
         probe = validate_finding(probe, texts)
-    if probe is None or not any(e.quote for e in probe.evidence):
+    fresh = [e for e in probe.evidence if _is_new_evidence(e, records, texts, prev, run.file_hashes)] if probe else []
+    if not fresh:
         run.dropped.append({**data, "why": "閉じる根拠が確かめられない"})
-        return "受け付けませんでした: 根拠の原文が確かめられません。対応が確認できないなら閉じないでください。"
-    first = next(e for e in probe.evidence if e.quote)
+        return "受け付けませんでした: 前回の点検の後に増えた記録か、変わった書類の原文が要ります。対応が確認できないなら閉じないでください。"
+    first = fresh[0]
     run.resolved.append(Resolution(target.rule_id, target.period, target.message, data["reason"], first.record_date or "", first.quote))
     return "閉じました。"
 
@@ -490,18 +527,25 @@ def _carry_over(run: CheckRun, prior: list[Finding]) -> None:
 
 def _accept_progress(data: dict, texts: dict, run: CheckRun) -> str:
     """done は根拠の原文を確かめられる時だけ受ける。確かめられなければ unknown に下げる。"""
-    record_text = "\n".join(v for k, v in texts.items() if k.endswith(".csv") and v) + "\n" + (texts.get(APP_RECORDS) or "")
     marks = []
     for m in data["marks"]:
         status = m["status"]
-        if status == "done":
-            source = texts[m["file"]] if m["file"] in texts else record_text
-            if not m["quote"] or not _quote_ok(m["quote"], source):
-                status = "unknown"
-                run.dropped.append({**m, "why": "進捗の根拠が確かめられない"})
+        if status == "done" and not (m["file"] in texts and m["quote"].strip() and _quote_ok(m["quote"], texts[m["file"]])):
+            status = "unknown"
+            run.dropped.append({**m, "why": "進捗の根拠が確かめられない"})
+        elif status == "na" and m["step"] != "medical":  # 対象外になるのは医療系だけ
+            status = "unknown"
         marks.append(ProgressMark(m["step"], status, m["date"], m["note"], m["file"], m["quote"]))
     run.progress = marks
     return "受け付けました。"
+
+
+def _near_period(record_date: str, period: str) -> bool:
+    """対象が月の時は、前後1か月の記録だけを事情の根拠と認める。"""
+    if not re.fullmatch(r"\d{4}-\d{2}", period) or not re.match(r"\d{4}-\d{2}", record_date):
+        return True
+    months = lambda t: int(t[:4]) * 12 + int(t[5:7])  # noqa: E731
+    return abs(months(record_date) - months(period)) <= 1
 
 
 def _accept_dismissal(data: dict, all_bodies: dict[str, list[str]], run: CheckRun, candidates: list[Finding]) -> str:
@@ -509,7 +553,11 @@ def _accept_dismissal(data: dict, all_bodies: dict[str, list[str]], run: CheckRu
         run.dropped.append({**data, "why": "候補に無い"})
         return "受け付けませんでした: その候補はありません。rule_id と period を候補のとおりに指定してください。"
     bodies = all_bodies.get(data["record_date"], [])
-    if not any(_squeeze(data["quote"]) in _squeeze(b) for b in bodies) or not data["quote"]:
+    needle = _squeeze(data["quote"])
+    if not _near_period(data["record_date"], data["period"]):
+        run.dropped.append({**data, "why": "取り下げの根拠の日付が遠い"})
+        return "受け付けませんでした: その月の事情を示す記録を根拠にしてください。"
+    if len(needle) < MIN_CLOSING_QUOTE or not any(needle in _squeeze(b) for b in bodies):
         run.dropped.append({**data, "why": "取り下げの根拠が記録に無い"})
         return "受け付けませんでした: その日付の記録に、その語句はありません。"
     run.dismissed.append(Dismissal(data["rule_id"], data["period"], data["reason"], data["record_date"], data["quote"]))
@@ -522,6 +570,8 @@ def save_run(conn: sqlite3.Connection, user_id: str, run: CheckRun) -> None:
         "dismissed": [asdict(d) for d in run.dismissed],
         "resolved": [asdict(r) for r in run.resolved],
         "progress": [asdict(m) for m in run.progress],
+        "last_record_id": run.last_record_id,
+        "file_hashes": run.file_hashes,
         "dropped": run.dropped,
         "not_run": run.not_run,
         "error": run.error,
@@ -544,6 +594,7 @@ def latest_run(conn: sqlite3.Connection, user_id: str) -> tuple[CheckRun, str] |
         findings=[Finding(**f) for f in data["findings"]], dismissed=[Dismissal(**d) for d in data["dismissed"]],
         resolved=[Resolution(**r) for r in data.get("resolved", [])],
         progress=[ProgressMark(**m) for m in data.get("progress", [])],
+        last_record_id=data.get("last_record_id", 0), file_hashes=data.get("file_hashes", {}),
         dropped=data["dropped"], not_run=data["not_run"], error=data["error"], cost=data["cost"],
     )
     return run, row["run_at"]
@@ -557,3 +608,19 @@ def latest_marks(conn: sqlite3.Connection, user_id: str) -> dict[str, ProgressMa
         if data:
             return {m["step"]: ProgressMark(**m) for m in data}
     return {}
+
+
+def check_and_save(s: Settings, client_factory: Any, user_id: str) -> None:
+    """その利用者だけ点検し直して保存する。走らせられない時も「未実施」を残す。"""
+    conn = connect(s)
+    try:
+        try:
+            run = run_claude_checks(conn, client_factory(), s, user_id)
+        except Exception as e:  # キーが無い時など。記録はそのまま、点検だけが未実施
+            latest = latest_run(conn, user_id)
+            prev = latest[0] if latest else CheckRun()
+            run = CheckRun(findings=prev.findings, dismissed=prev.dismissed, resolved=prev.resolved, progress=prev.progress,
+                           not_run=True, error=f"{type(e).__name__}: {e}")
+        save_run(conn, user_id, run)
+    finally:
+        conn.close()

@@ -53,7 +53,7 @@ class Cell:
 
 def user_progress(conn: sqlite3.Connection, s: Settings, user: User) -> list[Cell]:
     on = today(s)
-    refs = user_refs(s, user)
+    refs = user_refs(conn, s, user)
     facts = stored_facts(conn, refs)
     plan = _latest_plan(facts)
     marks = latest_marks(conn, user.id)

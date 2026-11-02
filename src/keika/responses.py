@@ -102,6 +102,14 @@ def silenced_counts(conn: sqlite3.Connection) -> dict[str, int]:
     return counts
 
 
-def silenced_for_prompt(conn: sqlite3.Connection, user_id: str) -> list[dict]:
-    """Claude に渡す「人が確認して問題なしとしたもの」。同じ指摘を繰り返さないため。"""
-    return [{"rule_id": r["rule_id"], "period": r["period"], "内容": r["message"]} for r in silenced_list(conn) if r["user_id"] == user_id]
+def silenced_for_prompt(conn: sqlite3.Connection, s: Settings, user_id: str) -> list[dict]:
+    """Claude に渡す「人が確認して問題なしとしたもの」。根拠の書類が変わったものは渡さない（また出てよい）。"""
+    latest: dict[str, sqlite3.Row] = {}
+    for row in conn.execute("SELECT * FROM finding_responses WHERE user_id IS ? ORDER BY id", (user_id,)):
+        latest[row["fingerprint"]] = row
+    out = []
+    for row in latest.values():
+        finding = Finding.model_validate_json(row["finding"])
+        if row["kind"] == "off_target" and row["evidence_hash"] == evidence_hash(s, finding):
+            out.append({"rule_id": finding.rule_id, "period": finding.period, "内容": finding.message})
+    return out

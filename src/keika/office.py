@@ -57,6 +57,8 @@ def _real(doc: Doc) -> bool:
 
 def _activities(docs: list[Doc], kind: str, topic: str):
     for ref, f in docs:
+        if _about((ref, f), "計画") and f.doc_type != "業務継続計画":  # 研修計画は予定で、実施の記録ではない
+            continue
         for act in f.activities:
             if kind in act.kind + act.title and re.search(topic, act.title + act.kind) and _parse(act.date):
                 yield act, ref
@@ -94,8 +96,11 @@ def _infection(docs: list[Doc], on: date) -> dict:
     steps = []
     if not guide or not _real(guide):
         steps.append("感染症の指針を整える")
-    if _infection_committee(docs, on) or not _committee_dates(docs, "感染"):
-        steps.append("委員会をおおむね6か月に1回開いて記録する")
+    gaps = _infection_committee(docs, on)
+    if gaps:
+        steps.extend(g.message.removesuffix("開催と記録を確認してください。").rstrip("。") for g in gaps)
+    elif not _committee_dates(docs, "感染"):
+        steps.append("感染症対策の委員会をおおむね6か月に1回開いて記録する")
     for kind in ("研修", "訓練"):
         if not _within_year(docs, kind, "感染", on):
             steps.append(f"感染症の{kind}を年1回以上行って記録する")
@@ -123,6 +128,7 @@ def _abuse(conn: sqlite3.Connection, s: Settings, docs: list[Doc], on: date) -> 
     if _regulation_mentions(s, docs, "虐待") is False:
         steps.append("運営規程に虐待防止の措置を書く")
     trainings = list(_activities(docs, "研修", "虐待"))
+    record = next((ref for _, ref in _activities(docs, "研修", ".")), None)
     for person in list_people(conn, "staff"):
         hired = _parse(_staff_data(conn, person.id).get("hired"))
         if hired is None or on - hired > YEAR:
@@ -131,7 +137,8 @@ def _abuse(conn: sqlite3.Connection, s: Settings, docs: list[Doc], on: date) -> 
         attended = any(_parse(a.date) >= hired and family in (a.participants or "") + a.title for a, _ in trainings)
         if not attended:
             steps.append(f"{person.name}さんの新規採用時の虐待防止研修（{hired.isoformat()} 入職）を確かめる")
-    return {"steps": steps, "evidence": guide}
+    records_first = next((d for d in docs if record and d[0].rel_path == record.rel_path), None)
+    return {"steps": steps, "evidence": records_first if any("研修" in x for x in steps) and records_first else guide}
 
 
 def _staff_data(conn: sqlite3.Connection, staff_id: str) -> dict:

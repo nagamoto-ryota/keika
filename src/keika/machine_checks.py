@@ -186,8 +186,9 @@ def _cert_renewal(user: User, on: date) -> list[Finding]:
     if end is None or (end - on).days > NUDGE_DAYS:
         return []
     deadline = end - timedelta(days=30)
+    timing = f"30日前の {deadline.isoformat()} を過ぎています。更新の申請の状況" if on > deadline else f"{deadline.isoformat()} までに更新の申請がされるよう、援助"
     return [Finding(rule_id="R44", user_id=user.id, kind="nudge", period=end.isoformat(), searched_scope="台帳の認定有効期間", todo="認定の更新申請の援助",
-                    message=f"認定の有効期間が {end.isoformat()} で終わります。{deadline.isoformat()} までに更新の申請がされるよう、援助を確認してください。")]
+                    message=f"認定の有効期間が {end.isoformat()} で終わります。{timing}を確認してください。")]
 
 
 def _missing_docs(user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocFacts]]) -> list[Finding]:
@@ -235,9 +236,17 @@ def _infection_committee(facts: list[tuple[DocRef, DocFacts]], on: date) -> list
 # --- まとめ ---
 
 
-def user_refs(s: Settings, user: User) -> list[DocRef]:
+def user_refs(conn: sqlite3.Connection, s: Settings, user: User) -> list[DocRef]:
     target = squash(user.name)
-    return [r for r in scan(s) if r.user_folder and squash(re.sub(r"^[A-Za-z]+\d+_", "", r.user_folder)) == target]
+    same_name = sum(squash(u.name) == target for u in list_users(conn)) > 1
+
+    def mine(folder: str) -> bool:
+        if squash(re.sub(r"^[A-Za-z]+\d+_", "", folder)) != target:
+            return False
+        # 同姓同名がいる時は、ID の付いたフォルダだけを本人のものとする（他人の書類を読まない）
+        return folder.startswith(f"{user.id}_") if same_name else True
+
+    return [r for r in scan(s) if r.user_folder and mine(r.user_folder)]
 
 
 def run_machine_checks(conn: sqlite3.Connection, s: Settings, user_id: str | None = None) -> list[Finding]:
@@ -246,7 +255,7 @@ def run_machine_checks(conn: sqlite3.Connection, s: Settings, user_id: str | Non
     users = [u for u in [get_user(conn, user_id)] if u] if user_id else list_users(conn)
     out: list[Finding] = []
     for user in users:
-        refs = user_refs(s, user)
+        refs = user_refs(conn, s, user)
         facts = stored_facts(conn, refs)
         records = list_records(conn, user.id)
         visits = _yobo_visits(user, records, facts, on) if _is_yobo(user) else _monthly_visits(user, records, on)

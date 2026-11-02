@@ -14,10 +14,11 @@ from typing import Any, Callable
 
 from keika.db import connect
 from keika.files import _hash, scan, to_payload
-from keika.intake import _to_review, process_text
+from keika.intake import process_text, to_review
 from keika.settings import Settings, now_real
 
 SETTLE_SECONDS = 20
+RECHECK_SECONDS = 0.5
 
 
 def date_hint(name: str) -> str | None:
@@ -27,7 +28,12 @@ def date_hint(name: str) -> str | None:
 
 def handle_file(conn: sqlite3.Connection, client: Any, s: Settings, path: Path, on_saved: Callable[[str], None] | None = None) -> bool:
     """取り込んだら True。同期の途中、または取り込み済みなら False。"""
-    if time.time() - path.stat().st_mtime < SETTLE_SECONDS:
+    before = path.stat()
+    if time.time() - before.st_mtime < SETTLE_SECONDS:
+        return False
+    time.sleep(RECHECK_SECONDS)  # 元の日時を保つコピーでも、大きさが動いていれば待つ
+    after = path.stat()
+    if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
         return False
     sha = _hash(path)
     if conn.execute("SELECT 1 FROM intake_files WHERE sha256 = ?", (sha,)).fetchone():
@@ -38,7 +44,7 @@ def handle_file(conn: sqlite3.Connection, client: Any, s: Settings, path: Path, 
         return False
     payload = to_payload(s, ref)
     if payload.text is None:
-        _to_review(conn, f"（{path.name}）", path.name, {}, [], f"{path.name} は文字として読めませんでした。文字起こしを置いてください。")
+        to_review(conn, f"（{path.name}）", path.name, {}, [], f"{path.name} は文字として読めませんでした。文字起こしを置いてください。")
     else:
         process_text(conn, client, s, payload.text, path.name, date_hint=date_hint(path.name), on_saved=on_saved)
     conn.execute("INSERT INTO intake_files (sha256, rel_path, taken_at) VALUES (?, ?, ?)", (sha, rel, now_real().isoformat()))
@@ -64,7 +70,7 @@ def start_watcher(s: Settings, client_factory: Callable[[], Any], on_saved: Call
         while not stop.is_set():
             try:
                 scan_inbox(conn, client_factory(), s, on_saved=on_saved)
-            except (RuntimeError, OSError):  # キーが無い、同期で一時的に開けない等。次の回にまた見る
+            except Exception:  # キーが無い、通信切れ、同期で開けない等。止まらず次の回にまた見る
                 pass
             stop.wait(interval)
         conn.close()

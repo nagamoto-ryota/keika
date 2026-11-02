@@ -91,11 +91,11 @@ def ask_structured(
                 messages=[{"role": "user", "content": content}],
             ) as stream:
                 message = stream.get_final_message()
-        except anthropic.APIError as e:  # 通信切れや 429 は SDK が既に再試行している
-            raise StructuredError(f"API の失敗: {type(e).__name__}") from e
         except ValueError as e:  # JSON や型の崩れ
             last = e
             continue
+        except Exception as e:  # 外部との境界。ストリームの途中の切断は SDK の型に包まれない
+            raise StructuredError(f"API の失敗: {type(e).__name__}") from e
         METER.add(message.usage)
         if message.stop_reason == "refusal":
             raise StructuredError("Claude が読み取りを断った")

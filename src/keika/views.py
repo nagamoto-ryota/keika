@@ -39,6 +39,7 @@ class EvidenceView:
     context: str
     highlight: str | None
     open_url: str | None
+    unverified: bool = False
 
 
 def _doc_label(file: str) -> str:
@@ -75,7 +76,7 @@ def evidence_view(s: Settings, e: Evidence, records: list[Record], year: int) ->
     url = f"/doc?path={url_quote(e.file)}"
     ext = path.suffix.lower().lstrip(".")
     if ext == "pdf":
-        return EvidenceView(label, e.quote or "", highlight, url + (f"#page={e.page}" if e.page else ""))
+        return EvidenceView(label, e.quote or "", highlight, url + (f"#page={e.page}" if e.page else ""), e.unverified)
     payload = to_payload(s, DocRef(e.file, "", ext, "user", None))
     context = _around(payload.text, e.quote) if payload.text else None
     return EvidenceView(label, context or e.quote or "", highlight, url)

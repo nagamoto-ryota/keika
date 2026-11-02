@@ -8,6 +8,7 @@
     <summary>{{ e.label }}</summary>
     <div class="evi-body">
       <p class="original">{{ e.context|mark_quote(e.highlight) }}</p>
+      {% if e.unverified %}<p class="small muted">この書類は文字として読めないので、引用を機械で原文と照合できていません。原本で確かめてください。</p>{% endif %}
       {% if e.open_url %}<a href="{{ e.open_url }}" target="_blank" rel="noopener">書類を開く</a>{% endif %}
     </div>
   </details>

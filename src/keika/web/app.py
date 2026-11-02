@@ -1,28 +1,33 @@
 """画面。ログインや権限は作らない（事業所内の PC で動かす）。"""
 from __future__ import annotations
 
+import ipaddress
+import os
 import re
+import socket
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, get_args
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
+from urllib.parse import urlparse
 
 from keika.claude import make_client
-from keika.claude_checks import CheckRun, latest_run, run_claude_checks, save_run
-from keika.db import connect
+from keika.claude_checks import CheckRun, check_and_save, latest_run
+from keika.db import ThreadConnection, connect
+from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
-from keika.intake import open_reviews, process_text, resolve_review
+from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, to_review
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
 from keika.office import declare, office_rows
 from keika.progress import STEPS, user_progress
 from keika.reading import stored_facts
-from keika.records import RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
+from keika.records import KindRead, RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
 from keika.tasks import build_board
@@ -71,7 +76,7 @@ def _mark_quote(text: str | None, quote: str | None) -> Markup:
 def _dashboard_row(conn, s: Settings, user: User, month: str) -> Row:
     records = list_records(conn, user.id)
     visited = any(r.event_date.startswith(month) and r.kind_read == HOME_VISIT for r in records)
-    plans = [f for _, f in stored_facts(conn, user_refs(s, user)) if f.doc_type in PLAN_TYPES and f.period_end]
+    plans = [f for _, f in stored_facts(conn, user_refs(conn, s, user)) if f.doc_type in PLAN_TYPES and f.period_end]
     found, _ = current_findings(conn, s, user.id)
     found = [i.finding for i in sort_findings(conn, s, user.id, found).open]
     latest = latest_run(conn, user.id)
@@ -113,6 +118,20 @@ def _summary(conn, staff: list, rows: list[Row]) -> list[dict]:
     return out
 
 
+def _host_allowed(host: str) -> bool:
+    """このPC、同じ事業所内のネットワークのアドレス、このPCの名前だけを受ける。"""
+    name = host.rsplit(":", 1)[0].strip("[]").lower()
+    if name in ("localhost", "127.0.0.1", "::1", "testserver", socket.gethostname().lower()):
+        return True
+    extra = os.environ.get("KEIKA_ALLOWED_HOSTS", "")
+    if name in {h.strip().lower() for h in extra.split(",") if h.strip()}:
+        return True
+    try:
+        return ipaddress.ip_address(name).is_private
+    except ValueError:
+        return False
+
+
 def _next_user_id(conn) -> str:
     numbers = [int(u.id[1:]) for u in list_users(conn) if u.id[1:].isdigit()]
     return f"U{max(numbers, default=0) + 1:02d}"
@@ -120,7 +139,8 @@ def _next_user_id(conn) -> str:
 
 def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False) -> FastAPI:
     app = FastAPI(title="ケイカ")
-    conn = connect(s)
+    conn = ThreadConnection(s)
+    connect(s).close()  # 表を先に作る
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["sample"] = sample
@@ -128,6 +148,18 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates.env.filters["mark_quote"] = _mark_quote
     templates.env.filters["hdate_full"] = lambda text: (text or "").replace("-", "/")
     templates.env.filters["hdate"] = lambda text: hdate(text, today(s).year)
+
+    @app.middleware("http")
+    async def same_place_only(request: Request, call_next):
+        """外のページからの送信と、DNS を使った読み出しを断る。ログインが無いので、ここが入口の守り。"""
+        host = request.headers.get("host", "")
+        if not _host_allowed(host):
+            return PlainTextResponse("このホスト名では開けません", status_code=400)
+        origin = request.headers.get("origin")
+        if request.method == "POST" and origin and urlparse(origin).netloc != host:
+            return PlainTextResponse("外のページからは送信できません", status_code=403)
+        return await call_next(request)
+
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     @app.get("/")
@@ -142,14 +174,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return templates.TemplateResponse(request, "dashboard.html", {"board": board, "staff": list_people(conn, "staff"), "cm": cm, "reviews": len(open_reviews(conn)), "office_todo": sum(r.status == "todo" for r in office_rows(conn, s))})
 
     def _check_in_background(user_id: str) -> None:
-        """記録が保存されたら、その利用者だけ点検し直す。失敗しても記録は失わない。"""
-        own = connect(s)
-        try:
-            save_run(own, user_id, run_claude_checks(own, client_factory(), s, user_id))
-        except RuntimeError:  # API キーが無い時など。記録はそのまま、点検だけ走らない
-            pass
-        finally:
-            own.close()
+        """記録が保存されたら、その利用者だけ点検し直す。失敗しても記録は失わず「未実施」と出す。"""
+        check_and_save(s, client_factory, user_id)
 
     @app.get("/records/new")
     def new_record(request: Request):
@@ -163,9 +189,10 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(400, "文章を入れてください")
         try:
             client = client_factory()
-        except RuntimeError as e:
-            raise HTTPException(503, str(e)) from None
-        results = process_text(conn, client, s, text.strip(), "画面", on_saved=lambda uid: background.add_task(_check_in_background, uid))
+        except RuntimeError as e:  # キーが無くても、話した内容は失わない
+            results = [IntakeResult(review_id=to_review(conn, text.strip(), "画面", {}, [], f"整えられませんでした（{e}）"))]
+        else:
+            results = process_text(conn, client, s, text.strip(), "画面", on_saved=lambda uid: background.add_task(_check_in_background, uid))
         names = {u.id: u.name for u in list_users(conn)}
         return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
 
@@ -177,18 +204,23 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.get("/records/{record_id}/edit")
     def edit_form(request: Request, record_id: int):
-        return templates.TemplateResponse(request, "edit_record.html", {"r": _record_or_404(record_id), "users": list_users(conn)})
+        return templates.TemplateResponse(request, "edit_record.html", {"r": _record_or_404(record_id), "users": list_users(conn), "kinds": get_args(KindRead)})
 
     @app.post("/records/{record_id}/edit")
     def edit_save(
         record_id: int, background: BackgroundTasks, user_id: str = Form(...), event_date: str = Form(...), event_time: str = Form(""),
-        kind_written: str = Form(""), partner: str = Form(""), body: str = Form(...), author: str = Form(""),
+        kind_written: str = Form(""), kind_read: str = Form(""), partner: str = Form(""), body: str = Form(...), author: str = Form(""),
     ):
         before = _record_or_404(record_id)
         if not body.strip():
             raise HTTPException(400, "本文を入れてください")
-        changes = dict(user_id=user_id, event_date=event_date, event_time=event_time, kind_written=kind_written, partner=partner, body=body.strip(), author=author)
-        edit_record(conn, record_id, changes, editor=author or "画面")
+        if get_user(conn, user_id) is None:
+            raise HTTPException(400, "台帳に無い利用者です")
+        changes = dict(user_id=user_id, event_date=event_date, event_time=event_time, kind_written=kind_written, kind_read=kind_read or None, partner=partner, body=body.strip(), author=author)
+        try:
+            edit_record(conn, record_id, changes, editor=author or "画面")
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
         for uid in {before.user_id, user_id}:
             background.add_task(_check_in_background, uid)
         return RedirectResponse(f"/users/{user_id}", status_code=303)
@@ -196,7 +228,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     @app.get("/records/{record_id}/history")
     def record_history(request: Request, record_id: int):
         names = {u.id: u.name for u in list_users(conn)}
-        return templates.TemplateResponse(request, "history.html", {"r": _record_or_404(record_id), "versions": history(conn, record_id), "names": names})
+        return templates.TemplateResponse(request, "history.html", {"r": _record_or_404(record_id), "versions": history(conn, record_id), "names": names, "original": original_of(conn, record_id)})
 
     @app.post("/records/{record_id}/checked")
     def record_checked(record_id: int):
@@ -251,7 +283,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         parts = sort_findings(conn, s, user_id, found)
         records = list_records(conn, user_id)
         year = today(s).year
-        facts = stored_facts(conn, user_refs(s, user))
+        facts = stored_facts(conn, user_refs(conn, s, user))
         return templates.TemplateResponse(request, "user.html", {
             "user": user,
             "findings": [_view(s, i, records, year) for i in parts.open],
@@ -259,7 +291,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "run": run,
             "docs": [{"name": r.rel_path.rsplit("/", 1)[-1], "facts": f} for r, f in facts],
             "records": list(reversed(records)),
-            "unread": len(user_refs(s, user)) - len(facts),
+            "unread": len(user_refs(conn, s, user)) - len(facts),
             "cells": user_progress(conn, s, user),
         })
 
@@ -292,7 +324,12 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(403, "このフォルダの外は開けません") from None
         if not target.is_file():
             raise HTTPException(404, "書類が見つかりません")
-        return FileResponse(target, content_disposition_type="inline", filename=target.name)
+        ext = target.suffix.lower().lstrip(".")
+        if ext not in ALL_EXTS:  # HTML や SVG を、アプリと同じ場所で実行させない
+            raise HTTPException(403, "この種類のファイルは開けません")
+        inline = ext in BINARY_EXTS
+        return FileResponse(target, content_disposition_type="inline" if inline else "attachment", filename=target.name,
+                            headers={"X-Content-Type-Options": "nosniff"})
 
     @app.get("/silenced")
     def silenced(request: Request):

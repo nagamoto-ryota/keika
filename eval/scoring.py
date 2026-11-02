@@ -49,7 +49,7 @@ def _same_place(want: dict, finding: Finding) -> bool:
     for ev in finding.evidence:
         if ev.file != want["file"]:
             continue
-        if want.get("page") is not None and ev.page != want["page"]:
+        if want.get("page") is not None and ev.page not in (None, want["page"]):
             continue
         if want.get("date") is not None and ev.record_date != _norm_date(want["date"]):
             continue
@@ -69,7 +69,8 @@ def _location_ok(item: dict, finding: Finding, with_inbox: bool) -> bool:
 
 
 def _reason_ok(item: dict, finding: Finding) -> bool:
-    text = " ".join(filter(None, [finding.message, finding.suggestion, *(e.quote for e in finding.evidence)]))
+    names = [Path(e.file).name for e in finding.evidence]
+    text = " ".join(filter(None, [finding.message, finding.suggestion, *(e.quote for e in finding.evidence), *names]))
     return all(any(str(_norm_date(w) if isinstance(w, date) else w) in text for w in g["any_of"]) for g in item.get("must_mention", []))
 
 

@@ -10,5 +10,6 @@
     <p>{{ v.body }}</p>
   </article>
 {% endfor %}
+{% if original %}<details class="fold"><summary>話した元の文</summary><p class="original small">{{ original }}</p></details>{% endif %}
 <p><a href="/users/{{ r.user_id }}">戻る</a></p>
 {% endblock %}

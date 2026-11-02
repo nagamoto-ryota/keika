@@ -58,6 +58,7 @@ SYSTEM = """日本の介護支援専門員が話した内容（音声入力や�
 - 話し言葉を、記録の文章に直す（です・ます調ではなく「〜した」「〜とのこと」）。言い間違いや繰り返しは整える。話の中身は削らない。
 - 1回の話に複数の利用者や複数の出来事があれば、分けて複数の記録にする。
 - 同じ名前の人がいないか台帳で確かめる。利用者本人、家族、職員を取り違えない。誤変換した人名や事業所名は台帳で直し、name_fixes に書く。話に出ていない人や事業所の名前を足さない。
+- spoken_name には話の中の呼び方をそのまま書く。台帳の氏名と違う書き方なら、必ず name_fixes にその読み替えを書く（heard に呼び方、fixed に台帳の氏名）。
 - 誰の話か迷う時は user_id を空にするか ambiguous を true にする。無理に決めない。
 - 種類は話の中身で判定する。電話なら「電話」、利用者の家を訪ねたなら「居宅訪問」、デイなど事業所で会ったなら「事業所訪問」。
 - 評価や助言を足さない。医療の判断をしない。
@@ -131,19 +132,23 @@ def _roster(conn: sqlite3.Connection) -> str:
     return json.dumps({"利用者": users, "関係者": people}, ensure_ascii=False)
 
 
-def _is_ambiguous_name(conn: sqlite3.Connection, spoken: str, user_id: str) -> bool:
-    """呼び方が複数の人に当たるのに、利用者の氏名そのものではない時は迷いとする。"""
-    name = re.sub(r"(さん|様|さま|ちゃん|くん|氏)$", "", spoken.strip())
-    matches = find_person(conn, name)
-    people = {(m.kind, m.id) for m in matches}
-    if len(people) < 2:
-        return False
-    user = get_user(conn, user_id)
-    return not (user and squash(name) in (squash(user.name), squash(user.name.split()[0])) and
-                not any(m.kind == "user" and m.user_id != user_id for m in matches))
+_SEPARATORS = re.compile(r"[／/・、,]")
+_HONORIFIC = re.compile(r"(さん|様|さま|ちゃん|くん|君|氏|先生)$")
 
 
-def _to_review(conn: sqlite3.Connection, original: str, source: str, entry: dict, warnings: list[str], note: str) -> int:
+def _calls_this_user(conn: sqlite3.Connection, spoken: str, user_id: str, fixes: list[WireFix]) -> bool:
+    """話の中の呼び方が、その利用者か、その利用者の家族に当たるか。当たらなければ自動で保存しない。"""
+    fixed = {squash(f.heard): f.fixed for f in fixes}
+    for token in _SEPARATORS.split(spoken):
+        name = _HONORIFIC.sub("", token.strip())
+        name = fixed.get(squash(name), name)
+        matches = find_person(conn, name)
+        if matches and all(m.user_id == user_id for m in matches):
+            return True
+    return False
+
+
+def to_review(conn: sqlite3.Connection, original: str, source: str, entry: dict, warnings: list[str], note: str) -> int:
     cur = conn.execute(
         "INSERT INTO review_items (original, source, entry, warnings, note, status, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?)",
         (original, source, json.dumps(entry, ensure_ascii=False), json.dumps(warnings, ensure_ascii=False), note, now_real().isoformat()),
@@ -187,22 +192,26 @@ def process_text(
     try:
         wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireIntake)
     except StructuredError as e:
-        return [IntakeResult(review_id=_to_review(conn, text, source, {}, [], f"整えられませんでした（{e}）"))]
+        return [IntakeResult(review_id=to_review(conn, text, source, {}, [], f"整えられませんでした（{e}）"))]
+    if not wire.entries:
+        return [IntakeResult(review_id=to_review(conn, text, source, {}, [], "記録にできる内容を読み取れませんでした"))]
     results, saved = [], []
     names = _name_parts(conn)
     for entry in wire.entries:
         fixed = " ".join(f.fixed for f in entry.name_fixes)
         warnings = invented_terms(text + " " + fixed, entry.body, names)
         note = entry.ambiguity_note
-        problem = not get_user(conn, entry.user_id) or entry.ambiguous or _is_ambiguous_name(conn, entry.spoken_name, entry.user_id)
+        problem = not get_user(conn, entry.user_id) or entry.ambiguous or not _calls_this_user(conn, entry.spoken_name, entry.user_id, entry.name_fixes)
         if problem or warnings:
             if problem and not note:
                 note = f"「{entry.spoken_name}」が誰か確かめてください"
             if warnings:
                 note = (note + " " if note else "") + "話に無い語が入っているかもしれません"
-            results.append(IntakeResult(review_id=_to_review(conn, text, source, entry.model_dump(), warnings, note), warnings=warnings))
+            results.append(IntakeResult(review_id=to_review(conn, text, source, entry.model_dump(), warnings, note), warnings=warnings))
             continue
         record = _save_entry(conn, s, entry, source)
+        conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, text))
+        conn.commit()
         results.append(IntakeResult(record=record))
         if entry.user_id not in saved:
             saved.append(entry.user_id)
@@ -210,6 +219,11 @@ def process_text(
         for user_id in saved:
             on_saved(user_id)
     return results
+
+
+def original_of(conn: sqlite3.Connection, record_id: int) -> str | None:
+    row = conn.execute("SELECT original FROM intake_originals WHERE record_id = ?", (record_id,)).fetchone()
+    return row["original"] if row else None
 
 
 def open_reviews(conn: sqlite3.Connection) -> list[dict]:
@@ -224,7 +238,7 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
 def resolve_review(conn: sqlite3.Connection, review_id: int, *, user_id: str | None, body: str | None = None, s: Settings | None = None) -> Record | None:
     """振り分けを決める。user_id が無ければ、記録にせず脇に置く（消さない）。"""
     row = conn.execute("SELECT * FROM review_items WHERE id = ?", (review_id,)).fetchone()
-    if row is None:
+    if row is None or row["status"] != "open":
         raise ValueError("要確認の項目が見つかりません")
     if user_id is None:
         conn.execute("UPDATE review_items SET status = 'set_aside' WHERE id = ?", (review_id,))
@@ -237,6 +251,7 @@ def resolve_review(conn: sqlite3.Connection, review_id: int, *, user_id: str | N
         kind_read=None if entry["kind_read"] == "不明" else entry["kind_read"], monitoring=entry["monitoring"], partner=entry["partner"],
         body=body or entry["body"], author=_author(conn, user_id), source=f"intake:{row['source']}",
     ))
+    conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, row["original"]))
     conn.execute("UPDATE review_items SET status = 'resolved' WHERE id = ?", (review_id,))
     conn.commit()
     return record

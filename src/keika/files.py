@@ -19,6 +19,9 @@ _HASHES: dict[tuple[str, int, int], str] = {}  # 変わっていないファイ�
 TEXT_EXTS = {"txt", "csv"}
 OFFICE_EXTS = {"docx", "xlsx"}
 BINARY_EXTS = {"pdf", "png", "jpg", "jpeg"}
+UNREADABLE = "unreadable:"
+MAX_BYTES = 30 * 1024 * 1024  # API の上限（1回 32MB）より少し小さく
+IMAGE_MAGIC = {"png": b"\x89PNG", "jpg": b"\xff\xd8", "jpeg": b"\xff\xd8"}
 OLD_EXTS = {"doc", "xls"}  # 文字にできないが「読めない」と知らせるために拾う
 ALL_EXTS = TEXT_EXTS | OFFICE_EXTS | BINARY_EXTS | OLD_EXTS
 MEDIA_TYPES = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}
@@ -60,7 +63,11 @@ def scan(s: Settings) -> list[DocRef]:
                 continue
             parts = Path(rel).parts
             user_folder = parts[1] if scope == "user" and len(parts) > 2 else None
-            refs.append(DocRef(rel, _hash(path), ext, scope, user_folder))
+            try:
+                sha = _hash(path)
+            except OSError:  # 使用中や同期中で開けない。次に見た時にまた読む
+                sha = f"{UNREADABLE}{rel}"
+            refs.append(DocRef(rel, sha, ext, scope, user_folder))
     return refs
 
 
@@ -120,8 +127,12 @@ def to_payload(s: Settings, ref: DocRef) -> Payload:
         raw = path.read_bytes()
         if ref.ext in TEXT_EXTS:
             return Payload(text=decode_text(raw))
+        if len(raw) > MAX_BYTES:
+            raise ValueError("大きすぎて読めない")
         if ref.ext == "pdf":
             _check_pdf(raw)
+        elif not raw.startswith(IMAGE_MAGIC[ref.ext]):
+            raise ValueError("画像として開けない")
         return Payload(data=raw, media_type=MEDIA_TYPES[ref.ext])
     except Exception as e:  # 壊れた書類の失敗の形は様々。1件で全体を止めない
         return Payload(unreadable=True, reason=f"{type(e).__name__}: {e}")

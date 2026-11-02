@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+import threading
 import time
 from datetime import date
 from pathlib import Path
@@ -63,6 +64,10 @@ def sync(user_prefix: str | None = None) -> int:
         if ref.ext == "csv" and facts.doc_type == "支援経過":
             outcome = import_csv(conn, client, s, ref)
             print(f"{ref.rel_path}: 追加 {outcome.added}、変更 {len(outcome.changed)}、同じ {outcome.unchanged}{'、失敗: ' + outcome.error if outcome.error else ''}")
+            if outcome.conflicts:
+                print(f"  人が直した記録と CSV が違います（上書きしていません）: {len(outcome.conflicts)} 件")
+            if outcome.bad_dates:
+                print(f"  日付を読めなかった行: {outcome.bad_dates} 行")
     print(f"書類 {len(results)} 件、読めなかった {len(failed)} 件、{time.time() - started:.0f} 秒、API {METER.calls} 回、約 ${METER.cost_usd:.2f}")
     for name in failed:
         print(f"  読めなかった: {name}")
@@ -126,9 +131,15 @@ def serve(host: str, port: int, watch: bool = True) -> int:
     conn.close()
     if watch:
         from keika.claude import make_client
+        from keika.claude_checks import check_and_save
         from keika.watcher import start_watcher
 
-        start_watcher(s, make_client)
+        def on_saved(user_id: str) -> None:  # 届いた記録もその場で点検する
+            threading.Thread(target=check_and_save, args=(s, make_client, user_id), daemon=True).start()
+
+        start_watcher(s, make_client, on_saved=on_saved)
+    if host == "0.0.0.0":
+        print("注意: 同じネットワークの全員が、ログインなしで利用者の情報を見られます。事業所内のネットワークだけで使ってください。")
     print(f"ケイカを起動します: http://{host}:{port}")
     uvicorn.run(create_app(s), host=host, port=port, log_level="warning")
     return 0

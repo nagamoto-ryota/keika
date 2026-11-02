@@ -12,6 +12,7 @@ class Evidence(BaseModel):
     page: int | None = None
     quote: str | None = None
     record_date: str | None = None
+    unverified: bool = False  # 文字の層が無く、引用を機械で原文と照合できない
 
 
 class Finding(BaseModel):
