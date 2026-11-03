@@ -1,6 +1,6 @@
 """薬と医療判断の線を、実物の Claude で確かめる。入口の整文と、点検の指摘の両方。
 
-  python eval/run_boundary.py --db data/demo2.db
+  python eval/run_boundary.py --db data/demo_clean.db
 
 話の例は架空。--db は読み取り済みの架空データの DB で、コピーして使う。結果は eval/results/ に残す。
 """

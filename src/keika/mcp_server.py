@@ -1,6 +1,7 @@
 """Claude Desktop から話した内容を受け取る MCP サーバー。
 
 別の抜け道にしないため、入口のファイルと同じ process_text を通す。
+架空データの実演専用。データベースと同じフォルダに鍵のファイルが無ければ、Claude にもデータベースにも触らずに断る。
 """
 from __future__ import annotations
 
@@ -14,15 +15,23 @@ from keika.ledger import get_user
 from keika.settings import Settings
 
 REPO = Path(__file__).resolve().parents[2]
+KEY_NAME = "mcp_on"
+LOCKED = "この道具は止めています。何も記録していません。架空データの実演の時だけ、準備をした上で使えます。"
 TOOL_DESCRIPTION = (
-    "ケアマネジャーが話した内容を、ケイカの支援経過の下書きとして記録します。"
-    "「ケイカに記録」「経過に記録」「支援経過に記録」と言われた時は、他を探さずにこの道具を使います。"
-    "利用者が話した言葉をそのまま text に渡します。要約や言い換えをせず、人名や薬名を直さない。"
-    "返ってきた結果を、そのまま利用者に伝えます。"
+    "架空データの実演専用の道具です。実在の利用者の話には使いません。"
+    "準備をしていない時は、何も記録せずに断ります。"
+    "実演では、話した言葉をそのまま text に渡します。要約や言い換えをせず、人名や薬名を直さない。"
+    "返ってきた結果を、そのまま伝えます。"
 )
 
 
+def enabled(s: Settings) -> bool:
+    return (s.db_path.parent / KEY_NAME).is_file()
+
+
 def record_text(s: Settings, client: Any, text: str) -> str:
+    if not enabled(s):
+        return LOCKED
     if not text.strip():
         return "話した内容が空だったので、何も記録していません。"
     conn = connect(s)
@@ -47,6 +56,8 @@ def build_server(s: Settings, client_factory: Callable[[], Any]):
 
     @server.tool(name="record_text", description=TOOL_DESCRIPTION)
     def record_text_tool(text: str) -> str:
+        if not enabled(s):
+            return LOCKED
         return record_text(s, client_factory(), text)
 
     return server
