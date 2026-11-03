@@ -11,7 +11,7 @@
   </article>
   {% else %}
   <article class="card unknown">
-    <p>「記録の確認」に回しました。{% if r.warnings %}話の中に無い言葉があります: {{ r.warnings|join('、') }}{% endif %}</p>
+    <p>「記録の確認」に回しました。{% if r.warnings %}入力した文章に無い言葉があります: {{ r.warnings|join('、') }}{% endif %}</p>
     <a href="/review">記録の確認を開く</a>
   </article>
   {% endif %}

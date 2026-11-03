@@ -138,6 +138,6 @@ def test_warning_is_shown_in_plain_words(env):
     s, c = env
     to_review(c, "訪問した", "typed", {"user_id": "U01", "body": "15時から訪問した。"}, ["15"], "")
     body = TestClient(create_app(s)).get("/").text
-    assert "話の中にありません" in body and "15時から訪問した" in body
+    assert "入力した文章にありません" in body and "15時から訪問した" in body
     assert "話に無いかもしれない語" not in body
     assert open_reviews(c)[0]["hints"][0]["context"] == "15時から訪問した"

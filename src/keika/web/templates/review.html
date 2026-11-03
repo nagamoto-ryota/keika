@@ -5,7 +5,7 @@
 {% for it in items %}
   <article class="card unknown">
     {% if it.note %}<p class="todo-line">{{ it.note }}</p>{% endif %}
-    {% if it.warnings %}<p class="small">話の中に無い言葉: <strong>{{ it.warnings|join('、') }}</strong></p>{% endif %}
+    {% if it.warnings %}<p class="small">入力した文章に無い言葉: <strong>{{ it.warnings|join('、') }}</strong></p>{% endif %}
     <form method="post" action="/review/{{ it.id }}">
       <p><select name="user_id" required>
         <option value="">誰の記録か選ぶ</option>
@@ -21,7 +21,7 @@
       <input type="hidden" name="user_id" value="">
       <button class="plain">記録にしない</button>
     </form>
-    <details class="more"><summary>話した元の文</summary><p class="original small">{{ it.original }}</p></details>
+    <details class="more"><summary>入力した元の文章</summary><p class="original small">{{ it.original }}</p></details>
   </article>
 {% else %}
   <p class="clear">確認するものはありません。</p>

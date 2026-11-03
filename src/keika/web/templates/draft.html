@@ -3,9 +3,9 @@
 {% block main %}
 <p class="muted no-print"><a href="/users/{{ d.user_id }}">{{ user.name }}</a> ／ {{ d.source }} から作りました</p>
 <h1>{{ d.title }}<span class="muted small">（下書き）</span></h1>
-<p class="draft-note">AI が文字起こしから作った下書きです。内容を確かめて直してください。話に出てこなかった欄は「〇〇」のままです。</p>
+<p class="draft-note">AI が文字起こしから作った下書きです。内容を確かめて直してください。文字起こしに出てこなかった欄は「〇〇」のままです。</p>
 {% if d.status == 'checked' %}<p class="muted">確かめ終わっています。</p>{% endif %}
-{% if d.flagged %}<p class="todo-line no-print">元の話と合うか確かめたい文が {{ d.flagged }} 件あります。赤い線の文を見比べてください。</p>{% endif %}
+{% if d.flagged %}<p class="todo-line no-print">文字起こしと合うか確かめたい文が {{ d.flagged }} 件あります。赤い線の文を見比べてください。</p>{% endif %}
 
 <form method="post" action="/drafts/{{ d.id }}" class="write draft">
   <table class="draft-head">
@@ -57,7 +57,7 @@ document.getElementById("copy-draft").addEventListener("click", function () {
 {% if d.held %}
 <section class="no-print">
   <h2>下書きに入れなかった文</h2>
-  <p class="muted small">薬、診断、受診の判断に関わるので、AI の下書きには入れていません。話の中身は人が確かめてください。</p>
+  <p class="muted small">薬、診断、受診の判断に関わるので、AI の下書きには入れていません。文字起こしの内容は人が確かめてください。</p>
   {% for h in d.held %}<p class="small">{{ h.text }}{% if h.quote %} <span class="muted">（元の発言: {{ h.quote }}）</span>{% endif %}</p>{% endfor %}
 </section>
 {% endif %}

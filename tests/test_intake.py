@@ -237,7 +237,7 @@ def test_review_card_says_which_word_and_what_to_do(env):
     s, c = env
     run(s, c, "柚木さん宅を訪問。変わりなし。", entry(body="柚木様宅を訪問した。歩行は99歩だった。"))
     page = TestClient(create_app(s)).get("/").text
-    assert "「99」は、話の中にありません" in page
+    assert "「99」は、入力した文章にありません" in page
     assert "AI が書き足したのかもしれません" in page and "歩行は99歩だった" in page
 
 
@@ -261,6 +261,6 @@ def test_name_warning_says_what_ai_took_the_spoken_word_for(env):
     fix = {"heard": "ゆかさん", "fixed": "鷺沼 由佳"}
     to_review(c, "ゆかさんは不在", "typed", {"user_id": "U06", "body": "鷺沼由佳さんは不在であった。", "name_fixes": [fix]}, ["由佳"], "")
     page = TestClient(create_app(s)).get("/").text
-    assert "「由佳」という書き方は、話の中にありません" in page
-    assert "AI が「ゆかさん」を「鷺沼 由佳」のことだと判断したようです" in page
+    assert "「由佳」という書き方は、入力した文章にありません" in page
+    assert "入力では「ゆかさん」でした。AI が「鷺沼 由佳」さんのことだと判断して書き換えました" in page
     assert "書き足したのかもしれません" not in page

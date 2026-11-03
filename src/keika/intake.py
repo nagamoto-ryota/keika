@@ -304,7 +304,7 @@ def original_of(conn: sqlite3.Connection, record_id: int) -> str | None:
     return row["original"] if row else None
 
 
-UNSPOKEN_NOTE = "話に無い語が入っているかもしれません"
+UNSPOKEN_NOTE = "入力した文章に無い言葉が入っているかもしれません"
 
 
 def term_context(body: str, term: str) -> str:
@@ -327,7 +327,7 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
     for r in rows:
         entry, warnings = json.loads(r["entry"]), json.loads(r["warnings"])
         items.append({"id": r["id"], "original": r["original"], "source": r["source"], "entry": entry, "warnings": warnings,
-                      "note": r["note"].replace(UNSPOKEN_NOTE, "").strip(),
+                      "note": r["note"].replace(UNSPOKEN_NOTE, "").replace("話に無い語が入っているかもしれません", "").strip(),
                       "hints": [{"word": w, "context": term_context(entry.get("body") or "", w),
                                  "fix": next((f for f in entry.get("name_fixes", []) if w in f["fixed"]), None)} for w in warnings],
                       "name_fixes": [f for f in entry.get("name_fixes", []) if squash(f["heard"]) != squash(f["fixed"])]})

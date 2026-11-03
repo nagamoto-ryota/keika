@@ -2,13 +2,13 @@
   {% if it.note %}<p class="todo-line">{{ it.note }}</p>{% endif %}
   {% for h in it.hints %}
   {% if h.fix %}
-  <p class="todo-line">「{{ h.word }}」という書き方は、話の中にありません。</p>
-  {% if h.context != h.word %}<p class="small">本文: {{ h.context }}</p>{% endif %}
-  <p class="small muted">AI が「{{ h.fix.heard }}」を「{{ h.fix.fixed }}」のことだと判断したようです。合っていれば、そのまま記録してください。違っていれば、下の本文を直してください。</p>
+  <p class="todo-line">「{{ h.word }}」という書き方は、入力した文章にありません。</p>
+  {% if h.context != h.word %}<p class="small">AI が整えた文: {{ h.context }}</p>{% endif %}
+  <p class="small muted">入力では「{{ h.fix.heard }}」でした。AI が「{{ h.fix.fixed }}」さんのことだと判断して書き換えました。この人で合っていれば、そのまま記録してください。違っていれば、下の文を直してください。</p>
   {% else %}
-  <p class="todo-line">「{{ h.word }}」は、話の中にありません。</p>
-  {% if h.context != h.word %}<p class="small">本文: {{ h.context }}</p>{% endif %}
-  <p class="small muted">AI が書き足したのかもしれません。話したとおりなら、そのまま記録してください。話していなければ、下の本文を直してください。</p>
+  <p class="todo-line">「{{ h.word }}」は、入力した文章にありません。</p>
+  {% if h.context != h.word %}<p class="small">AI が整えた文: {{ h.context }}</p>{% endif %}
+  <p class="small muted">AI が書き足したのかもしれません。事実と合っていれば、そのまま記録してください。違っていれば、下の文を直してください。</p>
   {% endif %}
   {% endfor %}
   {% if it.name_fixes %}<p class="small muted">台帳の書き方に直した名前: {% for f in it.name_fixes %}{{ f.heard }} → {{ f.fixed }}{% if not loop.last %}、{% endif %}{% endfor %}</p>{% endif %}
@@ -27,5 +27,5 @@
     <input type="hidden" name="user_id" value="">
     <button class="plain">記録にしない</button>
   </form>
-  <details class="more"><summary>話した元の文</summary><p class="original small">{{ it.original }}</p></details>
+  <details class="more"><summary>入力した元の文章</summary><p class="original small">{{ it.original }}</p></details>
 </article>
