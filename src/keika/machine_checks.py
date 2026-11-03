@@ -200,6 +200,9 @@ def _plan_expiry(user: User, facts: list[tuple[DocRef, DocFacts]], on: date) -> 
     left = (_parse(f.period_end) - on).days
     if left > NUDGE_DAYS:
         return []
+    if left < 0:
+        return [Finding(rule_id="R45", user_id=user.id, kind="finding", period=f.period_end, evidence=[_doc_evidence(ref.rel_path, f.period_source)], todo="次の計画を確かめる",
+                        message=f"読み取った一番新しい計画の期間は {f.period_end} までで、過ぎています。次の計画があるか確認してください。")]
     return [Finding(rule_id="R45", user_id=user.id, kind="nudge", period=f.period_end, evidence=[_doc_evidence(ref.rel_path, f.period_source)], todo="計画の見直しの準備",
                     message=f"計画の期間が {f.period_end} で終わります。あと{left}日です。見直しの準備を確認してください。")]
 
@@ -209,6 +212,9 @@ def _cert_renewal(user: User, on: date) -> list[Finding]:
     end = _parse(cert[1]) if len(cert) == 2 else None
     if end is None or (end - on).days > NUDGE_DAYS:
         return []
+    if end < on:
+        return [Finding(rule_id="R44", user_id=user.id, kind="finding", period=end.isoformat(), searched_scope="台帳の認定有効期間", todo="認定の更新を確かめる",
+                        message=f"台帳の認定の有効期間 {end.isoformat()} を過ぎています。更新の結果と台帳を確認してください。")]
     deadline = end - timedelta(days=30)
     timing = f"30日前の {deadline.isoformat()} を過ぎています。更新の申請の状況" if on > deadline else f"{deadline.isoformat()} までに更新の申請がされるよう、援助"
     return [Finding(rule_id="R44", user_id=user.id, kind="nudge", period=end.isoformat(), searched_scope="台帳の認定有効期間", todo="認定の更新申請の援助",

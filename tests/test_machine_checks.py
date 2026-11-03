@@ -391,3 +391,27 @@ def machine_env(tmp_path):
     upsert_user(c, User(id="U01", name="杉森 ハル", cm="CM01", data={"type": "居宅介護支援", "cert_period": ["2026-04-01", "2028-03-31"]}))
     yield s, c
     c.close()
+
+
+def test_expired_plan_is_a_finding_without_negative_days(machine_env):
+    s, c = machine_env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-11-01", kind_read="居宅訪問", body="訪問。"))
+    folder = s.drive_root / "利用者" / "U01_杉森ハル"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "計画書.txt").write_text("計画書", encoding="utf-8")
+    ref = [r for r in scan(s) if r.rel_path.endswith("計画書.txt")][0]
+    _save(c, ref, DocFacts(doc_type="居宅サービス計画書", summary="計画書", period_start="2025-11-01", period_end="2026-10-31"))
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R45"]
+    assert len(found) == 1 and found[0].kind == "finding"
+    assert "-" + "4" not in found[0].message and "あと" not in found[0].message and "2026-10-31" in found[0].message
+
+
+def test_expired_certification_is_a_finding(tmp_path):
+    root = tmp_path / "drive"
+    (root / "利用者").mkdir(parents=True)
+    s = Settings(drive_root=root, db_path=tmp_path / "m.db", as_of=date(2026, 11, 4))
+    c = connect(s)
+    upsert_user(c, User(id="U01", name="杉森 ハル", cm="CM01", data={"type": "居宅介護支援", "cert_period": ["2024-11-01", "2026-10-31"]}))
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R44"]
+    c.close()
+    assert len(found) == 1 and found[0].kind == "finding" and "過ぎて" in found[0].message
