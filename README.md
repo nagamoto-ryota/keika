@@ -35,7 +35,7 @@ http://127.0.0.1:8000 を開きます。
 Claude Desktop に話した内容を、ケイカの入口と同じ整文と検査に通して記録します。検査に通らない話は記録にせず、やることの「記録の確認」に回します。
 
 1. `uv pip install --python .venv/Scripts/python.exe -e ".[mcp]"` を実行します。
-2. Claude Desktop の設定ファイル `claude_desktop_config.json` の `mcpServers` に、次を足します。パスは自分の環境に合わせます。
+2. Claude Desktop を終了してから、設定ファイル `claude_desktop_config.json` の `mcpServers` に、次を足します。パスは自分の環境に合わせます。動いている間に足すと、終了の時に上書きされて消えました。
 
 ```json
 {
@@ -56,7 +56,7 @@ Claude Desktop に話した内容を、ケイカの入口と同じ整文と検�
 
 - 同じ `KEIKA_DB_PATH` を画面でも使うと、記録が画面に出ます。先に `keika sync` で台帳を入れておきます。
 - API キーはアプリのフォルダの `.env` を使います。
-- 本物の MCP のやり取りと本物の Claude で、記録になること、空の話を記録しないことは確かめました。Claude Desktop に登録して実際に話す確認は、まだです。
+- Windows の Claude Desktop に登録して架空の話を1回入れ、記録になることを確かめました。空の話を記録しないことは、本物の MCP のやり取りで確かめました。
 - Claude には話した言葉をそのまま渡すように頼んでいますが、言い換えないことを機械では保証できません。
 - Claude Desktop に話した内容の扱いは、Claude のアプリの規約と設定によります。API の前提と同じとは限りません。
 
