@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {% block title %}訪問前の1枚 - {{ sheet.user.name }} - ケイカ{% endblock %}
+{% macro ask(text) %}<li class="ask"><span class="box" aria-hidden="true">□</span><span>{{ text }}</span><div class="write-space"></div></li>{% endmacro %}
 {% block main %}
 <p class="muted no-print"><a href="/users/{{ sheet.user.id }}">{{ sheet.user.name }}のページへ戻る</a></p>
 <h1>訪問前の1枚 <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
-<p class="muted small">保存してある記録と点検の結果を並べた物です。AI の点検は当たらないこともあります。</p>
-<div class="write-actions no-print"><button type="button" class="plain" onclick="window.print()">印刷する</button></div>
+<div class="write-actions no-print">
+  <button type="button" class="plain" onclick="window.print()">印刷する</button>
+  <button type="button" class="plain" id="copy-sheet">文章をコピーする</button>
+  <span class="small muted">メモ帳や Google ドキュメントに貼って、各行に書き込めます</span>
+</div>
 
 <table class="sheet-dates">
   <tr><th>前回の訪問</th><td>{{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'まだありません' }}</td>
@@ -15,30 +19,49 @@
 
 <h2>宿題・持ち越し</h2>
 {% if sheet.homework %}
-<ul>{% for h in sheet.homework %}<li>{{ h.text }} <span class="muted small">（{{ h.event_date|hdate }} {{ h.title }}）</span></li>{% endfor %}</ul>
+<ul class="asks">{% for h in sheet.homework %}{{ ask(h.text) }}{% endfor %}</ul>
 {% else %}<p class="muted">まだありません。</p>{% endif %}
 
 <h2>今確かめること</h2>
 {% if sheet.checks %}
-<ul>{% for x in sheet.checks %}<li>{{ x.title|hdate }}{% if x.message != x.title %}<br><span class="muted small">{{ x.message|hdate }}</span>{% endif %}</li>{% endfor %}</ul>
+<ul class="asks">{% for x in sheet.checks %}{{ ask(x.title|hdate) }}{% endfor %}</ul>
 {% else %}<p class="muted">今のところありません。</p>{% endif %}
 
-<h2>目標（聞いておきたいこと）</h2>
+<h2>目標（様子を聞く）</h2>
 {% if sheet.goals %}
-<ul>{% for g in sheet.goals %}<li>{{ g }}</li>{% endfor %}</ul>
+<ul class="asks">{% for g in sheet.goals %}{{ ask(g) }}{% endfor %}</ul>
 {% else %}<p class="muted">計画書から読み取れていません。</p>{% endif %}
 {% if sheet.services %}<p class="small">サービス: {{ sheet.services|join('、') }}</p>{% endif %}
 
 <h2>前回の訪問の記録</h2>
 {% if sheet.last_visit %}
-<p class="sheet-record">{{ sheet.last_visit.body }}</p>
+<p class="sheet-record small">{{ sheet.last_visit.body }}</p>
 {% else %}<p class="muted">まだありません。</p>{% endif %}
 
 {% if sheet.since_visit %}
 <h2>その後の記録</h2>
-{% for r in sheet.since_visit %}<p class="sheet-record"><strong>{{ r.event_date|hdate }} {{ r.kind_read or r.kind_written }}</strong> {{ r.body }}</p>{% endfor %}
+{% for r in sheet.since_visit %}<p class="sheet-record small"><strong>{{ r.event_date|hdate }} {{ r.kind_read or r.kind_written }}</strong> {{ r.body }}</p>{% endfor %}
 {% endif %}
 
-<h2>メモ</h2>
-<div class="sheet-memo"></div>
+<textarea id="sheet-text" hidden>{{ sheet.user.name }} 訪問前の1枚
+前回の訪問 {{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'なし' }} ／ 計画の期限 {{ sheet.plan_end|hdate if sheet.plan_end else '不明' }} ／ 認定の期限 {{ sheet.cert_end|hdate if sheet.cert_end else '不明' }}
+{% if sheet.homework %}
+【宿題・持ち越し】
+{% for h in sheet.homework %}□ {{ h.text }}
+→
+{% endfor %}{% endif %}{% if sheet.checks %}
+【今確かめること】
+{% for x in sheet.checks %}□ {{ x.title|hdate }}
+→
+{% endfor %}{% endif %}{% if sheet.goals %}
+【目標（様子を聞く）】
+{% for g in sheet.goals %}□ {{ g }}
+→
+{% endfor %}{% endif %}</textarea>
+<script>
+document.getElementById("copy-sheet").addEventListener("click", function () {
+  navigator.clipboard.writeText(document.getElementById("sheet-text").value);
+  this.textContent = "コピーしました";
+});
+</script>
 {% endblock %}

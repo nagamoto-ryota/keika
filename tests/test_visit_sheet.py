@@ -236,8 +236,29 @@ def test_sheet_page_shows_all_parts_and_is_printable(env):
     meeting(s, c)
     save_run(c, "U04", CheckRun(findings=[finding()]))
     page = TestClient(create_app(s)).get("/users/U04/visit").text
-    for word in ("10月の訪問の様子。", "ショートステイ", "週3回を計画に反映する", "自分で歩いて庭に出る", "デイサービスこなら坂", "印刷する", "メモ", "柚木 茂"):
+    for word in ("10月の訪問の様子。", "ショートステイ", "週3回を計画に反映する", "自分で歩いて庭に出る", "デイサービスこなら坂", "印刷する", "文章をコピーする", "柚木 茂"):
         assert word in page
+
+
+def test_sheet_has_box_and_write_space_per_item_and_no_memo_at_bottom(env):
+    s, c = env
+    meeting(s, c)
+    page = TestClient(create_app(s)).get("/users/U04/visit").text
+    assert 'class="box"' in page and 'class="write-space"' in page
+    assert "<h2>メモ</h2>" not in page
+
+
+def test_sheet_does_not_repeat_where_each_item_came_from(env):
+    s, c = env
+    meeting(s, c)
+    assert "（11/5" not in TestClient(create_app(s)).get("/users/U04/visit").text
+
+
+def test_copy_text_has_a_line_to_write_on_after_each_item(env):
+    s, c = env
+    meeting(s, c)
+    page = TestClient(create_app(s)).get("/users/U04/visit").text
+    assert "□ ショートステイは必要になったら再相談する。\n→" in page.replace("\r\n", "\n")
 
 
 def test_sheet_does_not_list_unknown_user(env):

@@ -142,3 +142,12 @@ form.draft table input[size] { width: auto; }
 .sheet-memo { min-height: 120px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
 .homework { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding: 6px 0; }
 .homework p { margin: 0; }
+.asks { list-style: none; padding: 0; margin: 4px 0 12px; }
+.ask { display: grid; grid-template-columns: 1.4em 1fr; column-gap: 4px; padding: 4px 0; }
+.ask .box { font-size: 1.05em; }
+.write-space { grid-column: 2; height: 0; }
+@media print {
+  .write-space { height: 2.2em; border-bottom: 1px dotted #888; }
+  .ask { break-inside: avoid; }
+  .sheet-record { font-size: 0.85em; }
+}
