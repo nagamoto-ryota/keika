@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}訪問前の1枚 - {{ sheet.user.name }} - ケイカ{% endblock %}
+{% block main %}
+<p class="muted no-print"><a href="/users/{{ sheet.user.id }}">{{ sheet.user.name }}のページへ戻る</a></p>
+<h1>訪問前の1枚 <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
+<p class="muted small">保存してある記録と点検の結果を並べた物です。AI の点検は当たらないこともあります。</p>
+<div class="write-actions no-print"><button type="button" class="plain" onclick="window.print()">印刷する</button></div>
+
+<table class="sheet-dates">
+  <tr><th>前回の訪問</th><td>{{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'まだありません' }}</td>
+      <th>今月の訪問</th><td>{{ sheet.visited_this_month|hdate ~ ' に済み' if sheet.visited_this_month else 'まだです' }}</td></tr>
+  <tr><th>計画の期限</th><td>{{ sheet.plan_end|hdate if sheet.plan_end else '読み取れていません' }}</td>
+      <th>認定の期限</th><td>{{ sheet.cert_end|hdate if sheet.cert_end else '台帳にありません' }}</td></tr>
+</table>
+
+<h2>宿題・持ち越し</h2>
+{% if sheet.homework %}
+<ul>{% for h in sheet.homework %}<li>{{ h.text }} <span class="muted small">（{{ h.event_date|hdate }} {{ h.title }}）</span></li>{% endfor %}</ul>
+{% else %}<p class="muted">まだありません。</p>{% endif %}
+
+<h2>今確かめること</h2>
+{% if sheet.checks %}
+<ul>{% for x in sheet.checks %}<li>{{ x.title|hdate }}{% if x.message != x.title %}<br><span class="muted small">{{ x.message|hdate }}</span>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="muted">今のところありません。</p>{% endif %}
+
+<h2>目標（聞いておきたいこと）</h2>
+{% if sheet.goals %}
+<ul>{% for g in sheet.goals %}<li>{{ g }}</li>{% endfor %}</ul>
+{% else %}<p class="muted">計画書から読み取れていません。</p>{% endif %}
+{% if sheet.services %}<p class="small">サービス: {{ sheet.services|join('、') }}</p>{% endif %}
+
+<h2>前回の訪問の記録</h2>
+{% if sheet.last_visit %}
+<p class="sheet-record">{{ sheet.last_visit.body }}</p>
+{% else %}<p class="muted">まだありません。</p>{% endif %}
+
+{% if sheet.since_visit %}
+<h2>その後の記録</h2>
+{% for r in sheet.since_visit %}<p class="sheet-record"><strong>{{ r.event_date|hdate }} {{ r.kind_read or r.kind_written }}</strong> {{ r.body }}</p>{% endfor %}
+{% endif %}
+
+<h2>メモ</h2>
+<div class="sheet-memo"></div>
+{% endblock %}

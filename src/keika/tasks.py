@@ -9,6 +9,7 @@ import calendar
 import sqlite3
 from dataclasses import dataclass, field
 
+from keika.drafts import Homework, open_homework
 from keika.findings import Finding
 from keika.ledger import User, list_users
 from keika.progress import Cell, user_progress
@@ -31,6 +32,7 @@ class Task:
     deadline: str | None = None
     note: str = ""
     view: dict | None = None  # 画面に出す形（画面の側で入れる）
+    homework: Homework | None = None  # 会議や訪問で残った宿題
 
 
 @dataclass
@@ -75,6 +77,8 @@ def _person(conn: sqlite3.Connection, s: Settings, user: User, days_left: int, b
     for cell in person.cells:
         if cell.status in ("todo", "check") and cell.key != "visit" and STEP_RULE[cell.key] not in covered:
             person.tasks.append(Task(cell.note or f"{cell.label}がまだです", note=cell.note))
+    for hw in open_homework(conn, user.id):
+        person.tasks.append(Task(f"宿題: {hw.text}", homework=hw))
     person.tasks.sort(key=lambda t: (t.deadline is None, t.deadline or ""))
     return person
 

@@ -40,6 +40,7 @@
 
   <div class="write-actions no-print">
     {% if not sample %}<button>保存する</button>{% endif %}
+    <a class="plain-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a>
     <button type="button" onclick="window.print()" class="plain">印刷する</button>
     <button type="button" class="plain" id="copy-draft">文章をコピーする</button>
   </div>
@@ -62,6 +63,7 @@ document.getElementById("copy-draft").addEventListener("click", function () {
 });
 </script>
 
+<p class="small muted no-print">Word は最後に保存した内容で作ります。確かめて直した後、利用者のフォルダに置くと、点検がこの書類を読みます。</p>
 {% if d.status == 'open' and not sample %}
 <form method="post" action="/drafts/{{ d.id }}/checked" class="no-print"><button class="plain">確かめ終わった（一覧から外す）</button></form>
 {% endif %}

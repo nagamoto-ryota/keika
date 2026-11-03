@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import io
 import json
 import re
 import sqlite3
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Literal
 
+import docx
 from pydantic import BaseModel, Field
 
 from keika.claude import model_for, ask_structured
@@ -28,6 +30,7 @@ SECTIONS = {
     "meeting": {"items": "検討した項目", "discussion": "検討内容", "conclusion": "結論", "remaining": "残された課題（次回の開催時期）"},
     "monitoring": {"condition": "本人・家族の様子", "services": "サービスの利用状況", "goals": "目標に対する変化", "plan_change": "計画を変える必要の有無", "next": "次に確かめること"},
 }
+HOMEWORK_SECTION = {"meeting": "remaining", "monitoring": "next"}  # やることへ載せる欄
 SectionKey = Literal["items", "discussion", "conclusion", "remaining", "condition", "services", "goals", "plan_change", "next"]
 
 
@@ -355,6 +358,69 @@ def sync_review(conn: sqlite3.Connection, review_id: int, user_id: str | None, r
         else:
             conn.execute("UPDATE drafts SET user_id = ?, record_id = ? WHERE id = ?", (user_id, record_id, row["id"]))
     conn.commit()
+
+
+@dataclass
+class Homework:
+    draft_id: int
+    item_id: str
+    text: str
+    title: str
+    event_date: str
+
+
+def open_homework(conn: sqlite3.Connection, user_id: str) -> list[Homework]:
+    """下書きの残された課題と次に確かめることのうち、済んでいない物。清書の前でも忘れないように出す。"""
+    found = []
+    for draft in list_drafts(conn, user_id, status=None):
+        for item in draft.sections.get(HOMEWORK_SECTION[draft.kind], []):
+            if item["text"] != BLANK and not item.get("done"):
+                found.append(Homework(draft.id, item["id"], item["text"], draft.title, draft.event_date))
+    return found
+
+
+def finish_homework(conn: sqlite3.Connection, draft_id: int, item_id: str) -> None:
+    row = conn.execute("SELECT payload FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+    data = json.loads(row["payload"]) if row else {"sections": {}}
+    for items in data["sections"].values():
+        for item in items:
+            if item["id"] == item_id:
+                item["done"] = True
+                conn.execute("UPDATE drafts SET payload = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), draft_id))
+                conn.commit()
+                return
+    raise ValueError("その宿題は見つかりません")
+
+
+def to_docx(draft: Draft, user_name: str, author: str) -> bytes:
+    """Word の下書き。確かめていない文には目印を付けたまま書き出す。"""
+    doc = docx.Document()
+    doc.add_heading(draft.title, level=1)
+    when = "〜".join(x for x in (draft.start_time, draft.end_time) if x)
+    head = doc.add_table(rows=2, cols=4)
+    head.style = "Table Grid"
+    place_label = "開催場所" if draft.kind == "meeting" else "訪問先"
+    date_label = "開催日" if draft.kind == "meeting" else "訪問日"
+    rows = [("利用者", user_name, "作成者", author or BLANK), (date_label, f"{draft.event_date} {when}".strip(), place_label, draft.place)]
+    for row, values in zip(head.rows, rows):
+        for cell, value in zip(row.cells, values):
+            cell.text = value
+    if draft.attendees:
+        doc.add_heading("出席者" if draft.kind == "meeting" else "同席した人", level=2)
+        people = doc.add_table(rows=1, cols=3)
+        people.style = "Table Grid"
+        for cell, value in zip(people.rows[0].cells, ("所属", "職種", "氏名")):
+            cell.text = value
+        for a in draft.attendees:
+            for cell, value in zip(people.add_row().cells, (a["org"], a["role"], a["name"])):
+                cell.text = value
+    for key, label in draft.headings.items():
+        doc.add_heading(label, level=2)
+        for item in draft.sections[key]:
+            doc.add_paragraph(("【確かめる】" if item["flag"] else "") + item["text"])
+    out = io.BytesIO()
+    doc.save(out)
+    return out.getvalue()
 
 
 def plain_text(draft: Draft, user_name: str) -> str:

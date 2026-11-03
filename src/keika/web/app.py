@@ -8,9 +8,10 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, get_args
+from urllib.parse import quote
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
@@ -20,7 +21,8 @@ from keika.claude import make_client
 from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
-from keika.drafts import SECTIONS, draft_for_results, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
+from keika.visit_sheet import build_sheet
+from keika.drafts import SECTIONS, draft_for_results, finish_homework, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
@@ -263,6 +265,34 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         update_draft(conn, draft_id, place=str(form.get("place", "")).strip(), start_time=str(form.get("start_time", "")).strip(),
                      end_time=str(form.get("end_time", "")).strip(), attendees=attendees, sections=sections)
         return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
+
+    @app.get("/drafts/{draft_id}/docx")
+    def draft_docx(draft_id: int):
+        draft = _draft_or_404(draft_id)
+        user = get_user(conn, draft.user_id)
+        staff = {p.id: p.name for p in list_people(conn, "staff")}
+        name = quote(f"{draft.title}_{draft.event_date}.docx")
+        return Response(
+            to_docx(draft, user.name, staff.get(user.cm, "")),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{name}"},
+        )
+
+    @app.post("/drafts/{draft_id}/items/{item_id}/done")
+    def done_homework(draft_id: int, item_id: str):
+        _draft_or_404(draft_id)
+        try:
+            finish_homework(conn, draft_id, item_id)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse("/", status_code=303)
+
+    @app.get("/users/{user_id}/visit")
+    def visit_page(request: Request, user_id: str):
+        sheet = build_sheet(conn, s, user_id)
+        if sheet is None:
+            raise HTTPException(404, "利用者が見つかりません")
+        return templates.TemplateResponse(request, "visit_sheet.html", {"sheet": sheet})
 
     @app.post("/drafts/{draft_id}/checked")
     def check_draft(draft_id: int):

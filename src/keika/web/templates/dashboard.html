@@ -46,7 +46,10 @@
   <details class="task">
     <summary><span class="dot"></span><span class="title">{{ t.title|hdate }}</span>{% if t.deadline %}<span class="due">{{ t.deadline|hdate }}まで</span>{% endif %}</summary>
     <div class="task-body">
-      {% if t.view %}
+      {% if t.homework %}
+        <p class="small muted">{{ t.homework.event_date|hdate }} の<a href="/drafts/{{ t.homework.draft_id }}">{{ t.homework.title }}</a>から</p>
+        {% if not sample %}<form method="post" action="/drafts/{{ t.homework.draft_id }}/items/{{ t.homework.item_id }}/done"><button class="plain">済んだ（一覧から外す）</button></form>{% endif %}
+      {% elif t.view %}
         {% with v = t.view, uid = person.user.id, back = '/' ~ ('?cm=' ~ cm if cm else '') %}{% include "_finding.html" %}{% endwith %}
       {% else %}
         <p class="muted">利用者のページで記録と書類を確かめられます。 <a href="/users/{{ person.user.id }}">開く</a></p>

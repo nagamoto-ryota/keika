@@ -205,7 +205,7 @@ def test_check_button_removes_from_dashboard(env):
     i = make(s, c, wire())
     client = TestClient(create_app(s))
     client.post(f"/drafts/{i}/checked", follow_redirects=False)
-    assert f"/drafts/{i}" not in client.get("/").text
+    assert "書類の下書きの確認" not in client.get("/").text  # 宿題は残るので、下書きへのリンクは宿題の側に残る
 
 
 def test_unknown_draft_is_404(env):
