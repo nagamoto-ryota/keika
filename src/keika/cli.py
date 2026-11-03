@@ -155,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--no-watch", action="store_true", help="入口のフォルダを見張らない")
     p_serve.add_argument("--sample", action="store_true", help="同梱の架空データの結果を、API キーなしで表示する")
     sub.add_parser("intake", help="入口のファイルを今すぐ取り込む")
+    sub.add_parser("mcp", help="Claude Desktop から話した内容を受け取る MCP サーバーを動かす")
     p_sync = sub.add_parser("sync", help="Drive の書類を読み、支援経過の CSV を取り込む（Claude を使う）")
     p_sync.add_argument("--user", help="利用者フォルダの先頭（例: U04）")
     p_check = sub.add_parser("check", help="1人分を Claude で点検する")
@@ -166,6 +167,11 @@ def main(argv: list[str] | None = None) -> int:
         return serve(args.host, args.port, watch=not args.no_watch)
     if args.command == "intake":
         return intake_now()
+    if args.command == "mcp":
+        from keika.mcp_server import run
+        from keika.settings import load_settings
+
+        return run(load_settings())
     if args.command == "check":
         return check(args.user_id)
     return sync(args.user)
