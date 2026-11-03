@@ -443,3 +443,67 @@ def test_new_finding_of_same_rule_does_not_erase_prior(env):
     _prior(c)
     run = run_claude_checks(c, Scripted(msg(report(rule_id="R11", message="別の指摘です。確認してください。", period="2026-10")), END), s, "U01")
     assert len(run.findings) == 2
+
+
+# --- 見直しの周 ---
+
+
+def _users_sent_after_first_round(client):
+    return [str(m["content"]) for call in client.calls for m in call["messages"] if m["role"] == "user" and isinstance(m["content"], str)]
+
+
+def test_second_look_is_asked_after_first_round(env):
+    s, c = env
+    client = Scripted(msg(report()), END, END)
+    run_claude_checks(c, client, s, "U01")
+    assert any("見直し" in t for t in _users_sent_after_first_round(client))
+    assert len(client.calls) == 3
+
+
+def test_second_look_is_asked_only_once(env):
+    s, c = env
+    client = Scripted(END)
+    run_claude_checks(c, client, s, "U01")
+    assert len(client.calls) == 2
+
+
+def test_second_look_can_add_a_finding(env):
+    s, c = env
+    client = Scripted(msg(report()), END, msg(report(rule_id="R02", todo="課題を確かめる")), END)
+    run = run_claude_checks(c, client, s, "U01")
+    assert [x.rule_id for x in run.findings] == ["R03", "R02"]
+
+
+def test_finding_can_be_withdrawn_in_second_look(env):
+    s, c = env
+    withdraw = tool("withdraw_finding", dict(number="N1", reason="計画書に書いてあった"))
+    client = Scripted(msg(report()), END, msg(withdraw), END)
+    run = run_claude_checks(c, client, s, "U01")
+    assert run.findings == []
+    assert run.dropped[-1]["why"] == "見直しで取り下げ"
+
+
+def test_withdrawing_unknown_number_is_an_error(env):
+    s, c = env
+    client = Scripted(msg(report()), END, msg(tool("withdraw_finding", dict(number="N9", reason="x"))), END)
+    run = run_claude_checks(c, client, s, "U01")
+    assert len(run.findings) == 1
+    assert client.calls[3]["messages"][-1]["content"][0]["is_error"] is True
+
+
+def test_second_look_cannot_withdraw_prior_finding_by_replacing_then_withdrawing(env):
+    s, c = env
+    prior = CheckRun(findings=[f()])
+    save_run(c, "U01", prior)
+    replace = report(replaces="P1", message="出し直しです。確認してください。")
+    client = Scripted(msg(replace), END, msg(tool("withdraw_finding", dict(number="N1", reason="誤り"))), END)
+    run = run_claude_checks(c, client, s, "U01")
+    assert [x.message for x in run.findings] == [f().message]  # 出し直しを取り下げたら、前回の指摘は残る
+
+
+def test_failure_in_second_look_keeps_first_round(env):
+    s, c = env
+    client = Scripted(msg(report()), END, msg(stop_reason="max_tokens"))
+    run = run_claude_checks(c, client, s, "U01")
+    assert run.not_run is False and len(run.findings) == 1
+    assert "見直し" in run.error

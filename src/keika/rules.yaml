@@ -8,6 +8,8 @@
 #   2. 報酬（加算・減算）の行は動かさない（請求は作品の範囲外）
 #   3. 判定に人の判断が欠かせない行は動かさない（judge: human）
 #   例外: R44（更新申請の援助）と R45（計画の期限）は指摘ではなく先回りの知らせなので、頻度によらず動かす
+#   例外: R15（生活援助の算定理由）と R47（モニタリングの記録の中身）は、測定で見落としを確かめた後に足した。
+#         上の基準で選んだ行ではないので、調整用データの数字にはこの2行の分だけ上乗せがある（docs/claude-usage.md）
 #
 # 件数が数えられる資料は豊島区だけで、全国の傾向を表す数字ではない。
 # basis_confirmed: false の行は、画面に条文を出さず「根拠確認中」と出す。
@@ -181,9 +183,9 @@
   legal_basis: 老企第29号（様式の通知。原文は未確認）
   basis_confirmed: false
   source: 豊島区（内数）、福井市
-  judge: machine
+  judge: claude
   done_when: 生活援助がある時に算定理由の欄が埋まっていること
-  active: false
+  active: true
   applies_to: kyotaku
 - id: R16
   title: 身体的拘束等をした場合の記録
@@ -543,3 +545,14 @@
   active: false
   not_required: true
   applies_to: both
+- id: R47
+  title: モニタリングの記録の中身
+  plain: 訪問したら、本人の様子、サービスの利用状況、目標に対する変化、計画を変える必要の有無が分かるように記録します。
+  layer: 支援経過
+  legal_basis: 居宅基準13条14号イ・ロ・ハ
+  basis_confirmed: true
+  source: 省令の「結果を記録する」から。頻度の基準で選んだ行ではない
+  judge: claude
+  done_when: 訪問の記録から、様子と変化の判断が分かること
+  active: true
+  applies_to: kyotaku

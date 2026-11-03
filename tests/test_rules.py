@@ -45,5 +45,15 @@ def test_active_rows_are_fixed():
     # 動かす行は頻度の基準で先に決めた。増減したら理由を残すこと
     assert {r.id for r in all_rules() if r.active} == {
         "R01", "R02", "R03", "R04", "R06", "R07", "R08", "R09", "R10", "R11", "R12", "R13", "R14",
-        "R19", "R20", "R21", "R23", "R24", "R25", "R27", "R28", "R31", "R32", "R33", "R44", "R45",
+        "R15", "R19", "R20", "R21", "R23", "R24", "R25", "R27", "R28", "R31", "R32", "R33", "R44", "R45", "R47",
     }
+
+
+def test_record_content_row_runs_for_claude():
+    row = get_rule("R47")
+    assert row.active is True and row.judge == "claude" and "13条14号" in basis_text(row)
+
+
+def test_housework_reason_row_runs_for_claude():
+    row = get_rule("R15")
+    assert row.active is True and row.judge == "claude"
