@@ -220,7 +220,7 @@ def _web_posting(rule: Rule, docs: list[Doc], declared: sqlite3.Row | None) -> O
     if declared:
         note = f"{declared['who']} が確かめました: {declared['basis']}"
         return OfficeRow(rule, "declared", rel, note=note, declared_at=declared["at"])
-    return OfficeRow(rule, "unknown", rel, "ウェブサイトへの掲載は Drive では分かりません。ご自身で確かめて申告してください")
+    return OfficeRow(rule, "unknown", rel, "ウェブサイトへの掲載は ドライブの書類では分かりません。ご自身で確かめて、「済んでいると記録する」を押してください")
 
 
 def office_findings(conn: sqlite3.Connection, s: Settings) -> list[Finding]:
