@@ -157,7 +157,7 @@ def _unspoken_fields(text: str, entry: "WireEntry", s: Settings, date_hint: str 
     found = []
     if entry.kind_read == "居宅訪問" and not _VISIT_WORDS.search(text):
         found.append("居宅訪問")
-    if entry.event_time and invented_terms(text, entry.event_time):
+    if entry.event_time and _digits(_without_spoken_clocks(text, entry.event_time)) - _digits(text):  # 時刻だけを見る。本文の検査に通すと「飲み忘れ」の話で誤って止まる
         found.append(entry.event_time)
     if _valid_date(entry.event_date) and entry.event_date != today(s).isoformat() and entry.event_date not in (date_hint or ""):
         month, day = entry.event_date.split("-")[1:]

@@ -313,3 +313,13 @@ def test_same_kind_written_and_read_is_not_described_as_a_mismatch(env):
     f = of(run_machine_checks(conn, s, "U01"), "R06", "finding", "2026-10")[0]
     assert "2026-10-20" in f.message and "2026-10-08 は種別" not in f.message
     assert "デイで面会。" in [e.quote for e in f.evidence]
+
+
+def test_meeting_written_in_another_document_is_not_called_missing(env):
+    s, conn = env
+    meeting = ActivityFact(kind="会議", date="2026-04-28", title="サービス担当者会議（本人宅）")
+    put(s, conn, "計画.txt", plan(doc_type="居宅サービス計画書", activities=[meeting]))
+    fs = run_machine_checks(conn, s, "U01")
+    assert {x.period for x in of(fs, "R33", "finding")} == {"アセスメント"}
+    told = of(fs, "R33", "unknown")
+    assert len(told) == 1 and "2026-04-28" in told[0].message and "要点" in told[0].message

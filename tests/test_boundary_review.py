@@ -167,3 +167,15 @@ def test_wish_not_in_the_quote_is_still_stopped():
 
 def test_wish_added_by_shaping_is_still_caught():
     assert invented_terms("薬を飲んでいる", "本人は薬をやめたいとのこと。")
+
+
+def test_spoken_time_is_kept_when_the_talk_mentions_missed_doses(env):  # noqa: F811
+    s, c = env
+    results, _ = run(s, c, "柚木さん宅を訪問。今日2時から。飲み忘れなし。", entry(event_time="14:00", body="柚木様宅を14時から訪問した。飲み忘れはなかった。"))
+    assert results[0].record is not None
+
+
+def test_unspoken_time_is_still_sent_to_a_person_when_the_talk_mentions_missed_doses(env):  # noqa: F811
+    s, c = env
+    results, _ = run(s, c, "柚木さん宅を訪問。今日2時から。飲み忘れなし。", entry(event_time="15:00", body="柚木様宅を訪問した。飲み忘れはなかった。"))
+    assert results[0].review_id is not None and "15:00" in results[0].warnings

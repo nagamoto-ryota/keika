@@ -93,7 +93,7 @@ def _written_exactly(conn: sqlite3.Connection, s: Settings, user_id: str, heard:
 
 def register_checks(conn: sqlite3.Connection, s: Settings, record: Record, unsure_words: list[str]) -> None:
     """Claude が迷った語と、薬の文の中で書類の語に近い語を、確認の対象にする。保存は止めない。"""
-    words = [w for w in unsure_words if w in record.body]
+    words = [w for w in unsure_words if w in record.body and not re.search(r"(さん|様|氏|先生)$", w)]  # 人の呼び方は薬名の確認に出さない
     for sentence in re.split(r"[。\n]", record.body):
         if MEDICINE_SENTENCE.search(sentence):
             words += [w for w in KATAKANA.findall(sentence) if candidates(conn, s, record.user_id, w)]

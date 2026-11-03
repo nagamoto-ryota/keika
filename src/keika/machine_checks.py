@@ -203,8 +203,17 @@ def _missing_docs(user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocF
     if len(facts) < len(refs):
         return [Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
                         message=f"未読の書類が {len(refs) - len(facts)} 件あるので、{'・'.join(missing)}の有無はまだ分かりません。")]
-    return [Finding(rule_id="R33", user_id=user.id, kind="finding", period=t, searched_scope=scope, todo=f"{t}を確かめる",
-                    message=f"Drive の {folder}/ に{t}が見当たりません。別の場所にあれば確認してください。") for t in missing]
+    meetings = [(a, ref) for ref, f in facts for a in f.activities if "担当者会議" in a.title and a.date]
+    found = []
+    for t in missing:
+        if t == "サービス担当者会議の要点" and meetings:  # 他の書類に開催の記載があれば「無い」とは言わない
+            day, ref = meetings[-1][0].date, meetings[-1][1]
+            found.append(Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
+                                 message=f"要点の書類は見当たりませんが、{ref.rel_path.split('/')[-1]} に {day} の担当者会議の記載があります。要点として足りるか確認してください。"))
+        else:
+            found.append(Finding(rule_id="R33", user_id=user.id, kind="finding", period=t, searched_scope=scope, todo=f"{t}を確かめる",
+                                 message=f"Drive の {folder}/ に{t}が見当たりません。別の場所にあれば確認してください。"))
+    return found
 
 
 # --- 事業所 ---

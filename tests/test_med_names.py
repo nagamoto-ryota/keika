@@ -210,3 +210,9 @@ def test_process_text_runs_without_a_document(env):
     s, c = env
     results, _ = run(s, c, f"柚木さん宅を訪問、薬は{HEARD}", entry(body=f"{HEARD}を内服。", unsure_words=[HEARD]))
     assert results[0].record and message(open_checks(c, s)[0])[1] == "薬の名前を確かめてください。"
+
+
+def test_a_person_called_unsure_is_not_a_medicine_check(env):
+    s, c = env
+    run(s, c, "柚木さん宅を訪問。能登さんが測ってくれた。", entry(body="能登さんが測っていた。", unsure_words=["能登さん"]))
+    assert c.execute("SELECT COUNT(*) FROM med_checks").fetchone()[0] == 0
