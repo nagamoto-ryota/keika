@@ -231,3 +231,26 @@ def test_home_shows_review_count(env):
     s, c = env
     run(s, c, "洋子さんから電話。", entry(user_id="", spoken_name="洋子さん"))
     assert "記録の確認" in TestClient(create_app(s)).get("/").text
+
+
+def test_review_card_says_which_word_and_what_to_do(env):
+    s, c = env
+    run(s, c, "柚木さん宅を訪問。変わりなし。", entry(body="柚木様宅を訪問した。歩行は99歩だった。"))
+    page = TestClient(create_app(s)).get("/").text
+    assert "「99」" in page and "元の話に見当たりません" in page
+    assert "AI が足した語かもしれません" in page and "歩行は99歩だった" in page
+
+
+def test_review_card_shows_names_changed_to_ledger_spelling(env):
+    s, c = env
+    fix = WireFix(heard="ゆのきさん", fixed="柚木 茂")
+    run(s, c, "ゆのきさん宅を訪問。変わりなし。", entry(spoken_name="ゆのきさん", name_fixes=[fix], ambiguous=True, body="柚木様宅を訪問した。"))
+    page = TestClient(create_app(s)).get("/").text
+    assert "台帳の字に直した名前" in page and "ゆのきさん" in page and "柚木 茂" in page
+
+
+def test_nickname_in_kana_corrected_to_ledger_is_not_flagged(env):
+    s, c = env
+    fix = WireFix(heard="ふさえさん", fixed="柚木 房江")
+    results, _ = run(s, c, "柚木さん宅を訪問。ふさえさんは不在。", entry(body="柚木様宅を訪問した。柚木房江さんは不在であった。", name_fixes=[fix]))
+    assert results[0].record is not None

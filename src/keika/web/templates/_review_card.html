@@ -1,6 +1,11 @@
 <article class="card unknown">
   {% if it.note %}<p class="todo-line">{{ it.note }}</p>{% endif %}
-  {% if it.hints %}<p class="todo-line">話の中に見当たりません: {% for h in it.hints %}「{{ h }}」{% endfor %}</p><p class="small muted">合っていれば、そのまま記録してください。</p>{% endif %}
+  {% for h in it.hints %}
+  <p class="todo-line">「{{ h.word }}」が、元の話に見当たりません。</p>
+  {% if h.context != h.word %}<p class="small">本文: {{ h.context }}</p>{% endif %}
+  {% endfor %}
+  {% if it.hints %}<p class="small muted">AI が足した語かもしれません。話したとおりなら、そのまま記録してください。違っていれば、下の本文を直してください。</p>{% endif %}
+  {% if it.name_fixes %}<p class="small muted">台帳の字に直した名前: {% for f in it.name_fixes %}{{ f.heard }} → {{ f.fixed }}{% if not loop.last %}、{% endif %}{% endfor %}</p>{% endif %}
   <form method="post" action="/review/{{ it.id }}">
     <p><select name="user_id" required>
       <option value="">誰の記録か選ぶ</option>
