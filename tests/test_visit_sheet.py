@@ -258,7 +258,7 @@ def test_copy_text_has_a_line_to_write_on_after_each_item(env):
     s, c = env
     meeting(s, c)
     page = TestClient(create_app(s)).get("/users/U04/visit").text
-    assert "□ ショートステイは必要になったら再相談する。\n→" in page.replace("\r\n", "\n")
+    assert 'data-section="宿題・持ち越し" data-label="ショートステイは必要になったら再相談する。"' in page and "/static/visit_sheet.js" in page
 
 
 def test_sheet_does_not_list_unknown_user(env):

@@ -4,7 +4,8 @@
 <h1 class="big">記録する</h1>
 <p class="muted">AI（Claude）が、話した内容や入力した文章を支援経過の下書きに整えます。誰の記録か迷った時は、やることの「記録の確認」に回します。内容を確かめて決めるのはご本人です。</p>
 <form method="post" action="/records/new" class="write">
-  <textarea id="text" name="text" rows="9" required placeholder="例: 今日〇〇さんのお宅に行ってきました。変わりなしで、来月もこのままでとのことです。"></textarea>
+  {% if visit_user %}<input type="hidden" name="visit_user" value="{{ visit_user }}"><input type="hidden" name="visit_stamp" value="{{ visit_stamp }}">{% endif %}
+  <textarea id="text" name="text" rows="{{ 16 if visit_user else 9 }}" required placeholder="例: 今日〇〇さんのお宅に行ってきました。変わりなしで、来月もこのままでとのことです。">{{ text or '' }}</textarea>
   <div class="write-actions">
     <button type="button" id="mic" class="plain" hidden>話す</button>
     <span id="mic-state" class="small muted"></span>

@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS finding_plans (
 CREATE TABLE IF NOT EXISTS visit_questions (
   user_id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS visit_notes (
+  user_id TEXT NOT NULL, item_key TEXT NOT NULL, section TEXT NOT NULL, label TEXT NOT NULL, answer TEXT NOT NULL,
+  updated_at TEXT NOT NULL, used_at TEXT, PRIMARY KEY (user_id, item_key)
+);
 CREATE TABLE IF NOT EXISTS drafts (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, kind TEXT NOT NULL, record_id INTEGER, event_date TEXT NOT NULL,
   payload TEXT NOT NULL, original TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL

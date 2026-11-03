@@ -153,3 +153,15 @@ form.draft table input[size] { width: auto; }
 }
 .sheet-check td, .sheet-check th { font-size: 0.9em; padding: 3px 6px; }
 .sheet-answer { white-space: nowrap; }
+.ask .note { grid-column: 2; width: 100%; margin-top: 3px; padding: 3px 6px; resize: vertical; overflow: hidden; font: inherit; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); box-sizing: border-box; }
+.note-line { width: 11em; font: inherit; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; }
+.yesno { margin-right: 8px; white-space: nowrap; }
+.note-failed { color: #b3261e; font-weight: 600; }
+form.inline { display: inline; }
+@media print {
+  .ask .note { border: none; padding: 0; field-sizing: content; overflow: visible; resize: none; font-weight: 600; background: none; }
+  .ask .note:placeholder-shown { display: none; }
+  .ask:has(.note:not(:placeholder-shown)) .write-space { display: none; }
+  .note-line { border: none; }
+  .note-line::placeholder { color: inherit; }
+}

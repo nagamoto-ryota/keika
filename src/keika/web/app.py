@@ -30,6 +30,7 @@ from keika.findings import Finding, fingerprint
 from keika.claude_checks import crosses_line
 from keika.legal_texts import basis_for
 from keika.med_names import decide_fix, decide_keep, decisions, message as med_message, open_checks, unconfirmed_record_ids
+from keika.visit_notes import get_notes, mark_used, save_note, sheet_items, to_record_text
 from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, to_review
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
@@ -40,7 +41,7 @@ from keika.records import KindRead, RecordIn, add_record, edit_record, get_recor
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
 from keika.tasks import build_board
-from keika.settings import OutsideRootError, Settings, safe_path, today
+from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
 from keika.views import evidence_view, hdate
 
 HERE = Path(__file__).parent
@@ -290,7 +291,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     def _sheet_view(sheet, failed: bool) -> dict:
         q = get_questions(conn, sheet.user.id)
-        return {"sheet": sheet, "q": q, "failed": failed, "stale": bool(q) and q.get("key") != questions_key(conn, s, sheet.user)}
+        items = sheet_items(sheet, q, get_notes(conn, sheet.user.id), lambda text: hdate(text, today(s).year))
+        return {"sheet": sheet, "q": q, "items": items, "failed": failed, "stale": bool(q) and q.get("key") != questions_key(conn, s, sheet.user)}
 
     @app.get("/users/{user_id}/visit")
     def visit_page(request: Request, user_id: str):
@@ -298,6 +300,25 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if sheet is None:
             raise HTTPException(404, "利用者が見つかりません")
         return templates.TemplateResponse(request, "visit_sheet.html", _sheet_view(sheet, False))
+
+    @app.post("/users/{user_id}/visit/notes")
+    def post_note(user_id: str, section: str = Form(...), label: str = Form(...), answer: str = Form("")):
+        if get_user(conn, user_id) is None:
+            raise HTTPException(404, "利用者が見つかりません")
+        save_note(conn, s, user_id, section, label, answer)
+        return {"ok": True}
+
+    @app.post("/users/{user_id}/visit/to-record")
+    def visit_to_record(request: Request, user_id: str):
+        user = get_user(conn, user_id)
+        if user is None:
+            raise HTTPException(404, "利用者が見つかりません")
+        notes = get_notes(conn, user_id)
+        if not notes:
+            return RedirectResponse(f"/users/{user_id}/visit", status_code=303)
+        return templates.TemplateResponse(request, "new_record.html", {
+            "text": to_record_text(user.name, notes), "visit_user": user_id, "visit_stamp": now_real().isoformat(),
+        })
 
     @app.post("/users/{user_id}/visit/questions")
     def post_questions(request: Request, user_id: str):
@@ -329,7 +350,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return templates.TemplateResponse(request, "new_record.html", {})
 
     @app.post("/records/new")
-    def post_record(request: Request, background: BackgroundTasks, text: str = Form(...), mode: str = Form("shape")):
+    def post_record(request: Request, background: BackgroundTasks, text: str = Form(...), mode: str = Form("shape"), visit_user: str = Form(""), visit_stamp: str = Form("")):
         if sample:
             raise HTTPException(403, "見本モードでは記録できません。API キーを設定して keika serve で起動してください。")
         if not text.strip():
@@ -344,6 +365,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             background.add_task(_draft_in_background, client, results, "画面")  # 点検は長いので、下書きを先に作る
             for uid in saved:
                 background.add_task(_check_in_background, uid)
+        if visit_user and visit_stamp:  # 記録か確認に入ったので、次の訪問の欄には出さない
+            mark_used(conn, visit_user, visit_stamp)
         names = {u.id: u.name for u in list_users(conn)}
         return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
 

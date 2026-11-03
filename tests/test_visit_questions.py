@@ -155,8 +155,9 @@ def test_copy_text_includes_questions(env):
     client = TestClient(create_app(s, client_factory=lambda: FakeClient(answer(wire()))))
     client.post("/users/U09/visit/questions")
     page = client.get("/users/U09/visit").text
-    text = page.split('id="sheet-text"')[1].split("</textarea>")[0]
-    assert "【基本チェックリスト】" in text and "□ 6 階段を手すりや壁をつたわらずに昇っていますか（前回: はい）" in text and "【アセスメントで聞けていないこと】" in text
+    # コピーの文はこの印から画面で組み立てる
+    assert 'data-section="基本チェックリスト" data-label="6 階段を手すりや壁をつたわらずに昇っていますか" data-past="はい"' in page
+    assert 'data-section="アセスメントで聞けていないこと"' in page and "/static/visit_sheet.js" in page
 
 
 def test_failure_shows_message(env):
