@@ -153,7 +153,8 @@ def test_homework_is_on_the_todo_board(env):
     s, c = env
     meeting(s, c)
     person = next(p for p in build_board(c, s).people if p.user.id == "U04")
-    assert any("ショートステイ" in t.title for t in person.tasks)
+    row = next(t for t in person.tasks if t.homework)
+    assert row.title == "宿題・持ち越し 1件" and "ショートステイ" in row.homework[0].text
 
 
 def test_todo_page_has_done_button_and_source_link(env):

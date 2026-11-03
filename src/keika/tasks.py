@@ -32,7 +32,7 @@ class Task:
     deadline: str | None = None
     note: str = ""
     view: dict | None = None  # 画面に出す形（画面の側で入れる）
-    homework: Homework | None = None  # 会議や訪問で残った宿題
+    homework: list[Homework] = field(default_factory=list)  # 会議や訪問で残った宿題。人ごとに1行にまとめる
 
 
 @dataclass
@@ -77,8 +77,9 @@ def _person(conn: sqlite3.Connection, s: Settings, user: User, days_left: int, b
     for cell in person.cells:
         if cell.status in ("todo", "check") and cell.key != "visit" and STEP_RULE[cell.key] not in covered:
             person.tasks.append(Task(cell.note or f"{cell.label}がまだです", note=cell.note))
-    for hw in open_homework(conn, user.id):
-        person.tasks.append(Task(f"宿題: {hw.text}", homework=hw))
+    homework = open_homework(conn, user.id)
+    if homework:
+        person.tasks.append(Task(f"宿題・持ち越し {len(homework)}件", homework=homework))
     person.tasks.sort(key=lambda t: (t.deadline is None, t.deadline or ""))
     return person
 
