@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}訪問前の1枚 - {{ sheet.user.name }} - ケイカ{% endblock %}
-{% macro ask(text) %}<li class="ask"><span class="box" aria-hidden="true">□</span><span>{{ text }}</span><div class="write-space"></div></li>{% endmacro %}
+{% macro ask(text, past='') %}<li class="ask"><span class="box" aria-hidden="true">□</span><span>{{ text }}{% if past %} <span class="muted small">前回: {{ past }}</span>{% endif %}</span><div class="write-space"></div></li>{% endmacro %}
 {% block main %}
 <p class="muted no-print"><a href="/users/{{ sheet.user.id }}">{{ sheet.user.name }}のページへ戻る</a></p>
 <h1>訪問前の1枚 <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
@@ -33,6 +33,34 @@
 {% else %}<p class="muted">計画書から読み取れていません。</p>{% endif %}
 {% if sheet.services %}<p class="small">サービス: {{ sheet.services|join('、') }}</p>{% endif %}
 
+{% if not sample %}
+<form method="post" action="/users/{{ sheet.user.id }}/visit/questions" class="no-print" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='作っています（1分ほど）';">
+  <button class="plain">{{ '聞くことを作り直す' if q else '聞くことを洗い出す' }}</button>
+  <span class="small muted">AI が書類を読み、アセスメントで聞けていないことなどを挙げます</span>
+</form>
+{% endif %}
+{% if failed %}<p class="notice no-print">作れませんでした。時間をおいて、もう一度押してください。</p>{% endif %}
+
+{% if q and q.assessment %}
+<h2>アセスメントで聞けていないこと</h2>
+<ul class="asks">{% for g in q.assessment %}{{ ask(g.item ~ ': ' ~ g.question, g.past) }}{% endfor %}</ul>
+{% endif %}
+{% if q and q.intentions %}
+<h2>現状に対する意向（予防プラン）</h2>
+<ul class="asks">{% for a in q.intentions %}{{ ask(a.area ~ ' について、本人と家族の意向', a.past) }}{% endfor %}</ul>
+{% endif %}
+{% if q and q.basic_info %}
+<h2>基本情報</h2>
+<ul class="asks">{% for b in q.basic_info %}{{ ask(b.field ~ ': ' ~ b.question, b.past) }}{% endfor %}</ul>
+{% endif %}
+{% if q and q.checklist %}
+<h2>基本チェックリスト</h2>
+<table class="sheet-check">
+  <tr><th>No</th><th>質問</th><th>前回</th><th>今回</th></tr>
+  {% for c in q.checklist %}<tr><td>{{ c.no }}</td><td>{{ c.question }}</td><td>{% if c.past %}前回: {{ c.past }}{% else %}<span class="muted">－</span>{% endif %}</td><td class="sheet-answer">はい・いいえ</td></tr>{% endfor %}
+</table>
+{% endif %}
+
 <h2>前回の訪問の記録</h2>
 {% if sheet.last_visit %}
 <p class="sheet-record small">{{ sheet.last_visit.body }}</p>
@@ -56,6 +84,22 @@
 {% endfor %}{% endif %}{% if sheet.goals %}
 【目標（様子を聞く）】
 {% for g in sheet.goals %}□ {{ g }}
+→
+{% endfor %}{% endif %}{% if q and q.assessment %}
+【アセスメントで聞けていないこと】
+{% for g in q.assessment %}□ {{ g.item }}: {{ g.question }}{% if g.past %}（前回: {{ g.past }}）{% endif %}
+→
+{% endfor %}{% endif %}{% if q and q.intentions %}
+【現状に対する意向（予防プラン）】
+{% for a in q.intentions %}□ {{ a.area }} について、本人と家族の意向{% if a.past %}（前回: {{ a.past }}）{% endif %}
+→
+{% endfor %}{% endif %}{% if q and q.basic_info %}
+【基本情報】
+{% for b in q.basic_info %}□ {{ b.field }}: {{ b.question }}{% if b.past %}（前回: {{ b.past }}）{% endif %}
+→
+{% endfor %}{% endif %}{% if q and q.checklist %}
+【基本チェックリスト】
+{% for c in q.checklist %}□ {{ c.no }} {{ c.question }}{% if c.past %}（前回: {{ c.past }}）{% endif %}
 →
 {% endfor %}{% endif %}</textarea>
 <script>

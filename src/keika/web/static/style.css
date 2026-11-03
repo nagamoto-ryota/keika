@@ -151,3 +151,5 @@ form.draft table input[size] { width: auto; }
   .ask { break-inside: avoid; }
   .sheet-record { font-size: 0.85em; }
 }
+.sheet-check td, .sheet-check th { font-size: 0.9em; padding: 3px 6px; }
+.sheet-answer { white-space: nowrap; }

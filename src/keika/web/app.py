@@ -21,6 +21,7 @@ from keika.claude import make_client
 from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
+from keika.visit_questions import get_questions, make_questions
 from keika.visit_sheet import build_sheet
 from keika.drafts import SECTIONS, draft_for_results, finish_homework, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
@@ -292,7 +293,20 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         sheet = build_sheet(conn, s, user_id)
         if sheet is None:
             raise HTTPException(404, "利用者が見つかりません")
-        return templates.TemplateResponse(request, "visit_sheet.html", {"sheet": sheet})
+        return templates.TemplateResponse(request, "visit_sheet.html", {"sheet": sheet, "q": get_questions(conn, user_id), "failed": False})
+
+    @app.post("/users/{user_id}/visit/questions")
+    def post_questions(request: Request, user_id: str):
+        sheet = build_sheet(conn, s, user_id)
+        if sheet is None:
+            raise HTTPException(404, "利用者が見つかりません")
+        try:
+            made = make_questions(conn, client_factory(), s, user_id)
+        except RuntimeError:  # キーが無い時
+            made = None
+        if made is None:
+            return templates.TemplateResponse(request, "visit_sheet.html", {"sheet": sheet, "q": get_questions(conn, user_id), "failed": True})
+        return RedirectResponse(f"/users/{user_id}/visit", status_code=303)
 
     @app.post("/drafts/{draft_id}/checked")
     def check_draft(draft_id: int):
