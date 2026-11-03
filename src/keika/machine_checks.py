@@ -84,7 +84,7 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
         elif any(r.kind_read is None for r in rows):
             out.append(Finding(rule_id="R06", user_id=user.id, kind="unknown", period=month, searched_scope=scope,
                                evidence=[_record_evidence(r) for r in rows if r.kind_read is None],
-                               message=f"{month}の記録に、接触の種類を読み取れないものがあります。居宅訪問だったか確認してください。"))
+                               message=f"{month}の記録に、訪問か電話かなどを読み取れないものがあります。家を訪ねた記録か確認してください。"))
         else:
             written = [r for r in rows if "訪問" in r.kind_written]
             detail = "".join(f"{r.event_date} は種別が「{r.kind_written}」ですが、本文は「{r.kind_read}」と読めます。"
@@ -246,7 +246,7 @@ def _missing_docs(s: Settings, user: User, refs: list[DocRef], facts: list[tuple
         return []
     if len(facts) < len(refs):
         return [Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
-                        message=f"未読の書類が {len(refs) - len(facts)} 件あるので、{'・'.join(missing)}の有無はまだ分かりません。")]
+                        message=f"まだ読み取っていない書類が {len(refs) - len(facts)} 件あるので、{'・'.join(missing)}の有無はまだ分かりません。")]
     meetings = [(a.date, ref) for ref, f in facts for a in f.activities if "担当者会議" in a.title and a.date] or _meetings_in_text(s, facts)
     found = []
     for t in missing:
@@ -256,7 +256,7 @@ def _missing_docs(s: Settings, user: User, refs: list[DocRef], facts: list[tuple
                                  message=f"要点の書類は見当たりませんが、{ref.rel_path.split('/')[-1]} に {day} の担当者会議の記載があります。要点として足りるか確認してください。"))
         else:
             found.append(Finding(rule_id="R33", user_id=user.id, kind="finding", period=t, searched_scope=scope, todo=f"{t}を確かめる",
-                                 message=f"Drive の {folder}/ に{t}が見当たりません。別の場所にあれば確認してください。"))
+                                 message=f"ドライブの {folder}/ に{t}が見当たりません。別の場所にあれば確認してください。"))
     return found
 
 

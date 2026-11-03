@@ -20,7 +20,7 @@
 <section class="person" id="shitagaki">
   <h2>書類の下書きの確認 <span class="muted small">{{ drafts|length }}件</span></h2>
   {% for d in drafts %}
-  <p><a href="/drafts/{{ d.id }}">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.flagged %} <span class="muted small">印 {{ d.flagged }} 件</span>{% endif %}</p>
+  <p><a href="/drafts/{{ d.id }}">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.flagged %} <span class="muted small">確かめたい文 {{ d.flagged }} 件</span>{% endif %}</p>
   {% endfor %}
 </section>
 {% endif %}

@@ -2,7 +2,7 @@
 {% block title %}記録を直す - ケイカ{% endblock %}
 {% block main %}
 <h1>記録を直す</h1>
-<p class="muted">普通に直せます。前の版は履歴に残ります。</p>
+<p class="muted">自由に直せます。直す前の内容は履歴に残ります。</p>
 <form method="post" action="/records/{{ r.id }}/edit" class="write">
   <p><label>誰の記録か <select name="user_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == r.user_id }}>{{ u.name }}</option>{% endfor %}</select></label></p>
   <p><label>出来事の日 <input type="date" name="event_date" value="{{ r.event_date }}" required></label>

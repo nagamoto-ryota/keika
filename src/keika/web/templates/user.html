@@ -10,8 +10,8 @@
 
 <section>
   <h2>やること <small class="muted">{{ findings|length }}件</small></h2>
-  {% if run and run.not_run %}<p class="notice">文章の点検は未実施です（通信の失敗など）。記録は失われていません。日付の点検だけを出しています。</p>{% endif %}
-  {% if not run %}<p class="muted small">文章の点検はまだです。日付の点検だけを出しています。</p>{% endif %}
+  {% if run and run.not_run %}<p class="notice">AI の点検が動きませんでした（通信の失敗など）。記録は残っています。今は日付で分かる物だけを出しています。</p>{% endif %}
+  {% if not run %}<p class="muted small">AI の点検はまだです。今は日付で分かる物だけを出しています。</p>{% endif %}
   {% for v in findings %}
     <article class="card {{ v.f.kind }}">
       {% if v.f.todo %}<p class="todo-line">{{ v.f.todo|hdate }}</p>{% endif %}
@@ -21,19 +21,19 @@
     <p class="muted">今のところやることはありません。</p>
   {% endfor %}
   {% if noted %}
-    <details class="fold"><summary>経緯あり {{ noted|length }}件</summary>
+    <details class="fold"><summary>経緯を残した指摘 {{ noted|length }}件</summary>
     {% for v in noted %}
       <p class="small">{{ v.f.message|hdate }}{% if v.changed %} <span class="notice">根拠の書類が変更されました</span>{% endif %}</p>
     {% endfor %}
     </details>
   {% endif %}
   {% if run and run.resolved %}
-    <details class="fold"><summary>記録で確認して閉じました {{ run.resolved|length }}件</summary>
+    <details class="fold"><summary>記録で確かめて片付いた指摘 {{ run.resolved|length }}件</summary>
     {% for r in run.resolved %}<p class="small">{{ r.message|hdate }}<br><span class="muted">{{ r.reason }}{% if r.record_date %}（{{ r.record_date|hdate }} の記録{% else %}（{% endif %}「{{ r.quote }}」）</span></p>{% endfor %}
     </details>
   {% endif %}
   {% if run and run.dismissed %}
-    <details class="fold"><summary>読み直して取り下げました {{ run.dismissed|length }}件</summary>
+    <details class="fold"><summary>事情が分かって取り下げた指摘 {{ run.dismissed|length }}件</summary>
     {% for d in run.dismissed %}<p class="small">{{ d.period|hdate }}: {{ d.reason }}（{{ d.record_date|hdate }} の記録「{{ d.quote }}」）</p>{% endfor %}
     </details>
   {% endif %}
@@ -47,7 +47,7 @@
         <strong>{{ r.event_date|hdate }}</strong>
         <span class="muted">{{ r.kind_read or r.kind_written }}{% if r.partner %}・{{ r.partner }}{% endif %}</span>
         {% if r.unchecked %}<span class="pill todo">未確認</span>{% endif %}
-        {% if r.id in med_waiting %}<span class="pill finding">薬名未確認</span>{% endif %}
+        {% if r.id in med_waiting %}<span class="pill finding">薬の名前が未確認</span>{% endif %}
         {% if r.kind_read and r.kind_written and r.kind_read not in r.kind_written and '訪問' in r.kind_written %}<span class="pill finding">種別は「{{ r.kind_written }}」</span>{% endif %}
       </div>
       <p>{{ r.body }}</p>
@@ -65,7 +65,7 @@
 
 <section>
   <details class="fold">
-    <summary><strong>読み取った書類の要点</strong> {{ docs|length }}件{% if unread %}（未読 {{ unread }}件）{% endif %}</summary>
+    <summary><strong>読み取った書類の要点</strong> {{ docs|length }}件{% if unread %}（まだ読み取っていない書類 {{ unread }}件）{% endif %}</summary>
     {% for d in docs %}
       <details class="doc">
         <summary>{{ d.name }}</summary>

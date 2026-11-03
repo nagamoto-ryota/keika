@@ -2,7 +2,7 @@
 {% block title %}記録しました - ケイカ{% endblock %}
 {% block main %}
 <h1 class="big">記録しました</h1>
-<p class="muted">読んで確かめてください。あとから普通に直せます。お知らせは裏で確かめ直しています。</p>
+<p class="muted">読んで確かめてください。あとから普通に直せます。お知らせは今、AI が確かめ直しています。</p>
 {% for r in results %}
   {% if r.record %}
   <article class="record">
@@ -11,8 +11,8 @@
   </article>
   {% else %}
   <article class="card unknown">
-    <p>要確認箱に入れました。{% if r.warnings %}話に無い語が入っているかもしれません: {{ r.warnings|join('、') }}{% endif %}</p>
-    <a href="/review">要確認箱を開く</a>
+    <p>「記録の確認」に回しました。{% if r.warnings %}話の中に無い言葉があります: {{ r.warnings|join('、') }}{% endif %}</p>
+    <a href="/review">記録の確認を開く</a>
   </article>
   {% endif %}
 {% endfor %}

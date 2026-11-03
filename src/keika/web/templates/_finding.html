@@ -1,6 +1,6 @@
 {# 指摘の中身。v は _view の結果、uid は利用者 ID、back は押した後に戻る場所 #}
 <p class="msg">{{ v.f.message|hdate }}</p>
-{% if v.added_by %}<p class="small muted">この点検は「{{ v.added_by }}」から足しました。</p>{% endif %}
+{% if v.added_by %}<p class="small muted">この点検項目は「{{ v.added_by }}」をもとに足しました。</p>{% endif %}
 {% if v.changed %}<p class="notice small">根拠の書類が変更されました。もう一度確かめてください。</p>{% endif %}
 {% if v.evidence %}
 <div class="evi">
@@ -9,14 +9,14 @@
     <summary>{{ e.label }}</summary>
     <div class="evi-body">
       <p class="original">{{ e.context|mark_quote(e.highlight) }}</p>
-      {% if e.unverified %}<p class="small muted">この書類は文字として読めないので、引用を機械で原文と照合できていません。原本で確かめてください。</p>{% endif %}
+      {% if e.unverified %}<p class="small muted">スキャンした書類なので、AI が抜き出した文が正しいか機械で確かめられていません。書類の現物で確かめてください。</p>{% endif %}
       {% if e.open_url %}<a href="{{ e.open_url }}" target="_blank" rel="noopener">書類を開く</a>{% endif %}
     </div>
   </details>
   {% endfor %}
 </div>
 {% endif %}
-{% if v.f.suggestion %}<div class="suggest"><span class="muted small">書き足し案。実際に行った事だけを残してください。</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
+{% if v.f.suggestion %}<div class="suggest"><span class="muted small">記録に書き足す文の案です。実際にした事だけを残してください。</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
 <div class="actions">
   {% if not sample and v.f.user_id %}
   <form method="post" action="/users/{{ uid }}/plan" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（1分ほど）';">

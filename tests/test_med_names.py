@@ -177,7 +177,7 @@ def test_screen_shows_the_check_on_todo_list_user_page_and_board(env):
     page = client.get("/").text
     assert "薬の名前の確認" in page and f"「{HEARD}」と聞こえました。" in page and "「アムロジピン」に直す" in page
     assert not any(g in page for g in ("のことですね", "おそらく", "正しくは"))
-    assert "薬名未確認" in client.get("/board").text and "薬名未確認" in client.get("/users/U04").text
+    assert "薬の名前が未確認" in client.get("/board").text and "薬の名前が未確認" in client.get("/users/U04").text
     check = open_checks(c, s)[0]
     assert client.post(f"/med/{check.id}/fix", data={"chosen": "ノルバスク"}, follow_redirects=False).status_code == 400
     assert body_of(c, r.id) == r.body

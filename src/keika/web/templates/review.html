@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}要確認箱 - ケイカ{% endblock %}
+{% block title %}記録の確認 - ケイカ{% endblock %}
 {% block main %}
-<h1 class="big">要確認箱 <span class="count">{{ items|length }}</span></h1>
+<h1 class="big">記録の確認 <span class="count">{{ items|length }}</span></h1>
 {% for it in items %}
   <article class="card unknown">
     {% if it.note %}<p class="todo-line">{{ it.note }}</p>{% endif %}
-    {% if it.warnings %}<p class="small">話に無いかもしれない語: <strong>{{ it.warnings|join('、') }}</strong></p>{% endif %}
+    {% if it.warnings %}<p class="small">話の中に無い言葉: <strong>{{ it.warnings|join('、') }}</strong></p>{% endif %}
     <form method="post" action="/review/{{ it.id }}">
       <p><select name="user_id" required>
         <option value="">誰の記録か選ぶ</option>
@@ -24,6 +24,6 @@
     <details class="more"><summary>話した元の文</summary><p class="original small">{{ it.original }}</p></details>
   </article>
 {% else %}
-  <p class="clear">要確認はありません。</p>
+  <p class="clear">確認するものはありません。</p>
 {% endfor %}
 {% endblock %}

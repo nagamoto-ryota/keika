@@ -42,7 +42,7 @@ from keika.views import evidence_view, hdate
 
 HERE = Path(__file__).parent
 KIND_ORDER = {"finding": 0, "unknown": 1, "nudge": 2}
-KIND_LABEL = {"finding": "確認", "unknown": "分からない", "nudge": "先回り"}
+KIND_LABEL = {"finding": "確認", "unknown": "読み取れず", "nudge": "早めのお知らせ"}
 
 
 @dataclass

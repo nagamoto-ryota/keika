@@ -112,7 +112,7 @@ def test_declared_is_shown_differently_from_done(env):
     put(s, c, "重要事項の掲示.txt", doc_type="掲示", summary="重要事項の掲示")
     declare(c, "R27", who="真柴", basis="確認した")
     body = TestClient(create_app(s)).get("/office").text
-    assert "申告" in body
+    assert "確かめました" in body
 
 
 def _abuse_docs(s, c, trainings):

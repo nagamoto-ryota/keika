@@ -218,7 +218,7 @@ def _web_posting(rule: Rule, docs: list[Doc], declared: sqlite3.Row | None) -> O
     posted = next((d for d in docs if d[1].doc_type == "掲示" or _about(d, "掲示")), None)
     rel = posted[0].rel_path if posted else None
     if declared:
-        note = f"{declared['who']} が申告: {declared['basis']}"
+        note = f"{declared['who']} が確かめました: {declared['basis']}"
         return OfficeRow(rule, "declared", rel, note=note, declared_at=declared["at"])
     return OfficeRow(rule, "unknown", rel, "ウェブサイトへの掲載は Drive では分かりません。ご自身で確かめて申告してください")
 

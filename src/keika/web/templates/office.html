@@ -2,7 +2,7 @@
 {% block title %}事業所の備え - ケイカ{% endblock %}
 {% block main %}
 {% with tab = 'office' %}{% include "_list_tabs.html" %}{% endwith %}
-<p class="muted">Drive の事業所のフォルダを読んだ結果です。紙で保管している物は読めません。別の場所にあれば、ご自身で確かめてください。</p>
+<p class="muted">ドライブの事業所のフォルダを読んだ結果です。紙で保管している物は読めません。別の場所にあれば、ご自身で確かめてください。</p>
 
 {% include "_office_tasks.html" %}
 
@@ -10,7 +10,7 @@
 {% for r in rows if r.status in ('done', 'declared') %}
 <p class="done-row">
   <span class="ok-mark">✓</span> {{ r.rule.title }}
-  {% if r.status == 'declared' %}<span class="pill unknown">人の申告</span> <span class="small muted">{{ r.note }}（{{ r.declared_at[:10]|hdate }}）</span>{% endif %}
+  {% if r.status == 'declared' %}<span class="pill unknown">人が確かめた物</span> <span class="small muted">{{ r.note }}（{{ r.declared_at[:10]|hdate }}）</span>{% endif %}
   {% if r.evidence_rel_path %}<a class="small" href="/doc?path={{ r.evidence_rel_path|urlencode }}" target="_blank" rel="noopener">書類を開く</a>{% endif %}
 </p>
 {% else %}

@@ -16,9 +16,9 @@
 {% for doc in plan.docs %}
 <section class="card">
   <p class="todo-line">{{ doc.title }} <span class="muted small">{{ doc.kind }}</span></p>
-  {% if doc.flag %}<p class="small draft-flag">記録や書類に見当たりません: {{ doc.flag }}</p>{% endif %}
+  {% if doc.flag %}<p class="small draft-flag">この言葉は記録や書類にありません。確かめてください: {{ doc.flag }}</p>{% endif %}
   <textarea rows="6" class="plan-doc">{{ doc.body }}</textarea>
-  <button type="button" class="plain" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); this.textContent='写しました'">文字を写す</button>
+  <button type="button" class="plain" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); this.textContent='コピーしました'">文章をコピーする</button>
 </section>
 {% endfor %}
 {% if plan.removed %}<p class="muted small">薬、診断、受診の判断に関わる案や、過去の日付で書く案を {{ plan.removed }} 件、外しました。</p>{% endif %}

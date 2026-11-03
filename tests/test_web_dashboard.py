@@ -128,7 +128,7 @@ def _claude(**kw):
 def test_user_page_shows_claude_finding_with_suggestion_blank(client, conn):
     save_run(conn, "U04", CheckRun(findings=[_claude()]))
     body = client.get("/users/U04").text
-    assert "週2回のままです" in body and "月・水・木" in body and "書き足し案" in body and 'class="blank"' in body
+    assert "週2回のままです" in body and "月・水・木" in body and "記録に書き足す文の案" in body and 'class="blank"' in body
 
 
 def test_dashboard_counts_claude_findings(client, conn):
@@ -143,12 +143,12 @@ def test_dismissed_candidate_is_hidden_and_shown_as_a_note(client, conn):
     assert "9月に居宅を訪問" in client.get("/users/U04").text
     save_run(conn, "U04", CheckRun(dismissed=[Dismissal("R06", "2026-09", "入院中", "2026-09-10", "入院中のため")]))
     body = client.get("/users/U04").text
-    assert "9月に居宅を訪問" not in body and "読み直して取り下げました" in body and "入院中" in body
+    assert "9月に居宅を訪問" not in body and "事情が分かって取り下げた指摘" in body and "入院中" in body
 
 
 def test_failed_check_is_shown_as_not_run(client, conn):
     save_run(conn, "U04", CheckRun(not_run=True, error="APIConnectionError"))
-    assert "未実施" in client.get("/users/U04").text
+    assert "AI の点検が動きませんでした" in client.get("/users/U04").text
 
 
 def _one_finding(conn):
@@ -191,7 +191,7 @@ def test_respond_history_noted_adds_todays_record(client, conn):
     fp = fingerprint(_claude(evidence=[Evidence(file="利用者/U04_柚木茂/担当者変更のお知らせ_2026-07-01.docx", quote="担当")]))
     client.post("/users/U04/respond", data={"fp": fp, "kind": "history_noted", "note": "今日、経緯を確認した。"})
     body = client.get("/users/U04").text
-    assert "今日、経緯を確認した。" in body and "経緯あり" in body
+    assert "今日、経緯を確認した。" in body and "経緯を残した指摘" in body
     assert client.post("/users/U04/respond", data={"fp": fp, "kind": "history_noted", "note": " "}).status_code == 400
     from keika.records import list_records
     assert [r.event_date for r in list_records(conn, "U04") if r.kind_written == "経緯"] == ["2026-11-04"]
@@ -209,7 +209,7 @@ def test_blank_marks_keep_the_blank_characters(client, conn):
 def test_user_page_shows_closed_findings_with_the_record(client, conn):
     save_run(conn, "U04", CheckRun(resolved=[Resolution("R11", "2026-10", "転倒後の見直しを確認してください。", "見直しの記録あり", "2026-11-04", "計画を見直した")]))
     body = client.get("/users/U04").text
-    assert "記録で確認して閉じました" in body and "転倒後の見直し" in body and "計画を見直した" in body
+    assert "記録で確かめて片付いた指摘" in body and "転倒後の見直し" in body and "計画を見直した" in body
 
 
 def test_no_done_button(client, conn):
@@ -229,4 +229,4 @@ def test_dashboard_summary_per_person_in_charge(client, conn):
     row = body[body.index('class="summary"'):body.index("</table>")]
     assert "井波 拓真" in row
     i = row.index("井波 拓真")
-    assert "問題なし 1" in row[i:] and "閉じた 1" in row[i:]
+    assert "問題なし 1" in row[i:] and "片付いた 1" in row[i:]
