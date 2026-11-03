@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}訪問前の1枚 - {{ sheet.user.name }} - ケイカ{% endblock %}
-{% macro ask(it) %}<li class="ask" data-section="{{ it.section }}" data-label="{{ it.label }}" data-past="{{ it.past }}"><span class="box" aria-hidden="true">□</span><span>{{ it.label }}{% if it.past %} <span class="muted small">前回: {{ it.past }}</span>{% endif %}</span><textarea class="note" rows="1" placeholder="ここに入力" aria-label="{{ it.label }} の答え">{{ it.answer }}</textarea><div class="write-space"></div></li>{% endmacro %}
+{% macro ask(it) %}<li class="ask" data-section="{{ it.section }}" data-label="{{ it.label }}" data-past="{{ it.past }}"><span class="box" aria-hidden="true">□</span><span>{{ it.label }}{% if it.past %} <span class="muted small">前回: {{ it.past }}</span>{% endif %}</span><textarea class="note" rows="1" placeholder="ここに入力" aria-label="{{ it.label }} の答え">{{ it.answer }}</textarea><div class="note-print">{{ it.answer }}</div><div class="write-space"></div></li>{% endmacro %}
 {% block main %}
 <p class="muted no-print"><a href="/users/{{ sheet.user.id }}">{{ sheet.user.name }}のページへ戻る</a></p>
 <h1>訪問前の1枚 <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
@@ -59,7 +59,7 @@
 <table class="sheet-check">
   <tr><th>No</th><th>質問</th><th>前回</th><th>今回</th></tr>
   {% for it in items['基本チェックリスト'] %}<tr class="ask-row" data-section="{{ it.section }}" data-label="{{ it.label }}" data-past="{{ it.past }}"><td>{{ it.raw.no }}</td><td>{{ it.raw.question }}</td><td>{% if it.past %}前回: {{ it.past }}{% else %}<span class="muted">－</span>{% endif %}</td><td class="sheet-answer">
-    {%- if it.raw.no == 12 %}<input type="text" class="note-line" value="{{ it.answer }}" placeholder="身長　　cm　体重　　kg" aria-label="身長と体重">
+    {%- if it.raw.no == 12 %}<input type="text" class="note-line" value="{{ it.answer }}" placeholder="身長　　cm　体重　　kg" aria-label="身長と体重"><span class="note-print">{{ it.answer }}</span>
     {%- else %}{% for v in ['はい', 'いいえ'] %}<label class="yesno"><input type="radio" name="c{{ it.raw.no }}" value="{{ v }}"{{ ' checked' if it.answer == v }}>{{ v }}</label>{% endfor %}{% endif -%}
   </td></tr>{% endfor %}
 </table>

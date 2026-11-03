@@ -1,10 +1,11 @@
-// 訪問前の1枚: 書いた答えを自動で保存し、コピーにも入れる。
+// 訪問前の1枚: 書いた答えを自動で保存し、コピーと印刷にも入れる。
 (function () {
   var data = document.getElementById("sheet-data");
   var url = data.dataset.url;
   var state = document.getElementById("note-state");
-  var timers = new Map();
-  var sending = new Map();
+  var timers = new Map();  // 入力の後、送るのを待っている項目
+  var sending = new Map(); // 送っている途中の項目
+  var dirty = new Set();   // まだ保存できていない項目（失敗した物も残る）
 
   function rows() { return document.querySelectorAll(".ask, .ask-row"); }
 
@@ -15,38 +16,57 @@
     return field ? field.value : "";
   }
 
+  function post(row) {
+    var body = new URLSearchParams({ section: row.dataset.section, label: row.dataset.label, answer: valueOf(row) });
+    return fetch(url, { method: "POST", body: body, keepalive: true }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+    });
+  }
+
+  function report() {
+    if (dirty.size && !sending.size && !timers.size) {
+      state.textContent = "保存できていない入力があります。送る前に通信を確かめてください";
+      state.classList.add("note-failed");
+    } else if (!dirty.size) {
+      state.textContent = "保存しました";
+      state.classList.remove("note-failed");
+    }
+  }
+
+  // 同じ項目は1通ずつ送る。送っている間に書き足された分は、終わってから送る
   function send(row) {
     clearTimeout(timers.get(row));
     timers.delete(row);
     if (!url) return Promise.resolve();
-    var body = new URLSearchParams({ section: row.dataset.section, label: row.dataset.label, answer: valueOf(row) });
+    if (sending.has(row)) return sending.get(row);
     state.textContent = "保存しています";
-    // 同じ項目は順番に送り、古い内容が後から上書きしないようにする
-    var job = (sending.get(row) || Promise.resolve()).then(function () {
-      return fetch(url, { method: "POST", body: body, keepalive: true });
-    }).then(function (r) {
-      if (!r.ok) throw new Error(r.status);
-      if (sending.get(row) === job) sending.delete(row);
-      state.textContent = "保存しました";
-      state.classList.remove("note-failed");
-    }).catch(function (e) {
-      if (sending.get(row) === job) sending.delete(row);
-      state.textContent = "保存できませんでした。書いた内容はまだ保存されていません";
-      state.classList.add("note-failed");
-      throw e;
+    dirty.delete(row);
+    var job = post(row).then(function () {
+      sending.delete(row);
+      if (dirty.has(row) && !timers.has(row)) return send(row);
+      report();
+    }, function () {
+      sending.delete(row);
+      dirty.add(row);
+      report();
     });
     sending.set(row, job);
     return job;
   }
 
-  function later(row) {
+  function changed(row, wait) {
+    if (!url) return;
+    dirty.add(row);
     clearTimeout(timers.get(row));
-    timers.set(row, setTimeout(function () { send(row).catch(function () {}); }, 800));
+    timers.set(row, setTimeout(function () { send(row); }, wait));
   }
 
   function flush() {
-    var jobs = Array.from(timers.keys()).map(send).concat(Array.from(sending.values()));
-    return Promise.all(jobs);
+    var jobs = Array.from(dirty).map(send).concat(Array.from(sending.values()));
+    return Promise.all(jobs).then(function () {
+      if (sending.size) return flush();
+      if (dirty.size) throw new Error("not saved");
+    });
   }
 
   function grow(field) {
@@ -54,15 +74,20 @@
     field.style.height = field.scrollHeight + 2 + "px";
   }
 
+  function mirror(row) {
+    var copy = row.querySelector(".note-print");
+    if (copy) copy.textContent = valueOf(row);
+  }
+
   rows().forEach(function (row) {
-    row.querySelectorAll(".note").forEach(function (field) {
-      if (field.value) grow(field);
-      field.addEventListener("input", function () { grow(field); later(row); });
-      field.addEventListener("blur", function () { if (timers.has(row)) send(row).catch(function () {}); });
-    });
-    row.querySelectorAll(".note-line").forEach(function (field) {
-      field.addEventListener("input", function () { later(row); });
-      field.addEventListener("blur", function () { if (timers.has(row)) send(row).catch(function () {}); });
+    row.querySelectorAll(".note, .note-line").forEach(function (field) {
+      if (field.classList.contains("note") && field.value) grow(field);
+      field.addEventListener("input", function () {
+        if (field.classList.contains("note")) grow(field);
+        mirror(row);
+        changed(row, 800);
+      });
+      field.addEventListener("blur", function () { if (timers.has(row)) send(row); });
     });
     row.querySelectorAll("input[type=radio]").forEach(function (radio) {
       if (radio.checked) row.dataset.picked = radio.value;
@@ -73,7 +98,7 @@
         } else {
           row.dataset.picked = radio.value;
         }
-        send(row).catch(function () {});
+        changed(row, 0);
       });
     });
   });
@@ -82,17 +107,27 @@
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var button = form.querySelector("button");
+      if (button.disabled) return;
+      var label = button.textContent;
+      button.disabled = true;
       flush().then(function () {
-        if (form.classList.contains("busy")) {
-          button.disabled = true;
-          button.textContent = "作っています（1分ほど）";
-        }
+        if (form.classList.contains("busy")) button.textContent = "作っています（1分ほど）";
         form.submit();
-      }).catch(function () {}); // 保存できない時は進まない。知らせは state に出ている
+      }).catch(function () { // 保存できない時は進まない。知らせは state に出ている
+        button.disabled = false;
+        button.textContent = label;
+      });
     });
   });
 
-  window.addEventListener("pagehide", function () { timers.forEach(function (_, row) { send(row).catch(function () {}); }); });
+  // ページを離れる時は、順番を待たずに送る。届かないと消えるので
+  window.addEventListener("pagehide", function () {
+    dirty.forEach(function (row) { post(row).catch(function () {}); });
+  });
+  window.addEventListener("beforeunload", function (e) {
+    if (Array.from(dirty).some(function (r) { return !timers.has(r) && !sending.has(r); })) e.preventDefault();
+  });
+  window.addEventListener("pageshow", function (e) { if (e.persisted) location.reload(); });
 
   function sheetText() {
     var out = [data.dataset.head];

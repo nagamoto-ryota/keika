@@ -299,7 +299,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         sheet = build_sheet(conn, s, user_id)
         if sheet is None:
             raise HTTPException(404, "利用者が見つかりません")
-        return templates.TemplateResponse(request, "visit_sheet.html", _sheet_view(sheet, False))
+        # 戻るボタンで古い答えを開き直すと、送った答えが生き返るので、保存させない
+        return templates.TemplateResponse(request, "visit_sheet.html", _sheet_view(sheet, False), headers={"Cache-Control": "no-store"})
 
     @app.post("/users/{user_id}/visit/notes")
     def post_note(user_id: str, section: str = Form(...), label: str = Form(...), answer: str = Form("")):
@@ -313,11 +314,12 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         user = get_user(conn, user_id)
         if user is None:
             raise HTTPException(404, "利用者が見つかりません")
+        stamp = now_real().isoformat()  # 読む前に取る。読んだ後の保存を「送った」扱いにしないため
         notes = get_notes(conn, user_id)
         if not notes:
             return RedirectResponse(f"/users/{user_id}/visit", status_code=303)
         return templates.TemplateResponse(request, "new_record.html", {
-            "text": to_record_text(user.name, notes), "visit_user": user_id, "visit_stamp": now_real().isoformat(),
+            "text": to_record_text(user.name, notes), "visit_user": user_id, "visit_stamp": stamp,
         })
 
     @app.post("/users/{user_id}/visit/questions")
@@ -355,6 +357,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(403, "見本モードでは記録できません。API キーを設定して keika serve で起動してください。")
         if not text.strip():
             raise HTTPException(400, "文章を入れてください")
+        if visit_user and visit_stamp and not get_notes(conn, visit_user):  # 同じ送信の二度目
+            return RedirectResponse(f"/users/{visit_user}/visit", status_code=303)
         try:
             client = client_factory()
         except RuntimeError as e:  # キーが無くても、話した内容は失わない
@@ -365,8 +369,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             background.add_task(_draft_in_background, client, results, "画面")  # 点検は長いので、下書きを先に作る
             for uid in saved:
                 background.add_task(_check_in_background, uid)
-        if visit_user and visit_stamp:  # 記録か確認に入ったので、次の訪問の欄には出さない
-            mark_used(conn, visit_user, visit_stamp)
+        if visit_user and visit_stamp and any(r.review_id or (r.record and r.record.user_id == visit_user) for r in results):
+            mark_used(conn, visit_user, visit_stamp, text)  # この人の記録か確認に入った分は、次の訪問の欄に出さない
         names = {u.id: u.name for u in list_users(conn)}
         return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
 

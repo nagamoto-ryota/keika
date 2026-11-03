@@ -42,12 +42,14 @@ def get_notes(conn: sqlite3.Connection, user_id: str) -> dict[str, dict]:
     return {r["item_key"]: dict(r) for r in rows}
 
 
-def mark_used(conn: sqlite3.Connection, user_id: str, stamp: str) -> None:
-    """stamp より後に書いた答えは、記録に入っていないので残す。"""
-    conn.execute(
-        "UPDATE visit_notes SET used_at = ? WHERE user_id = ? AND used_at IS NULL AND updated_at <= ?",
-        (now_real().isoformat(), user_id, stamp),
-    )
+def mark_used(conn: sqlite3.Connection, user_id: str, stamp: str, text: str) -> None:
+    """記録に送った文に入っている答えだけを片付ける。stamp より後に書いた答えと、文から消された答えは残す。"""
+    for key, n in get_notes(conn, user_id).items():
+        if n["answer"] in text:
+            conn.execute(
+                "UPDATE visit_notes SET used_at = ? WHERE user_id = ? AND item_key = ? AND updated_at <= ?",
+                (now_real().isoformat(), user_id, key, stamp),
+            )
     conn.commit()
 
 
@@ -69,6 +71,8 @@ def sheet_items(sheet: Any, q: dict | None, notes: dict[str, dict], fmt: Callabl
         items[section] = []
         for label, past, raw in rows:
             key = note_key(section, label)
+            if key in shown:  # 同じ文言は1行にまとめる。答えの行き先が1つなので、並べると片方が上書きされる
+                continue
             shown.add(key)
             items[section].append({"section": section, "label": label, "past": past, "answer": notes.get(key, {}).get("answer", ""), "raw": raw})
     items[LEFTOVER] = [{"section": n["section"], "label": n["label"], "past": "", "answer": n["answer"], "raw": None} for k, n in notes.items() if k not in shown]
@@ -78,10 +82,9 @@ def sheet_items(sheet: Any, q: dict | None, notes: dict[str, dict], fmt: Callabl
 def to_record_text(name: str, notes: dict[str, dict]) -> str:
     """書いた答えだけを、記録の入力欄に入れる文にする。"""
     lines = [f"{name}様の訪問で聞いたこと。"]
-    section = None
+    sections: dict[str, list[str]] = {}
     for n in notes.values():
-        if n["section"] != section:
-            section = n["section"]
-            lines.append(f"【{section}】")
-        lines.append(f"{n['label']} → {n['answer']}")
+        sections.setdefault(n["section"], []).append(f"{n['label']} → {n['answer']}")
+    for section, rows in sections.items():
+        lines += [f"【{section}】", *rows]
     return "\n".join(lines)

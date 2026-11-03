@@ -95,7 +95,7 @@ def test_recording_clears_only_what_was_sent(env, monkeypatch):
     monkeypatch.setattr("keika.web.app.process_text", lambda *a, **k: [IntakeResult(review_id=1)])
     monkeypatch.setattr("keika.web.app.open_reviews", lambda conn: [], raising=False)
     note(client, label="後で書いた項目", answer="送った後の入力")  # 送った後に足した分は残す
-    client.post("/records/new", data={"text": "柚木様の訪問", "visit_user": "U09", "visit_stamp": stamp})
+    client.post("/records/new", data={"text": "趣味: 聞く → 将棋", "visit_user": "U09", "visit_stamp": stamp})
     left = get_notes(c, "U09")
     assert [n["label"] for n in left.values()] == ["後で書いた項目"]
 
@@ -120,7 +120,67 @@ def test_answer_after_recording_can_be_written_again(env):
     s, c = env
     save_note(c, s, "U09", "基本情報", "趣味: 聞く", "将棋")
     from keika.visit_notes import mark_used
-    mark_used(c, "U09", "9999")
+    mark_used(c, "U09", "9999", "将棋")
     assert get_notes(c, "U09") == {}
     save_note(c, s, "U09", "基本情報", "趣味: 聞く", "囲碁")
     assert [n["answer"] for n in get_notes(c, "U09").values()] == ["囲碁"]
+
+
+def _send(client):
+    import re
+    form = client.post("/users/U09/visit/to-record").text
+    return re.search(r'name="visit_stamp" value="([^"]+)"', form).group(1)
+
+
+def test_same_wording_twice_is_one_line(env):
+    from keika.visit_notes import sheet_items
+    from types import SimpleNamespace as NS
+    sheet = NS(homework=[NS(flag=False, text="電話する"), NS(flag=False, text="電話する")], checks=[], goals=[])
+    assert len(sheet_items(sheet, None, {}, str)["宿題・持ち越し"]) == 1
+
+
+def test_answer_removed_from_the_text_stays_on_the_sheet(env, monkeypatch):
+    s, c = env
+    client = app_client(s)
+    note(client)
+    stamp = _send(client)
+    monkeypatch.setattr("keika.web.app.process_text", lambda *a, **k: [IntakeResult(review_id=1)])
+    client.post("/records/new", data={"text": "全く別の話", "visit_user": "U09", "visit_stamp": stamp})
+    assert [n["answer"] for n in get_notes(c, "U09").values()] == ["将棋"]
+
+
+def test_record_for_another_person_does_not_clear(env, monkeypatch):
+    from types import SimpleNamespace as NS
+    s, c = env
+    client = app_client(s)
+    note(client)
+    stamp = _send(client)
+    monkeypatch.setattr("keika.web.app.process_text", lambda *a, **k: [IntakeResult(record=NS(user_id="U04", id=1, event_date="2026-11-13", event_time="", kind_read="", kind_written="", body="将棋", status="", monitoring=False))])
+    monkeypatch.setattr("keika.web.app.templates", None, raising=False)
+    r = client.post("/records/new", data={"text": "趣味: 聞く → 将棋", "visit_user": "U09", "visit_stamp": stamp}, follow_redirects=False)
+    assert len(get_notes(c, "U09")) == 1, r.status_code
+
+
+def test_second_send_of_the_same_form_does_nothing(env, monkeypatch):
+    s, c = env
+    client = app_client(s)
+    note(client)
+    stamp = _send(client)
+    calls = []
+    monkeypatch.setattr("keika.web.app.process_text", lambda *a, **k: calls.append(1) or [IntakeResult(review_id=1)])
+    data = {"text": "趣味: 聞く → 将棋", "visit_user": "U09", "visit_stamp": stamp}
+    client.post("/records/new", data=data)
+    r = client.post("/records/new", data=data, follow_redirects=False)
+    assert r.status_code == 303 and len(calls) == 1
+
+
+def test_sheet_page_is_not_kept_for_the_back_button(env):
+    s, c = env
+    assert app_client(s).get("/users/U09/visit").headers["cache-control"] == "no-store"
+
+
+def test_answer_is_on_the_printed_copy_too(env):
+    s, c = env
+    client = app_client(s)
+    note(client, section="今確かめること", label="もう無い項目", answer="電話で確認済み")
+    assert '<div class="note-print">電話で確認済み</div>' in client.get("/users/U09/visit").text
