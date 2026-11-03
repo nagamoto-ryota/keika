@@ -117,3 +117,7 @@ Claude Desktop に話した内容を、ケイカの入口と同じ整文と検�
 ## 作る過程の記録
 
 [docs/claude-usage.md](docs/claude-usage.md) に、Claude をどこでどう使ったかと、試行錯誤を残しています。
+
+## ライセンス
+
+[MIT](LICENSE)。`src/keika/legal/` にある法令や通知の引用は、それぞれの出典の扱いに従います。
