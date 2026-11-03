@@ -1,3 +1,15 @@
+import json
+
+import pytest
+
+from datetime import date
+from keika.db import connect
+from keika.files import scan
+from keika.ledger import User, upsert_user
+from keika.machine_checks import run_machine_checks
+from keika.reading import DocFacts, _save
+from keika.records import RecordIn, add_record
+from keika.settings import Settings
 from datetime import date
 
 import pytest
@@ -323,3 +335,59 @@ def test_meeting_written_in_another_document_is_not_called_missing(env):
     assert {x.period for x in of(fs, "R33", "finding")} == {"アセスメント"}
     told = of(fs, "R33", "unknown")
     assert len(told) == 1 and "2026-04-28" in told[0].message and "要点" in told[0].message
+
+
+# --- 確認待ちの話 ---
+
+
+def _pending(c, user_id, day, kind="居宅訪問"):
+    entry = {"user_id": user_id, "kind_read": kind, "event_date": day, "event_time": "", "monitoring": True, "partner": "", "body": "訪問した。"}
+    c.execute("INSERT INTO review_items (original, source, entry, warnings, note, status, created_at) VALUES ('話', '口述.txt', ?, '[]', '誰か確かめて', 'open', '2026-11-04')",
+              (json.dumps(entry, ensure_ascii=False),))
+    c.commit()
+
+
+def test_visit_waiting_in_review_is_not_called_missing(machine_env):
+    s, c = machine_env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-10-05", kind_read="居宅訪問", body="訪問。"))
+    _pending(c, "U01", "2026-11-02")
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R06"]
+    assert len(found) == 1 and found[0].kind == "nudge" and "記録の確認" in found[0].message and "まだ" not in found[0].message
+
+
+def test_phone_call_waiting_in_review_does_not_count_as_visit(machine_env):
+    s, c = machine_env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-10-05", kind_read="居宅訪問", body="訪問。"))
+    _pending(c, "U01", "2026-11-02", kind="電話")
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R06"]
+    assert "まだ" in found[0].message
+
+
+def test_visit_waiting_in_review_for_other_user_does_not_count(machine_env):
+    s, c = machine_env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-10-05", kind_read="居宅訪問", body="訪問。"))
+    _pending(c, "U02", "2026-11-02")
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R06"]
+    assert "まだ" in found[0].message
+
+
+def test_meeting_written_in_plan_text_softens_missing_minutes(machine_env):
+    s, c = machine_env
+    folder = s.drive_root / "利用者" / "U01_杉森ハル"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "計画書.txt").write_text("担当者会議：2026-03-26 全員で確認した。", encoding="utf-8")
+    refs = [r for r in scan(s) if r.rel_path.endswith("計画書.txt")]
+    _save(c, refs[0], DocFacts(doc_type="居宅サービス計画書", summary="計画書"))
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R33" and "要点" in f.message]
+    assert found and found[0].kind == "unknown" and "2026-03-26" in found[0].message
+
+
+@pytest.fixture
+def machine_env(tmp_path):
+    root = tmp_path / "drive"
+    (root / "利用者").mkdir(parents=True)
+    s = Settings(drive_root=root, db_path=tmp_path / "m.db", as_of=date(2026, 11, 4))
+    c = connect(s)
+    upsert_user(c, User(id="U01", name="杉森 ハル", cm="CM01", data={"type": "居宅介護支援", "cert_period": ["2026-04-01", "2028-03-31"]}))
+    yield s, c
+    c.close()

@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS med_checks (
     id INTEGER PRIMARY KEY, record_id INTEGER NOT NULL, heard TEXT NOT NULL, status TEXT NOT NULL,
     chosen TEXT, editor TEXT, created_at TEXT NOT NULL, decided_at TEXT
 );
+CREATE TABLE IF NOT EXISTS drafts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, kind TEXT NOT NULL, record_id INTEGER, event_date TEXT NOT NULL,
+  payload TEXT NOT NULL, original TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
+);
 CREATE TRIGGER IF NOT EXISTS med_checks_no_delete BEFORE DELETE ON med_checks
 BEGIN SELECT RAISE(ABORT, '薬名の確認の結果は消せません'); END;
 -- 履歴は消せない。記録も消せない。記入日時は変えられない。

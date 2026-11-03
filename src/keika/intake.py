@@ -29,7 +29,13 @@ _SPOKEN_GAP = re.compile(rf"(?<=[{_JA}]){_GAP}(?=[{_JA}\d])|(?<=\d){_GAP}(?=[{_J
 _NOT_TAKEN = re.compile(r"(?:飲め|飲ん|服用|内服)[^。]{0,6}ない|飲み忘れ")
 _VISIT_WORDS = re.compile(r"訪問|行っ|行き|伺|お宅|宅|家")
 _WHEN_WORDS = re.compile(r"昨日|一昨日|おととい|先週|先日|前回|曜")
+_CUE = re.compile(r"^(?:\d+[ \t]*\n)?[\d:.,]+[ \t]*-->[ \t]*[\d:.,]+.*$", re.M)
+_VTT_HEAD = re.compile(r"\AWEBVTT.*$", re.M)
+_BRACKET_TIME = re.compile(r"^[\[(（]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?[\])）][ \t　]*", re.M)
+_BARE_TIME = re.compile(r"^\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?[ \t　]+", re.M)
+_SPEAKER_TIME = re.compile(r"^((?:話者|スピーカー|Speaker)[ \t]*\w*)[ \t　]+[\[(（]?\d{1,2}:\d{2}(?::\d{2})?[\])）]?[ \t　]*[:：]?[ \t　]*", re.M)
 _KANJI_DIGITS = str.maketrans("〇一二三四五六七八九", "0123456789")
+_LIST_MARKS = re.compile("[①-⑳]")  # ①②。そのまま数字にすると次の数字とつながる
 # 語: 話の中にこのどれかがあれば、平たい言い方を直しただけとみなす
 _CAREFUL_WORDS = {
     "受診": ("受診", "病院", "診"), "入院": ("入院",), "退院": ("退院",), "転倒": ("転倒", "転ん", "転び", "転ぶ", "尻もち", "こけ"),
@@ -71,6 +77,8 @@ SYSTEM = """日本の介護支援専門員が話した内容（音声入力や�
 - 薬から病名を推測しない。話に出ていない病名を書かない。
 - 緊急度や受診の要否を判定しない。「すぐ受診」のような判断は、話した人がそう言った時に、その人の言葉として書くだけにする。
 - 1回の話に複数の利用者や複数の出来事があれば、分けて複数の記録にする。
+- 担当者会議は、支援経過には開催の事実と決まったことを5行以内で書き、1つの記録にまとめる。発言を並べない。詳しい内容は別に作る下書きに任せる。
+- 話者の番号は人の名前ではない。
 - 同じ名前の人がいないか台帳で確かめる。利用者本人、家族、職員を取り違えない。誤変換した人名や事業所名は台帳で直し、name_fixes に書く。話に出ていない人や事業所の名前を足さない。
 - spoken_name には話の中の呼び方をそのまま書く。台帳の氏名と違う書き方なら、必ず name_fixes にその読み替えを書く（heard に呼び方、fixed に台帳の氏名）。
 - 誰の話か迷う時は user_id を空にするか ambiguous を true にする。無理に決めない。
@@ -83,7 +91,17 @@ SYSTEM = """日本の介護支援専門員が話した内容（音声入力や�
 class IntakeResult:
     record: Record | None = None
     review_id: int | None = None
+    entry: dict | None = None  # 確認に回した時の整文の結果
     warnings: list[str] = field(default_factory=list)
+
+
+def clean_transcript(text: str) -> str:
+    """録音機の文字起こしから、字幕の番号と経過時間の印を除く。話者の名前は残す。経過時間を話の時刻と取り違えないため。"""
+    text = _VTT_HEAD.sub("", _CUE.sub("", text))
+    text = _BRACKET_TIME.sub("", _SPEAKER_TIME.sub(r"\1: ", text))
+    if len(_BARE_TIME.findall(text)) >= 3:  # 1行だけなら、話した時刻かもしれない
+        text = _BARE_TIME.sub("", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip("\n") + ("\n" if text.endswith("\n") else "")
 
 
 def join_spoken(text: str) -> str:
@@ -92,7 +110,7 @@ def join_spoken(text: str) -> str:
 
 
 def _normal(text: str) -> str:
-    return unicodedata.normalize("NFKC", text).translate(_KANJI_DIGITS)
+    return unicodedata.normalize("NFKC", _LIST_MARKS.sub(" ", text)).translate(_KANJI_DIGITS)
 
 
 def _digits(text: str) -> set[str]:
@@ -241,7 +259,7 @@ def process_text(
     conn: sqlite3.Connection, client: Any, s: Settings, text: str, source: str, *,
     date_hint: str | None = None, on_saved: Callable[[str], None] | None = None,
 ) -> list[IntakeResult]:
-    text = join_spoken(text)
+    text = join_spoken(clean_transcript(text))
     prompt = (
         f"今日は {today(s).isoformat()} です。\n"
         + (f"この資料の日付の手がかり: {date_hint}\n" if date_hint else "")
@@ -265,7 +283,7 @@ def process_text(
                 note = f"「{entry.spoken_name}」が誰か確かめてください"
             if warnings:
                 note = (note + " " if note else "") + UNSPOKEN_NOTE
-            results.append(IntakeResult(review_id=to_review(conn, text, source, entry.model_dump(), warnings, note), warnings=warnings))
+            results.append(IntakeResult(review_id=to_review(conn, text, source, entry.model_dump(), warnings, note), warnings=warnings, entry=None if problem else entry.model_dump()))
             continue
         record = _save_entry(conn, s, entry, source)
         conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, text))

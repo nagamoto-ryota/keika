@@ -45,7 +45,7 @@ def test_new_file_is_processed_once(env):
     client = FakeClient(answer(wire()))
     assert handle_file(c, client, s, path) is True
     assert handle_file(c, client, s, path) is False
-    assert len(client.calls) == 1 and len(list_records(c, "U04")) == 1
+    assert len(client.calls) == 2  # 記録と下書きで1回ずつ and len(list_records(c, "U04")) == 1
 
 
 def test_same_content_is_not_processed_twice(env):
@@ -53,7 +53,7 @@ def test_same_content_is_not_processed_twice(env):
     client = FakeClient(answer(wire()))
     handle_file(c, client, s, drop(s, "a.txt"))
     assert handle_file(c, client, s, drop(s, "別名.txt")) is False
-    assert len(client.calls) == 1
+    assert len(client.calls) == 2  # 記録と下書きで1回ずつ
 
 
 def test_original_file_is_never_deleted(env):

@@ -119,3 +119,17 @@ button { font: inherit; padding: 2px 14px; border: 1px solid var(--accent); back
 .law h4 { margin: 10px 0 2px; font-size: 14px; color: var(--muted); font-weight: 600; }
 .law-text { margin: 0 0 6px; white-space: pre-line; font-size: 15px; line-height: 1.7; }
 .list-tabs { margin-bottom: 14px; }
+
+.draft-note { background: var(--paper); border-left: 4px solid var(--unknown); padding: 8px 12px; }
+.draft h2 { font-size: 1rem; margin: 18px 0 6px; }
+form.draft table input { width: 100%; box-sizing: border-box; }
+form.draft table input[size] { width: auto; }
+.draft-item { margin-bottom: 8px; }
+.draft-item.flagged textarea { border-left: 4px solid var(--finding); }
+.draft-flag { color: var(--finding); margin: 2px 0; }
+.draft-original { white-space: pre-wrap; background: var(--paper); padding: 12px; max-height: 420px; overflow: auto; }
+@media print {
+  .no-print, header, nav { display: none !important; }
+  .draft textarea, .draft input { border: none; resize: none; }
+  .draft textarea { field-sizing: content; }
+}

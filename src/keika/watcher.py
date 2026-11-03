@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from keika.db import connect
-from keika.files import _hash, scan, to_payload
-from keika.intake import process_text, to_review
+from keika.claude_checks import _ref_text
+from keika.drafts import intake_with_drafts
+from keika.files import _hash, scan
+from keika.intake import to_review
 from keika.settings import Settings, now_real
 
 SETTLE_SECONDS = 20
@@ -42,11 +44,11 @@ def handle_file(conn: sqlite3.Connection, client: Any, s: Settings, path: Path, 
     ref = next((r for r in scan(s) if r.rel_path == rel), None)
     if ref is None:
         return False
-    payload = to_payload(s, ref)
-    if payload.text is None:
+    text = _ref_text(s, ref)
+    if text is None:
         to_review(conn, f"（{path.name}）", path.name, {}, [], f"{path.name} は文字として読めませんでした。文字起こしを置いてください。")
     else:
-        process_text(conn, client, s, payload.text, path.name, date_hint=date_hint(path.name), on_saved=on_saved)
+        intake_with_drafts(conn, client, s, text, path.name, date_hint=date_hint(path.name), on_saved=on_saved)
     conn.execute("INSERT INTO intake_files (sha256, rel_path, taken_at) VALUES (?, ?, ?)", (sha, rel, now_real().isoformat()))
     conn.commit()
     return True

@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import calendar
+import json
 import re
 import sqlite3
 from datetime import date, timedelta
 
-from keika.files import DocRef, scan
+from keika.files import DocRef, scan, to_payload
 from keika.findings import Evidence, Finding
 from keika.ledger import User, get_user, list_users, squash
 from keika.reading import DocFacts, Source, stored_facts
@@ -92,6 +93,29 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
                                evidence=[_record_evidence(r) for r in (written or rows)],
                                message=f"{month}に居宅を訪問しての面接の記録が見当たりません。{detail}"
                                        "特段の事情があれば、その記録があるか確認してください。"))
+    return out
+
+
+def _pending_visits(conn: sqlite3.Connection, user_id: str) -> list[str]:
+    """記録の確認で待っている話のうち、この利用者の居宅訪問の日。"""
+    days = []
+    for row in conn.execute("SELECT entry FROM review_items WHERE status = 'open'"):
+        entry = json.loads(row["entry"])
+        if entry.get("user_id") == user_id and entry.get("kind_read") == HOME_VISIT and entry.get("event_date"):
+            days.append(entry["event_date"])
+    return days
+
+
+def _waiting_in_review(visits: list[Finding], days: list[str]) -> list[Finding]:
+    """話はあるのに「まだ」と言わない。確認待ちの話に訪問があれば、そちらを片付けるよう知らせる。"""
+    out = []
+    for f in visits:
+        first, _, last = f.period.partition("〜")
+        day = next((d for d in days if first and first <= d[:7] <= (last or first)), None)
+        if day and f.kind in ("nudge", "finding"):
+            f = f.model_copy(update={"kind": "nudge", "todo": "訪問の話を記録にする", "evidence": [],
+                                     "message": f"{day} の訪問の話が「記録の確認」で待っています。確かめて記録にしてください。"})
+        out.append(f)
     return out
 
 
@@ -191,7 +215,20 @@ def _cert_renewal(user: User, on: date) -> list[Finding]:
                     message=f"認定の有効期間が {end.isoformat()} で終わります。{timing}を確認してください。")]
 
 
-def _missing_docs(user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocFacts]]) -> list[Finding]:
+_MEETING_IN_TEXT = re.compile(r"担当者会議[：:\s]*(\d{4}-\d{2}-\d{2})")
+
+
+def _meetings_in_text(s: Settings, facts: list[tuple[DocRef, DocFacts]]) -> list[tuple[str, DocRef]]:
+    """読み取りが拾わなかった開催の記載を、書類の文字から探す。"""
+    found = []
+    for ref, _ in facts:
+        text = to_payload(s, ref).text
+        for day in _MEETING_IN_TEXT.findall(text or ""):
+            found.append((day, ref))
+    return found
+
+
+def _missing_docs(s: Settings, user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocFacts]]) -> list[Finding]:
     if not facts:
         return []  # まだ読み取っていない書類を「無い」と言わない
     folder = "/".join(refs[0].rel_path.split("/")[:2])
@@ -203,11 +240,11 @@ def _missing_docs(user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocF
     if len(facts) < len(refs):
         return [Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
                         message=f"未読の書類が {len(refs) - len(facts)} 件あるので、{'・'.join(missing)}の有無はまだ分かりません。")]
-    meetings = [(a, ref) for ref, f in facts for a in f.activities if "担当者会議" in a.title and a.date]
+    meetings = [(a.date, ref) for ref, f in facts for a in f.activities if "担当者会議" in a.title and a.date] or _meetings_in_text(s, facts)
     found = []
     for t in missing:
         if t == "サービス担当者会議の要点" and meetings:  # 他の書類に開催の記載があれば「無い」とは言わない
-            day, ref = meetings[-1][0].date, meetings[-1][1]
+            day, ref = meetings[-1]
             found.append(Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
                                  message=f"要点の書類は見当たりませんが、{ref.rel_path.split('/')[-1]} に {day} の担当者会議の記載があります。要点として足りるか確認してください。"))
         else:
@@ -268,9 +305,10 @@ def run_machine_checks(conn: sqlite3.Connection, s: Settings, user_id: str | Non
         facts = stored_facts(conn, refs)
         records = list_records(conn, user.id)
         visits = _yobo_visits(user, records, facts, on) if _is_yobo(user) else _monthly_visits(user, records, on)
+        visits = _waiting_in_review(visits, _pending_visits(conn, user.id))
         out += visits + _signatures(user, facts, on) + _consent(user, facts) + _plan_expiry(user, facts, on) + _cert_renewal(user, on)
         if refs:
-            out += _missing_docs(user, refs, facts)
+            out += _missing_docs(s, user, refs, facts)
     if user_id is None:
         office = stored_facts(conn, [r for r in scan(s) if r.scope == "office"])
         out += _infection_committee(office, on)

@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 
 from keika.claude import make_client
 from keika.claude_checks import CheckRun, check_and_save, latest_run
+from keika.db import connect as _connect
+from keika.drafts import SECTIONS, draft_for_results, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
@@ -204,7 +206,60 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "board": board, "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn),
             "reviews": _reviews_for(cm), "office": _office_for(cm),
             "med_checks": [] if cm == OFFICE_TAB else open_checks(conn, s, cm=cm),
+            "drafts": _drafts_for(cm), "user_names": {u.id: u.name for u in list_users(conn)},
         })
+
+    def _drafts_for(cm: str | None) -> list:
+        if cm == OFFICE_TAB:
+            return []
+        rows = list_drafts(conn)
+        if not cm:
+            return rows
+        mine = {u.id for u in list_users(conn) if u.cm == cm}
+        return [d for d in rows if d.user_id in mine]
+
+    def _draft_in_background(client, results, source: str) -> None:
+        own = _connect(s)
+        try:
+            draft_for_results(own, client, s, results, source)
+        finally:
+            own.close()
+
+    def _draft_or_404(draft_id: int):
+        draft = get_draft(conn, draft_id)
+        if draft is None:
+            raise HTTPException(404, "下書きが見つかりません")
+        return draft
+
+    @app.get("/drafts/{draft_id}")
+    def draft_page(request: Request, draft_id: int):
+        draft = _draft_or_404(draft_id)
+        user = get_user(conn, draft.user_id)
+        staff = {p.id: p.name for p in list_people(conn, "staff")}
+        return templates.TemplateResponse(request, "draft.html", {
+            "d": draft, "user": user, "author": staff.get(user.cm, ""), "plain": plain_text(draft, user.name),
+        })
+
+    @app.post("/drafts/{draft_id}")
+    async def save_draft(request: Request, draft_id: int):
+        if sample:
+            raise HTTPException(403, "見本モードでは直せません")
+        draft = _draft_or_404(draft_id)
+        form = await request.form()
+        people = zip(form.getlist("attendee_org"), form.getlist("attendee_role"), form.getlist("attendee_name"))
+        attendees = [{"org": o.strip(), "role": r.strip(), "name": n.strip()} for o, r, n in people if o.strip() or r.strip() or n.strip()]
+        sections = {key: form.getlist(f"s_{key}") for key in SECTIONS[draft.kind] if f"s_{key}" in form}
+        update_draft(conn, draft_id, place=str(form.get("place", "")).strip(), start_time=str(form.get("start_time", "")).strip(),
+                     end_time=str(form.get("end_time", "")).strip(), attendees=attendees, sections=sections)
+        return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
+
+    @app.post("/drafts/{draft_id}/checked")
+    def check_draft(draft_id: int):
+        if sample:
+            raise HTTPException(403, "見本モードでは直せません")
+        draft = _draft_or_404(draft_id)
+        mark_draft_checked(conn, draft_id)
+        return RedirectResponse(f"/users/{draft.user_id}", status_code=303)
 
     def _check_in_background(user_id: str) -> None:
         """記録が保存されたら、その利用者だけ点検し直す。失敗しても記録は失わず「未実施」と出す。"""
@@ -226,6 +281,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             results = [IntakeResult(review_id=to_review(conn, text.strip(), "画面", {}, [], f"整えられませんでした（{e}）"))]
         else:
             results = process_text(conn, client, s, text.strip(), "画面", on_saved=lambda uid: background.add_task(_check_in_background, uid))
+            background.add_task(_draft_in_background, client, results, "画面")
         names = {u.id: u.name for u in list_users(conn)}
         return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
 
@@ -343,6 +399,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "records": list(reversed(records)),
             "unread": len(user_refs(conn, s, user)) - len(facts),
             "cells": user_progress(conn, s, user),
+            "drafts": list_drafts(conn, user_id),
         })
 
     def _find(user_id: str, fp: str) -> Finding:

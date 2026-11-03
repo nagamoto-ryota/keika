@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from keika.claude import make_client
 from keika.db import connect
-from keika.intake import process_text
+from keika.drafts import intake_with_drafts
 from keika.ledger import get_user
 from keika.settings import Settings
 
@@ -28,7 +28,7 @@ def record_text(s: Settings, client: Any, text: str) -> str:
     conn = connect(s)
     try:
         lines = []
-        for result in process_text(conn, client, s, text, "mcp"):
+        for result in intake_with_drafts(conn, client, s, text, "mcp"):
             if result.record:
                 user = get_user(conn, result.record.user_id)
                 lines.append(f"{user.name}さんの {result.record.event_date} の記録を、未確認の下書きとして保存しました。内容を確かめて決めるのはご本人です。")

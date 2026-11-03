@@ -53,7 +53,7 @@ class Board:
 
 
 def _is_month_visit(f: Finding) -> bool:
-    return f.rule_id == "R06" and f.kind == "nudge" and "〜" not in f.period
+    return f.rule_id == "R06" and f.kind == "nudge" and "〜" not in f.period and f.todo != "訪問の話を記録にする"
 
 
 def _person(conn: sqlite3.Connection, s: Settings, user: User, days_left: int, board_visit: list, unknowns: list) -> Person:

@@ -144,7 +144,7 @@ def _abuse(conn: sqlite3.Connection, s: Settings, docs: list[Doc], on: date) -> 
         family = person.name.split()[0]
         attended = any(_parse(a.date) >= hired and family in (a.participants or "") + a.title for a, _ in trainings)
         if not attended:
-            steps.append(f"{person.name}さんの新規採用時の虐待防止研修（{hired.isoformat()} 入職）を確かめる")
+            steps.append(f"{person.name}さん（{hired.isoformat()} 入職）の新規採用時の虐待防止研修は、入職後に受けた記録が見当たりません。受講を確かめる")
     records_first = next((d for d in docs if record and d[0].rel_path == record.rel_path), None)
     return {"steps": steps, "evidence": records_first if any("研修" in x for x in steps) and records_first else guide}
 

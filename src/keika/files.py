@@ -16,7 +16,7 @@ from keika.settings import OutsideRootError, Settings, safe_path
 
 SCOPES = {"利用者": "user", "事業所": "office", "入口": "inbox"}
 _HASHES: dict[tuple[str, int, int], str] = {}  # 変わっていないファイルは計算し直さない
-TEXT_EXTS = {"txt", "csv"}
+TEXT_EXTS = {"txt", "csv", "srt", "vtt", "md"}
 OFFICE_EXTS = {"docx", "xlsx"}
 BINARY_EXTS = {"pdf", "png", "jpg", "jpeg"}
 UNREADABLE = "unreadable:"

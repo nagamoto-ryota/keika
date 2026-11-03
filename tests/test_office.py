@@ -126,7 +126,7 @@ def test_new_hire_training_missing_is_flagged(env):
     s, c = env
     _abuse_docs(s, c, [activity("研修", "虐待防止研修", "2026-02-01", "真柴 洋子")])
     r = row(s, c, "R25")
-    assert r.status == "todo" and "井波" in r.next_step and "新規採用" in r.next_step
+    assert r.status == "todo" and "井波" in r.next_step and "新規採用" in r.next_step and "見当たりません" in r.next_step
 
 
 def test_new_hire_training_done_when_named(env):

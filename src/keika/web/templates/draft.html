@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ d.title }}の下書き - ケイカ{% endblock %}
+{% block main %}
+<p class="muted no-print"><a href="/users/{{ d.user_id }}">{{ user.name }}</a> ／ {{ d.source }} から作りました</p>
+<h1>{{ d.title }}<span class="muted small">（下書き）</span></h1>
+<p class="draft-note">AI が文字起こしから作った下書きです。内容を確かめて直してください。話に無かった欄は「〇〇」のままです。</p>
+{% if d.status == 'checked' %}<p class="muted">確かめ終わっています。</p>{% endif %}
+{% if d.flagged %}<p class="todo-line no-print">印の付いた文が {{ d.flagged }} 件あります。元の話と見比べてください。</p>{% endif %}
+
+<form method="post" action="/drafts/{{ d.id }}" class="write draft">
+  <table class="draft-head">
+    <tr><th>利用者</th><td>{{ user.name }}</td><th>作成者</th><td>{{ author or '〇〇' }}</td></tr>
+    <tr><th>{{ '開催日' if d.kind == 'meeting' else '訪問日' }}</th><td>{{ d.event_date|hdate }}</td>
+        <th>{{ '開催場所' if d.kind == 'meeting' else '訪問先' }}</th><td><input name="place" value="{{ d.place }}"></td></tr>
+    <tr><th>時間</th><td colspan="3"><input name="start_time" value="{{ d.start_time }}" size="6"> 〜 <input name="end_time" value="{{ d.end_time }}" size="6"></td></tr>
+  </table>
+
+  <h2>{{ '出席者' if d.kind == 'meeting' else '同席した人' }}</h2>
+  <table class="draft-people">
+    <tr><th>所属</th><th>職種</th><th>氏名</th></tr>
+    {% for a in d.attendees %}
+    <tr><td><input name="attendee_org" value="{{ a.org }}"></td><td><input name="attendee_role" value="{{ a.role }}"></td><td><input name="attendee_name" value="{{ a.name }}"></td></tr>
+    {% endfor %}
+    <tr class="no-print"><td><input name="attendee_org"></td><td><input name="attendee_role"></td><td><input name="attendee_name"></td></tr>
+  </table>
+
+  {% for key, label in d.headings.items() %}
+  <h2>{{ label }}</h2>
+  {% for item in d.sections[key] %}
+  <div class="draft-item{{ ' flagged' if item.flag }}">
+    <textarea name="s_{{ key }}" rows="2">{{ item.text }}</textarea>
+    {% if item.flag %}<p class="small draft-flag no-print">{{ item.flag }}</p>{% endif %}
+    {% if item.quote %}<details class="no-print"><summary class="small muted">元の発言</summary><p class="small">{{ item.quote }}</p></details>{% endif %}
+  </div>
+  {% endfor %}
+  <textarea name="s_{{ key }}" rows="1" class="no-print" placeholder="書き足す"></textarea>
+  {% endfor %}
+
+  <div class="write-actions no-print">
+    <button>保存する</button>
+    <button type="button" onclick="window.print()" class="plain">印刷する</button>
+    <button type="button" class="plain" id="copy-draft">文字を写す</button>
+  </div>
+</form>
+<textarea id="draft-plain" hidden>{{ plain }}</textarea>
+<script>
+document.getElementById("copy-draft").addEventListener("click", function () {
+  navigator.clipboard.writeText(document.getElementById("draft-plain").value);
+  this.textContent = "写しました";
+});
+</script>
+
+{% if d.status == 'open' %}
+<form method="post" action="/drafts/{{ d.id }}/checked" class="no-print"><button class="plain">確かめ終わった（一覧から外す）</button></form>
+{% endif %}
+
+{% if d.held %}
+<section class="no-print">
+  <h2>下書きに入れなかった文</h2>
+  <p class="muted small">薬、診断、受診の判断に関わるので、AI の下書きには入れていません。話の中身は人が確かめてください。</p>
+  {% for h in d.held %}<p class="small">{{ h.text }}{% if h.quote %} <span class="muted">（元の発言: {{ h.quote }}）</span>{% endif %}</p>{% endfor %}
+</section>
+{% endif %}
+
+<details class="no-print"><summary>文字起こしの全文</summary><pre class="draft-original">{{ d.original }}</pre></details>
+{% endblock %}
