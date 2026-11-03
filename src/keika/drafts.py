@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from keika.claude import model_for, ask_structured
 from keika.claude_checks import _BACKDATE, _quote_ok, crosses_line
-from keika.intake import IntakeResult, _digits, _name_parts, _name_spoken, _normal, _roster, _without_spoken_clocks, clean_transcript, invented_terms, join_spoken, original_of, process_text
+from keika.intake import IntakeResult, _digits, _hira, _name_parts, _name_spoken, _normal, _roster, _without_spoken_clocks, clean_transcript, invented_terms, join_spoken, original_of, process_text
 from keika.ledger import get_user, squash
 from keika.settings import Settings, now_real
 
@@ -117,13 +117,24 @@ def _shares_words(text: str, quote: str) -> bool:
     return any(a[i:i + 2] in b for i in range(len(a) - 1))
 
 
+def _names_said_in_kana(conn: sqlite3.Connection, text: str) -> str:
+    """読みで話された名前（ゆかさん → 由佳）。台帳の読みが話にあれば、字を直しただけとみなす。"""
+    said = _hira(squash(text))
+    found = []
+    for row in conn.execute("SELECT name, kana FROM users UNION ALL SELECT name, kana FROM people"):
+        for name, kana in zip(row["name"].split(), row["kana"].split()):
+            if len(kana) >= 2 and _hira(kana) in said:
+                found.append(name)
+    return " ".join(found)
+
+
 def _nearby(quote: str, text: str) -> str:
     """元の発言とその前後。見つからなければ元の発言だけ。"""
     at = text.find(quote)
     return text[max(0, at - NEARBY):at + len(quote) + NEARBY] if at >= 0 else quote
 
 
-def _checked_item(item: WireItem, text: str, names: list[str]) -> tuple[dict | None, dict | None]:
+def _checked_item(item: WireItem, text: str, names: list[str], kana_names: str = "") -> tuple[dict | None, dict | None]:
     """(下書きに入れる文, 人に見せる元の発言)。"""
     quote = item.quote.strip()
     real = bool(quote) and len(squash(quote)) >= MIN_DRAFT_QUOTE and _quote_ok(quote, text)
@@ -134,7 +145,7 @@ def _checked_item(item: WireItem, text: str, names: list[str]) -> tuple[dict | N
         flags.append("元の発言と確かめられません")
     # 長い話にはたいていの数字が出てくるので、数字は元の発言の近くと照らす
     near = _nearby(quote, text)
-    extra = invented_terms(text, item.text, names) + sorted(_digits(_without_spoken_clocks(near, item.text)) - _digits(near))
+    extra = invented_terms(text + " " + kana_names, item.text, names) + sorted(_digits(_without_spoken_clocks(near, item.text)) - _digits(near))
     if extra:
         flags.append("文字起こしにありません: " + "、".join(extra))
     return {"text": item.text.strip(), "quote": quote if real else "", "flag": " / ".join(flags)}, None
@@ -191,6 +202,7 @@ def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Any, 
     try:
         wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireDraft, model=model_for("INTAKE"))
         names = _name_parts(conn)
+        kana_names = _names_said_in_kana(conn, text)
         roster = squash(_roster(conn))  # 台帳に載る人か。事業所の担当者も含む
         sections: dict[str, list[dict]] = {key: [] for key in SECTIONS[kind]}
         held: list[dict] = []
@@ -199,7 +211,7 @@ def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Any, 
             if section.key not in sections:
                 continue
             for item in section.items:
-                checked, kept_back = _checked_item(item, text, names)
+                checked, kept_back = _checked_item(item, text, names, kana_names)
                 if kept_back:
                     held.append(kept_back)
                 else:

@@ -178,7 +178,7 @@ def _beyond_the_line(original: str, shaped: str) -> list[str]:
     found += [w for w in line_crossings(shaped) if w not in original]
     said = _normal(original)
     found += [d for d in _DOSE.findall(_normal(shaped)) if d not in said]
-    if _NOT_TAKEN.search(original) and not re.search(r"ない|ず|忘れ", shaped):
+    if _NOT_TAKEN.search(original) and re.search(r"薬|服|飲", shaped) and not re.search(r"ない|ず|忘れ", shaped):
         found.append("飲めている")
     return list(dict.fromkeys(found))
 

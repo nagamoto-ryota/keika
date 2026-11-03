@@ -459,3 +459,23 @@ def test_number_said_far_from_the_quote_is_flagged(env):
     text = "週に5回は来ています。" + "あ" * 300 + "デイは週2回のまま続けます。"
     w = wire([WireItem(text="デイは週5回のまま続ける。", quote="デイは週2回のまま続けます")])
     assert "5" in get_draft(c, make(s, c, w, text=text)).sections["conclusion"][0]["flag"]
+
+
+def test_medicine_warning_only_for_sentences_about_medicine():
+    original = "薬は飲み忘れがありました。部屋は片付いていました。"
+    assert invented_terms(original, "部屋は片付いていた。") == []
+    assert invented_terms(original, "薬を飲めている。") == ["飲めている"]
+
+
+def test_name_spoken_in_kana_is_not_flagged_in_draft(env):
+    s, c = env
+    text = "柚木さんのお宅です。ふさえさんはいなかったです。デイは週2回です。"
+    w = wire([WireItem(text="柚木房江さんは不在だった。", quote="ふさえさんはいなかったです")])
+    assert get_draft(c, make(s, c, w, text=text)).sections["conclusion"][0]["flag"] == ""
+
+
+def test_name_never_spoken_is_still_flagged_in_draft(env):
+    s, c = env
+    text = "柚木さんのお宅です。奥さんはいなかったです。デイは週2回です。"
+    w = wire([WireItem(text="柚木房江さんは不在だった。", quote="奥さんはいなかったです")])
+    assert "房江" in get_draft(c, make(s, c, w, text=text)).sections["conclusion"][0]["flag"]
