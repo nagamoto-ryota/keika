@@ -99,8 +99,8 @@ def test_item_without_quote_is_flagged(env):
 
 def test_number_not_in_talk_is_flagged_even_with_a_real_quote(env):
     s, c = env
-    w = wire(sections=[WireSection(key="conclusion", items=[WireItem(text="デイは週5回のまま続ける。", quote="デイは週2回のまま続ける")])])
-    assert "5" in get_draft(c, make(s, c, w)).sections["conclusion"][0]["flag"]
+    w = wire(sections=[WireSection(key="conclusion", items=[WireItem(text="デイは週7回のまま続ける。", quote="デイは週2回のまま続ける")])])
+    assert "7" in get_draft(c, make(s, c, w)).sections["conclusion"][0]["flag"]
 
 
 def test_medical_judgement_is_held_out_of_the_draft(env):

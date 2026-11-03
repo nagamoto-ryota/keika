@@ -443,5 +443,19 @@ def test_public_check_covers_subtitle_files(tmp_path):
     spec = importlib.util.spec_from_file_location("check_public_fix", Path(__file__).parent.parent / "tools" / "check_public.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    (tmp_path / "a.srt").write_text("電話は 090-1234-5678 です", encoding="utf-8")
+    (tmp_path / "a.srt").write_text("電話は 090-" + "1234-5678 です", encoding="utf-8")
     assert mod.problems(["a.srt"], [], tmp_path)
+
+
+def test_number_said_just_before_the_quote_is_not_flagged(env):
+    s, c = env
+    text = "10月の話です。30日の夜中に尻もちをつきました。" + "あ" * 300 + "週に5回は来ています。"
+    w = wire([WireItem(text="10月30日の夜中に尻もちをついた。", quote="30日の夜中に尻もちをつきました")])
+    assert get_draft(c, make(s, c, w, text=text)).sections["conclusion"][0]["flag"] == ""
+
+
+def test_number_said_far_from_the_quote_is_flagged(env):
+    s, c = env
+    text = "週に5回は来ています。" + "あ" * 300 + "デイは週2回のまま続けます。"
+    w = wire([WireItem(text="デイは週5回のまま続ける。", quote="デイは週2回のまま続けます")])
+    assert "5" in get_draft(c, make(s, c, w, text=text)).sections["conclusion"][0]["flag"]

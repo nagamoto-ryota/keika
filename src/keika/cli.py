@@ -11,6 +11,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 SNAPSHOT = REPO / "demo" / "snapshot" / "keika.db"
+AS_OF = date(2026, 11, 13)  # 見本の基準日。見本の文字起こしの日付に合わせる
 
 
 def sample_settings(db_path: Path):
@@ -19,7 +20,7 @@ def sample_settings(db_path: Path):
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(SNAPSHOT, db_path)
-    return Settings(drive_root=REPO / "sample_data" / "drive", db_path=db_path, as_of=date(2026, 11, 4))
+    return Settings(drive_root=REPO / "sample_data" / "drive", db_path=db_path, as_of=AS_OF)
 
 
 def serve_sample(host: str, port: int) -> int:

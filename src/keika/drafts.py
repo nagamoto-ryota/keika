@@ -22,6 +22,7 @@ from keika.settings import Settings, now_real
 
 BLANK = "〇〇"
 MIN_DRAFT_QUOTE = 4  # 短い語はどの話にも当たるので、元の発言の証拠にならない
+NEARBY = 60  # 1文が前後の発言をまとめることがあるので、数字はこの字数の範囲で照らす
 KINDS = {"meeting": "サービス担当者会議の要点", "monitoring": "モニタリングの記録"}
 SECTIONS = {
     "meeting": {"items": "検討した項目", "discussion": "検討内容", "conclusion": "結論", "remaining": "残された課題（次回の開催時期）"},
@@ -116,6 +117,12 @@ def _shares_words(text: str, quote: str) -> bool:
     return any(a[i:i + 2] in b for i in range(len(a) - 1))
 
 
+def _nearby(quote: str, text: str) -> str:
+    """元の発言とその前後。見つからなければ元の発言だけ。"""
+    at = text.find(quote)
+    return text[max(0, at - NEARBY):at + len(quote) + NEARBY] if at >= 0 else quote
+
+
 def _checked_item(item: WireItem, text: str, names: list[str]) -> tuple[dict | None, dict | None]:
     """(下書きに入れる文, 人に見せる元の発言)。"""
     quote = item.quote.strip()
@@ -125,8 +132,9 @@ def _checked_item(item: WireItem, text: str, names: list[str]) -> tuple[dict | N
     flags = []
     if not real or not _shares_words(item.text, quote):
         flags.append("元の発言と確かめられません")
-    # 長い話にはたいていの数字が出てくるので、数字は元の発言と照らす
-    extra = invented_terms(text, item.text, names) + sorted(_digits(_without_spoken_clocks(quote, item.text)) - _digits(quote))
+    # 長い話にはたいていの数字が出てくるので、数字は元の発言の近くと照らす
+    near = _nearby(quote, text)
+    extra = invented_terms(text, item.text, names) + sorted(_digits(_without_spoken_clocks(near, item.text)) - _digits(near))
     if extra:
         flags.append("文字起こしにありません: " + "、".join(extra))
     return {"text": item.text.strip(), "quote": quote if real else "", "flag": " / ".join(flags)}, None
