@@ -9,7 +9,7 @@
 5. 画面と README と映像で、AI が下書きと指摘を出し、最終判断は人が行うと分かる。病気が分かる、診断できる、といった言い方や、特定の薬や商品をすすめる言い方をしていない。
 6. 薬名は自動で直らず、候補はその利用者の書類か確定済みの記録にある名前だけで、「〇〇のことですね」のような推測の言い方が無い。
 7. `pytest` が全部通り、`python eval/run_boundary.py --db <架空データの DB>` の「線を越えた数」が 0。
-8. MCP の鍵 `data/mcp_on` が無い（`ls data/mcp_on` が「無い」と返す）。鍵が無い時に `record_text` が断ることを試験で確かめている。
-9. 実データの混入を調べる: 禁止語のファイルに実在の利用者名と事業所名を入れて `tools/check_public.py` を通し、映像に使う DB は `demo/snapshot/keika.db` から作り直した物だけを使う（`review_items` と `records` に `mcp` の行が 0）。
+8. MCP の鍵が無い（`ls data/*.mcp_on` が「無い」と返す）。鍵が無い時に `record_text` が断ることを試験で確かめている。
+9. 実データの混入を調べる: 禁止語のファイルに実在の利用者名と事業所名を入れて `tools/check_public.py` を通し、映像に使う DB は `demo/snapshot/keika.db` から作り直した物だけを使う（`review_items`、`records`、`drafts`、`intake_originals` に `mcp` 由来の行が 0）。
 10. `data/quarantine/` が提出物に入らない: `git ls-files data` が空で、`git status --ignored` で `data/` が対象外のまま。隔離したファイルは開かない。
 11. 作る間はリポを非公開にしている。上がすべて通ったら公開に戻し、ログインしていないブラウザでリポと `LICENSE` が開けることを確かめてから提出する。公開に戻さないと提出の条件を満たさない。

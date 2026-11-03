@@ -20,7 +20,7 @@ from keika.claude import make_client
 from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
-from keika.drafts import SECTIONS, draft_for_results, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, update_draft
+from keika.drafts import SECTIONS, draft_for_results, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
@@ -150,6 +150,12 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     app = FastAPI(title="ケイカ")
     conn = ThreadConnection(s)
     connect(s).close()  # 表を先に作る
+    if sample:
+        @app.middleware("http")
+        async def refuse_writes(request: Request, call_next):
+            if request.method == "POST":  # 見本は同梱の結果を見るだけ。直せる経路を残さない
+                return PlainTextResponse("見本モードでは変更できません。API キーを設定して keika serve で起動してください。", status_code=403)
+            return await call_next(request)
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["sample"] = sample
@@ -249,7 +255,11 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         form = await request.form()
         people = zip(form.getlist("attendee_org"), form.getlist("attendee_role"), form.getlist("attendee_name"))
         attendees = [{"org": o.strip(), "role": r.strip(), "name": n.strip()} for o, r, n in people if o.strip() or r.strip() or n.strip()]
-        sections = {key: form.getlist(f"s_{key}") for key in SECTIONS[draft.kind] if f"s_{key}" in form}
+        sections = {}
+        for key in SECTIONS[draft.kind]:
+            if f"s_{key}" in form:
+                texts, ids = form.getlist(f"s_{key}"), form.getlist(f"s_{key}_id")
+                sections[key] = [{"id": ids[i] if i < len(ids) else "", "text": text} for i, text in enumerate(texts)]
         update_draft(conn, draft_id, place=str(form.get("place", "")).strip(), start_time=str(form.get("start_time", "")).strip(),
                      end_time=str(form.get("end_time", "")).strip(), attendees=attendees, sections=sections)
         return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
@@ -281,8 +291,11 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         except RuntimeError as e:  # キーが無くても、話した内容は失わない
             results = [IntakeResult(review_id=to_review(conn, text.strip(), "画面", {}, [], f"整えられませんでした（{e}）"))]
         else:
-            results = process_text(conn, client, s, text.strip(), "画面", on_saved=lambda uid: background.add_task(_check_in_background, uid))
-            background.add_task(_draft_in_background, client, results, "画面")
+            saved: list[str] = []
+            results = process_text(conn, client, s, text.strip(), "画面", on_saved=saved.append)
+            background.add_task(_draft_in_background, client, results, "画面")  # 点検は長いので、下書きを先に作る
+            for uid in saved:
+                background.add_task(_check_in_background, uid)
         names = {u.id: u.name for u in list_users(conn)}
         return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
 
@@ -368,6 +381,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             record = resolve_review(conn, review_id, user_id=chosen, body=body or None, s=s)
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
+        sync_review(conn, review_id, chosen, record.id if record else None)
         if record:
             background.add_task(_check_in_background, record.user_id)
         return RedirectResponse("/#kakunin", status_code=303)
@@ -382,12 +396,13 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         except RuntimeError:  # キーが無い時
             made = None
         if made is None:
-            return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": finding, "plan": None})
+            return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": finding, "plan": None, "failed": True})
         return RedirectResponse(f"/users/{user_id}/plan/{fp}", status_code=303)
 
     @app.get("/users/{user_id}/plan/{fp}")
     def plan_page(request: Request, user_id: str, fp: str):
-        return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": _find(user_id, fp), "plan": get_plan(conn, fp)})
+        hit = _find(user_id, fp)
+        return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": hit, "plan": get_plan(conn, hit), "failed": False})
 
     @app.get("/board")
     def board_page(request: Request, cm: str | None = None):
@@ -417,7 +432,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "records": list(reversed(records)),
             "unread": len(user_refs(conn, s, user)) - len(facts),
             "cells": user_progress(conn, s, user),
-            "drafts": list_drafts(conn, user_id),
+            "drafts": list_drafts(conn, user_id, status=None),
         })
 
     def _find(user_id: str, fp: str) -> Finding:

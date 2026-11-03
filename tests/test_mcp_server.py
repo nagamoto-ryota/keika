@@ -10,7 +10,7 @@ from test_intake import entry, env  # noqa: F401
 from test_reading import FakeClient, answer
 
 from keika.intake import WireIntake, open_reviews
-from keika.mcp_server import KEY_NAME, TOOL_DESCRIPTION, build_server, record_text
+from keika.mcp_server import TOOL_DESCRIPTION, build_server, key_path, record_text
 from keika.records import list_records
 from keika.settings import Settings
 
@@ -22,7 +22,7 @@ def client(*entries):
 @pytest.fixture
 def unlocked(env):  # noqa: F811
     s, c = env
-    (s.db_path.parent / KEY_NAME).touch()
+    key_path(s).touch()
     return s, c
 
 
@@ -94,7 +94,7 @@ def test_tool_does_not_even_make_a_client_without_key(tmp_path):
 
 
 def test_key_in_another_folder_does_not_unlock(tmp_path):
-    (tmp_path / KEY_NAME).touch()
+    (tmp_path / "x.db.mcp_on").touch()
     s = Settings(drive_root=tmp_path, db_path=tmp_path / "sub" / "x.db")
     assert "止めて" in record_text(s, client(entry()), "話")
 

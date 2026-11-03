@@ -29,11 +29,10 @@ _SPOKEN_GAP = re.compile(rf"(?<=[{_JA}]){_GAP}(?=[{_JA}\d])|(?<=\d){_GAP}(?=[{_J
 _NOT_TAKEN = re.compile(r"(?:飲め|飲ん|服用|内服)[^。]{0,6}ない|飲み忘れ")
 _VISIT_WORDS = re.compile(r"訪問|行っ|行き|伺|お宅|宅|家")
 _WHEN_WORDS = re.compile(r"昨日|一昨日|おととい|先週|先日|前回|曜")
-_CUE = re.compile(r"^(?:\d+[ \t]*\n)?[\d:.,]+[ \t]*-->[ \t]*[\d:.,]+.*$", re.M)
+_CUE = re.compile(r"(?:(?:\A|(?<=\n\n))\d+\n)?^\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}[ \t]*-->[ \t]*\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}.*$", re.M)
 _VTT_HEAD = re.compile(r"\AWEBVTT.*$", re.M)
-_BRACKET_TIME = re.compile(r"^[\[(（]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?[\])）][ \t　]*", re.M)
-_BARE_TIME = re.compile(r"^\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?[ \t　]+", re.M)
-_SPEAKER_TIME = re.compile(r"^((?:話者|スピーカー|Speaker)[ \t]*\w*)[ \t　]+[\[(（]?\d{1,2}:\d{2}(?::\d{2})?[\])）]?[ \t　]*[:：]?[ \t　]*", re.M)
+_LEAD_TIME = re.compile(r"^(?:[\[(（](\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,]\d+)?[\])）]|(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,]\d+)?(?=[ \t　]))[ \t　]*", re.M)
+_SPEAKER_TIME = re.compile(r"^((?:話者|スピーカー|Speaker)[ \t]*\w*)[ \t　]+[\[(（]?\d{1,2}:\d{2}(?::\d{2})?[\])）]?[ \t　]*(?:[:：][ \t　]*|$)", re.M)
 _KANJI_DIGITS = str.maketrans("〇一二三四五六七八九", "0123456789")
 _LIST_MARKS = re.compile("[①-⑳]")  # ①②。そのまま数字にすると次の数字とつながる
 _BLANK_MARKS = re.compile("(?<![一二三四五六七八九〇0-9])〇{2,}(?![一二三四五六七八九0-9])")  # 空欄の〇〇は 00 ではない
@@ -96,12 +95,25 @@ class IntakeResult:
     warnings: list[str] = field(default_factory=list)
 
 
+def _is_elapsed(stamps: list[tuple]) -> bool:
+    """行頭の時刻が録音の経過時間か。00:00 の近くから増えていく物だけを経過時間とみなす。話した時刻を消さないため。"""
+    if len(stamps) < 3:
+        return False
+    seconds = []
+    for g in stamps:
+        a, b, c = (x for x in (g[0:3] if g[0] else g[3:6]))
+        seconds.append(int(a) * 3600 + int(b) * 60 + int(c) if c else int(a) * 60 + int(b))
+    three_parts = all((g[2] or g[5]) for g in stamps)
+    return seconds == sorted(seconds) and (seconds[0] < 300 or (three_parts and seconds[0] < 3600))
+
+
 def clean_transcript(text: str) -> str:
     """録音機の文字起こしから、字幕の番号と経過時間の印を除く。話者の名前は残す。経過時間を話の時刻と取り違えないため。"""
+    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     text = _VTT_HEAD.sub("", _CUE.sub("", text))
-    text = _BRACKET_TIME.sub("", _SPEAKER_TIME.sub(r"\1: ", text))
-    if len(_BARE_TIME.findall(text)) >= 3:  # 1行だけなら、話した時刻かもしれない
-        text = _BARE_TIME.sub("", text)
+    text = _SPEAKER_TIME.sub(r"\1: ", text)
+    if _is_elapsed(_LEAD_TIME.findall(text)):
+        text = _LEAD_TIME.sub("", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip("\n") + ("\n" if text.endswith("\n") else "")
 
 
@@ -260,6 +272,7 @@ def process_text(
     conn: sqlite3.Connection, client: Any, s: Settings, text: str, source: str, *,
     date_hint: str | None = None, on_saved: Callable[[str], None] | None = None,
 ) -> list[IntakeResult]:
+    original = join_spoken(text)  # 元の文は掃除の前のまま残す
     text = join_spoken(clean_transcript(text))
     prompt = (
         f"今日は {today(s).isoformat()} です。\n"
@@ -269,9 +282,9 @@ def process_text(
     try:
         wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireIntake, model=model_for("INTAKE"))
     except StructuredError as e:
-        return [IntakeResult(review_id=to_review(conn, text, source, {}, [], f"整えられませんでした（{e}）"))]
+        return [IntakeResult(review_id=to_review(conn, original, source, {}, [], f"整えられませんでした（{e}）"))]
     if not wire.entries:
-        return [IntakeResult(review_id=to_review(conn, text, source, {}, [], "記録にできる内容を読み取れませんでした"))]
+        return [IntakeResult(review_id=to_review(conn, original, source, {}, [], "記録にできる内容を読み取れませんでした"))]
     results, saved = [], []
     names = _name_parts(conn)
     for entry in wire.entries:
@@ -284,10 +297,10 @@ def process_text(
                 note = f"「{entry.spoken_name}」が誰か確かめてください"
             if warnings:
                 note = (note + " " if note else "") + UNSPOKEN_NOTE
-            results.append(IntakeResult(review_id=to_review(conn, text, source, entry.model_dump(), warnings, note), warnings=warnings, entry=None if problem else entry.model_dump()))
+            results.append(IntakeResult(review_id=to_review(conn, original, source, entry.model_dump(), warnings, note), warnings=warnings, entry=None if problem else entry.model_dump()))
             continue
         record = _save_entry(conn, s, entry, source)
-        conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, text))
+        conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, original))
         conn.commit()
         register_checks(conn, s, record, entry.unsure_words)
         results.append(IntakeResult(record=record))

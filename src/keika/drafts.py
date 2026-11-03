@@ -1,11 +1,12 @@
 """書類の下書き。話や文字起こしから、担当者会議の要点とモニタリングの記録の下書きを作る。
 
 話に無い事は足さない。文ごとに元の発言を添え、機械で照らし合わせる。確かめられない文には印を付け、
-医療の判断に踏み込む文は下書きに入れず別に出す。分からない欄は「〇〇」で残す。清書と確定は人が行う。
+医療の判断に踏み込む文は下書きに入れず、元の発言だけを人に見せる。分からない欄は「〇〇」で残す。清書と確定は人が行う。
 """
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -14,13 +15,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from keika.claude import model_for, ask_structured
-from keika.claude_checks import _quote_ok, crosses_line
-from keika.intake import IntakeResult, _digits, _name_parts, _name_spoken, _roster, _without_spoken_clocks, invented_terms, original_of, process_text
-from keika.ledger import get_user
-from keika.records import Record
+from keika.claude_checks import _BACKDATE, _quote_ok, crosses_line
+from keika.intake import IntakeResult, _digits, _name_parts, _name_spoken, _normal, _roster, _without_spoken_clocks, clean_transcript, invented_terms, join_spoken, original_of, process_text
+from keika.ledger import get_user, squash
 from keika.settings import Settings, now_real
 
 BLANK = "〇〇"
+MIN_DRAFT_QUOTE = 4  # 短い語はどの話にも当たるので、元の発言の証拠にならない
 KINDS = {"meeting": "サービス担当者会議の要点", "monitoring": "モニタリングの記録"}
 SECTIONS = {
     "meeting": {"items": "検討した項目", "discussion": "検討内容", "conclusion": "結論", "remaining": "残された課題（次回の開催時期）"},
@@ -41,13 +42,13 @@ class WireSection(BaseModel):
 
 class WireAttendee(BaseModel):
     org: str = Field(description="所属。話に無ければ空文字")
-    role: str = Field(description="職種。話に無ければ空文字")
+    role: str = Field(description="職種や続柄。話に無ければ空文字")
     name: str = Field(description="氏名。話に出てきた人だけ。台帳で正しい字が分かれば台帳の字で書く")
     quote: str = Field(description="その人が出席していると分かる発言をそのまま")
 
 
 class WireDraft(BaseModel):
-    place: str = Field(description="開催場所や訪問先。話に無ければ空文字")
+    place: str = Field(description="開催場所や訪問先。文字起こしの言葉のまま。話に無ければ空文字")
     start_time: str = Field(description="開始時刻 HH:MM。話に無ければ空文字。文字起こしの経過時間は時刻ではない")
     end_time: str = Field(description="終了時刻 HH:MM。話に無ければ空文字")
     attendees: list[WireAttendee]
@@ -59,6 +60,7 @@ SYSTEM = """日本の介護支援専門員が使う書類の下書きを、会�
 守ること:
 - 話に無い事を足さない。数字、日付、人名、薬、受診は、話に出てきたものだけを書く。推測で補わない。
 - 話者は番号や不明のことがある。名乗りや呼びかけで分かる時だけ人に結び付ける。分からなければ「参加者」と書く。
+- 欠席の人は出席者に入れない。
 - 文ごとに quote へ元の発言をそのまま抜き出す。言いよどみも含めて原文のとおりに抜き出す。長くても60字くらいまでにする。
 - 雑談や脱線は入れない。1つの欄は多くても6文にし、小さな話はまとめるか省く。何を話し合い、何が決まり、何が決まらなかったかが分かるように、記録の文章（「〜した」「〜とのこと」）で短く書く。
 - 決まっていないことを結論に書かない。持ち越しになった話は残された課題に書く。
@@ -100,7 +102,7 @@ class Draft:
         return sum(1 for items in self.sections.values() for i in items if i["flag"])
 
 
-def draft_kind(record: Record) -> str | None:
+def draft_kind(record: Any) -> str | None:
     if record.kind_read == "会議":
         return "meeting"
     if record.kind_read == "居宅訪問" and record.monitoring:
@@ -108,39 +110,66 @@ def draft_kind(record: Record) -> str | None:
     return None
 
 
-def _checked_item(item: WireItem, text: str, names: list[str]) -> tuple[dict, bool]:
-    """(文, 下書きに入れてよいか)。"""
+def _shares_words(text: str, quote: str) -> bool:
+    """元の発言と文に、2文字の並びの重なりがあるか。無関係な引用を見分ける。"""
+    a, b = squash(_normal(text)), squash(_normal(quote))
+    return any(a[i:i + 2] in b for i in range(len(a) - 1))
+
+
+def _checked_item(item: WireItem, text: str, names: list[str]) -> tuple[dict | None, dict | None]:
+    """(下書きに入れる文, 人に見せる元の発言)。"""
     quote = item.quote.strip()
-    if crosses_line(item.text, quote):
-        return {"text": item.text, "quote": quote, "flag": ""}, False
+    real = bool(quote) and len(squash(quote)) >= MIN_DRAFT_QUOTE and _quote_ok(quote, text)
+    if crosses_line(item.text, quote) or _BACKDATE.search(item.text):
+        return None, {"quote": quote if real else ""}  # AI が書いた判断は見せない。本当にあった発言だけを見せる
     flags = []
-    if not quote or not _quote_ok(quote, text):
+    if not real or not _shares_words(item.text, quote):
         flags.append("元の発言と確かめられません")
     # 長い話にはたいていの数字が出てくるので、数字は元の発言と照らす
     extra = invented_terms(text, item.text, names) + sorted(_digits(_without_spoken_clocks(quote, item.text)) - _digits(quote))
     if extra:
-        flags.append("話に見当たりません: " + "、".join(extra))
-    return {"text": item.text, "quote": quote, "flag": " / ".join(flags)}, True
+        flags.append("文字起こしにありません: " + "、".join(extra))
+    return {"text": item.text.strip(), "quote": quote if real else "", "flag": " / ".join(flags)}, None
 
 
-def _spoken_or_blank(value: str, text: str, names: list[str]) -> str:
+def _place_or_blank(value: str, text: str) -> str:
     value = value.strip()
-    if not value or invented_terms(text, value, names) or (not any(ch.isdigit() for ch in value) and not _quote_ok(value, text)):
+    return value if value and _quote_ok(value, text) else BLANK
+
+
+def _time_or_blank(value: str, text: str) -> str:
+    """数字だけでなく、時刻として話されている時に認める。"""
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", value.strip())
+    if not m:
         return BLANK
-    return value
+    said = _normal(text)
+    hour = int(m[1])
+    hours = {str(hour), str(hour - 12)} if hour > 12 else {str(hour)}
+    return value.strip() if any(re.search(rf"(?<!\d){h}(?:時|:\d)", said) for h in hours) else BLANK
 
 
-def _attendee(a: WireAttendee, text: str, user_name: str) -> dict:
-    parts = a.name.split()
-    spoken = a.name.strip() == user_name or any(_name_spoken(p, text) for p in parts)
-    return {"org": a.org.strip() if _quote_ok(a.org.strip(), text) else "", "role": a.role.strip(), "name": a.name.strip() if spoken else BLANK}
+def _attendee(a: WireAttendee, text: str, user_name: str, roster: str) -> dict | None:
+    quote = a.quote.strip()
+    if "欠席" in quote:
+        return None
+    name = a.name.strip()
+    parts = name.split()
+    spoken = any(_name_spoken(p, text) for p in parts)
+    real_quote = bool(quote) and _quote_ok(quote, text)
+    if squash(name) == squash(user_name):
+        ok = spoken or real_quote
+    else:
+        ok = squash(name) in squash(text) or (squash(name) in roster and spoken and real_quote)
+    if not ok:
+        return {"org": "", "role": "", "name": BLANK}
+    return {"org": a.org.strip() if _quote_ok(a.org.strip(), text) else "", "role": a.role.strip(), "name": name}
 
 
-def _blank_item() -> dict:
-    return {"text": BLANK, "quote": "", "flag": ""}
+def _blank_item(number: int) -> dict:
+    return {"id": f"i{number}", "text": BLANK, "quote": "", "flag": ""}
 
 
-def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Record, text: str, source: str) -> int | None:
+def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Any, text: str, source: str, review_id: int | None = None) -> int | None:
     """失敗しても記録は残るので、下書きが無いだけにする。"""
     kind = draft_kind(record)
     user = get_user(conn, record.user_id)
@@ -154,49 +183,62 @@ def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Recor
     try:
         wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireDraft, model=model_for("INTAKE"))
         names = _name_parts(conn)
+        roster = squash(_roster(conn))  # 台帳に載る人か。事業所の担当者も含む
         sections: dict[str, list[dict]] = {key: [] for key in SECTIONS[kind]}
         held: list[dict] = []
+        counter = 0
         for section in wire.sections:
             if section.key not in sections:
                 continue
             for item in section.items:
-                checked, ok = _checked_item(item, text, names)
-                (sections[section.key] if ok else held).append(checked)
+                checked, kept_back = _checked_item(item, text, names)
+                if kept_back:
+                    held.append(kept_back)
+                else:
+                    counter += 1
+                    sections[section.key].append({"id": f"i{counter}", **checked})
         for key, items in sections.items():
             if not items:
-                items.append(_blank_item())
+                counter += 1
+                items.append(_blank_item(counter))
+        people = [_attendee(a, text, user.name, roster) for a in wire.attendees]
         payload = {
-            "place": _spoken_or_blank(wire.place, text, names),
-            "start_time": _spoken_or_blank(wire.start_time, text, names),
-            "end_time": _spoken_or_blank(wire.end_time, text, names),
-            "attendees": [_attendee(a, text, user.name) for a in wire.attendees],
+            "place": _place_or_blank(wire.place, text),
+            "start_time": _time_or_blank(wire.start_time, text),
+            "end_time": _time_or_blank(wire.end_time, text),
+            "attendees": [p for p in people if p],
             "sections": sections,
             "held": held,
+            "deleted": {},
+            "next_id": counter + 1,
+            "review_id": review_id,
         }
+        cur = conn.execute(
+            "INSERT INTO drafts (user_id, kind, record_id, event_date, payload, original, source, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)",
+            (record.user_id, kind, record.id, record.event_date, json.dumps(payload, ensure_ascii=False), text, source, now_real().isoformat()),
+        )
+        conn.commit()
+        return cur.lastrowid
     except Exception:  # 外部との境界。下書きの失敗で記録の取り込みを止めない
         return None
-    cur = conn.execute(
-        "INSERT INTO drafts (user_id, kind, record_id, event_date, payload, original, source, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)",
-        (record.user_id, kind, record.id, record.event_date, json.dumps(payload, ensure_ascii=False), text, source, now_real().isoformat()),
-    )
-    conn.commit()
-    return cur.lastrowid
 
 
 def draft_for_results(conn: sqlite3.Connection, client: Any, s: Settings, results: list[IntakeResult], source: str) -> list[int]:
     made = []
     for result in results:
+        review_id = None
         if result.record is not None:
             record, original = result.record, original_of(conn, result.record.id)
         elif result.entry and result.review_id:  # 記録は人の確認待ちでも、誰の話かは分かっている。下書きは先に作る
             row = conn.execute("SELECT original FROM review_items WHERE id = ?", (result.review_id,)).fetchone()
             e = result.entry
             record, original = SimpleNamespace(id=None, user_id=e["user_id"], kind_read=e["kind_read"], monitoring=e["monitoring"], event_date=e["event_date"]), row["original"]
+            review_id = result.review_id
         else:
             continue
         if draft_kind(record) is None or not original:
             continue
-        draft_id = make_draft(conn, client, s, record, original, source)
+        draft_id = make_draft(conn, client, s, record, join_spoken(clean_transcript(original)), source, review_id=review_id)
         if draft_id:
             made.append(draft_id)
     return made
@@ -223,36 +265,75 @@ def get_draft(conn: sqlite3.Connection, draft_id: int) -> Draft | None:
     return _from_row(row) if row else None
 
 
-def list_drafts(conn: sqlite3.Connection, user_id: str | None = None, *, status: str = "open") -> list[Draft]:
-    query = "SELECT * FROM drafts WHERE status = ?" + (" AND user_id = ?" if user_id else "") + " ORDER BY id"
-    return [_from_row(r) for r in conn.execute(query, (status, user_id) if user_id else (status,))]
+def list_drafts(conn: sqlite3.Connection, user_id: str | None = None, *, status: str | None = "open") -> list[Draft]:
+    where, args = [], []
+    if status:
+        where.append("status = ?")
+        args.append(status)
+    else:
+        where.append("status IN ('open', 'checked')")
+    if user_id:
+        where.append("user_id = ?")
+        args.append(user_id)
+    return [_from_row(r) for r in conn.execute(f"SELECT * FROM drafts WHERE {' AND '.join(where)} ORDER BY id", args)]
 
 
-def update_draft(conn: sqlite3.Connection, draft_id: int, *, place: str, start_time: str, end_time: str, attendees: list[dict], sections: dict[str, list[str]]) -> None:
-    """人が直した文は人の文なので、印を外す。元の発言は残す。"""
-    draft = get_draft(conn, draft_id)
-    merged = dict(draft.sections)
-    for key, texts in sections.items():
-        if key not in merged:
+def _tidy(text: str) -> str:
+    return text.replace("\r\n", "\n").strip()
+
+
+def update_draft(conn: sqlite3.Connection, draft_id: int, *, place: str, start_time: str, end_time: str, attendees: list[dict], sections: dict[str, list[dict]]) -> None:
+    """人が直した文は人の文なので、印を外す。元の発言は残す。項目は番号で照らす（古い画面から送られても、ずれない）。"""
+    row = conn.execute("SELECT payload FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+    data = json.loads(row["payload"])
+    deleted = data.setdefault("deleted", {})
+    next_id = data.get("next_id", 1)
+    for key, rows in sections.items():
+        if key not in data["sections"]:
             continue
-        old = merged[key]
+        known = {i["id"]: i for i in data["sections"][key]} | deleted
         items = []
-        for i, text in enumerate(t.strip() for t in texts):
+        kept = set()
+        for row_in in rows:
+            text = _tidy(row_in["text"])
             if not text:
                 continue
-            before = old[i] if i < len(old) else None
-            if before and before["text"] == text:
+            before = known.get(row_in.get("id", ""))
+            if before and _tidy(before["text"]) == text:
                 items.append(before)
+            elif before:
+                items.append({**before, "text": text, "flag": ""})
             else:
-                items.append({"text": text, "quote": before["quote"] if before else "", "flag": ""})
-        merged[key] = items or [_blank_item()]
-    payload = {"place": place, "start_time": start_time, "end_time": end_time, "attendees": attendees, "sections": merged, "held": draft.held}
-    conn.execute("UPDATE drafts SET payload = ? WHERE id = ?", (json.dumps(payload, ensure_ascii=False), draft_id))
+                items.append({"id": f"i{next_id}", "text": text, "quote": "", "flag": ""})
+                next_id += 1
+            kept.add(items[-1]["id"])
+            deleted.pop(items[-1]["id"], None)
+        for item in data["sections"][key]:
+            if item["id"] not in kept:
+                deleted[item["id"]] = item
+        if not items:
+            items = [_blank_item(next_id)]
+            next_id += 1
+        data["sections"][key] = items
+    data.update(place=place, start_time=start_time, end_time=end_time, attendees=attendees, next_id=next_id)
+    conn.execute("UPDATE drafts SET payload = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), draft_id))
     conn.commit()
 
 
 def mark_checked(conn: sqlite3.Connection, draft_id: int) -> None:
     conn.execute("UPDATE drafts SET status = 'checked' WHERE id = ?", (draft_id,))
+    conn.commit()
+
+
+def sync_review(conn: sqlite3.Connection, review_id: int, user_id: str | None, record_id: int | None) -> None:
+    """確認待ちの話の行き先に、下書きを合わせる。記録にしないなら一覧から外し、別の人なら移す。"""
+    for row in conn.execute("SELECT id, payload FROM drafts WHERE status = 'open'").fetchall():
+        if json.loads(row["payload"]).get("review_id") != review_id:
+            continue
+        if user_id is None:
+            conn.execute("UPDATE drafts SET status = 'set_aside' WHERE id = ?", (row["id"],))
+        else:
+            conn.execute("UPDATE drafts SET user_id = ?, record_id = ? WHERE id = ?", (user_id, record_id, row["id"]))
     conn.commit()
 
 
@@ -262,5 +343,5 @@ def plain_text(draft: Draft, user_name: str) -> str:
     lines = [draft.title, f"利用者: {user_name}", f"日: {draft.event_date}", f"場所: {draft.place}", f"時間: {when}", "出席者:"]
     lines += [f"  {a['org']} {a['role']} {a['name']}".rstrip() for a in draft.attendees]
     for key, label in draft.headings.items():
-        lines += ["", f"【{label}】"] + [i["text"] for i in draft.sections[key]]
+        lines += ["", f"【{label}】"] + [("【確かめる】" if i["flag"] else "") + i["text"] for i in draft.sections[key]]
     return "\n".join(lines)

@@ -15,6 +15,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -23,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from keika.claude import METER, ask_structured, make_client
 from keika.claude_checks import _quote_ok, crosses_line
+from keika.rules import Rule
 
 RULES_PATH = Path(__file__).parent.parent.parent / "src" / "keika" / "rules.yaml"
 _URL = re.compile(r"https?://\S+")
@@ -101,7 +103,7 @@ def route(client: Any, notice: str, url: str, proposals: list[WireProposal]) -> 
             routed.to_human.append((p, why))
             continue
         verdict = second_read(client, notice, p)
-        if verdict.supported and _quote_ok(verdict.quote, notice):
+        if verdict.supported and verdict.quote.strip() and _quote_ok(verdict.quote, notice):
             routed.accepted.append(p)
         else:
             routed.to_human.append((p, f"別の Claude が確かめられませんでした: {verdict.reason}"))
@@ -120,8 +122,11 @@ def to_rows(accepted: list[WireProposal], rules: list[dict], name: str, url: str
             "id": rid, "title": p.title, "plain": p.plain, "layer": "利用者書類", "legal_basis": p.legal_basis, "basis_confirmed": False,
             "source": name, "source_url": url, "judge": "claude", "done_when": p.done_when, "active": True, "applies_to": p.applies_to, "added_by": name,
         }
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", p.effective_from):
-            row["effective_from"] = p.effective_from
+        try:
+            row["effective_from"] = date.fromisoformat(p.effective_from).isoformat()
+        except ValueError:  # 原文に無い、ありえない日付は入れない
+            pass
+        Rule(**row)  # 読めない行を点検表に入れない
         rows.append(row)
     return rows
 

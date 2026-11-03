@@ -28,7 +28,7 @@ def problems(files: list[str], banned: list[str], root: Path = ROOT) -> list[str
         data = path.read_bytes()
         if KEY.search(data):
             found.append(f"{name}: API キーの形の文字列")
-        if name.endswith((".md", ".txt", ".csv", ".py", ".yaml", ".html", ".json")) and "legal/" not in name and PHONE.search(data):
+        if name.endswith((".md", ".txt", ".csv", ".py", ".yaml", ".html", ".json", ".srt", ".vtt")) and "legal/" not in name and PHONE.search(data):
             found.append(f"{name}: 000- 以外の電話番号の形")
         found += [f"{name}: 禁止語「{w}」" for w in banned if w.encode("utf-8") in data]
     return found

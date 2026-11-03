@@ -108,7 +108,7 @@ def test_medical_judgement_is_held_out_of_the_draft(env):
     w = wire(sections=[WireSection(key="conclusion", items=[WireItem(text="すぐ受診が必要である。", quote="デイは週2回のまま続ける")])])
     d = get_draft(c, make(s, c, w))
     assert not any("受診" in i["text"] for i in d.sections["conclusion"])
-    assert [h["text"] for h in d.held] == ["すぐ受診が必要である。"]
+    assert d.held == [{"quote": "デイは週2回のまま続ける"}]
 
 
 def test_empty_section_is_left_blank_with_marks(env):
@@ -156,7 +156,9 @@ def test_edit_clears_flag_of_changed_item_only(env):
     s, c = env
     w = wire(sections=[WireSection(key="conclusion", items=[WireItem(text="案A。", quote=""), WireItem(text="案B。", quote="")])])
     i = make(s, c, w)
-    update_draft(c, i, place="自宅", start_time="14:00", end_time="15:00", attendees=[], sections={"conclusion": ["案A直した。", "案B。"]})
+    a, b = get_draft(c, i).sections["conclusion"]
+    update_draft(c, i, place="自宅", start_time="14:00", end_time="15:00", attendees=[],
+                 sections={"conclusion": [{"id": a["id"], "text": "案A直した。"}, {"id": b["id"], "text": "案B。"}]})
     d = get_draft(c, i)
     assert d.place == "自宅"
     assert not d.sections["conclusion"][0]["flag"] and d.sections["conclusion"][1]["flag"]
@@ -288,7 +290,7 @@ def test_numbered_list_mark_is_not_read_as_part_of_a_number():
 
 def test_users_own_name_is_kept_as_attendee(env):
     s, c = env
-    w = wire(attendees=[WireAttendee(org="", role="本人", name="柚木 茂", quote="")])
+    w = wire(attendees=[WireAttendee(org="", role="本人", name="柚木 茂", quote="柚木様のお宅")])
     assert get_draft(c, make(s, c, w)).attendees[0]["name"] == "柚木 茂"
 
 

@@ -8,9 +8,17 @@
   {% for c in cells %}<span class="chk {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status in ('todo', 'check') %}！{% elif c.status == 'unknown' %}?{% else %}—{% endif %} {{ c.label }}</span>{% endfor %}
 </div>
 
+{% if drafts %}
+<section>
+  <h2>書類の下書き <small class="muted">{{ drafts|length }}件</small></h2>
+  {% for d in drafts %}<p><a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}</p>{% endfor %}
+</section>
+{% endif %}
+
 <section>
   <h2>やること <small class="muted">{{ findings|length }}件</small></h2>
   {% if run and run.not_run %}<p class="notice">AI の点検が動きませんでした（通信の失敗など）。記録は残っています。今は日付で分かる物だけを出しています。</p>{% endif %}
+  {% if run and run.error and not run.not_run %}<p class="notice">{{ run.error.split(':')[0] }}。最初の点検の結果は残っています。</p>{% endif %}
   {% if not run %}<p class="muted small">AI の点検はまだです。今は日付で分かる物だけを出しています。</p>{% endif %}
   {% for v in findings %}
     <article class="card {{ v.f.kind }}">

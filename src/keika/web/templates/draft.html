@@ -28,37 +28,49 @@
   <h2>{{ label }}</h2>
   {% for item in d.sections[key] %}
   <div class="draft-item{{ ' flagged' if item.flag }}">
-    <textarea name="s_{{ key }}" rows="2">{{ item.text }}</textarea>
+    <input type="hidden" name="s_{{ key }}_id" value="{{ item.id }}">
+    <textarea name="s_{{ key }}" rows="2" data-label="{{ label }}">{{ item.text }}</textarea>
     {% if item.flag %}<p class="small draft-flag no-print">{{ item.flag }}</p>{% endif %}
     {% if item.quote %}<details class="no-print"><summary class="small muted">元の発言</summary><p class="small">{{ item.quote }}</p></details>{% endif %}
   </div>
   {% endfor %}
-  <textarea name="s_{{ key }}" rows="1" class="no-print" placeholder="書き足す"></textarea>
+  <input type="hidden" name="s_{{ key }}_id" value="">
+  <textarea name="s_{{ key }}" rows="1" class="no-print" data-label="{{ label }}" placeholder="書き足す"></textarea>
   {% endfor %}
 
   <div class="write-actions no-print">
-    <button>保存する</button>
+    {% if not sample %}<button>保存する</button>{% endif %}
     <button type="button" onclick="window.print()" class="plain">印刷する</button>
     <button type="button" class="plain" id="copy-draft">文章をコピーする</button>
   </div>
 </form>
-<textarea id="draft-plain" hidden>{{ plain }}</textarea>
 <script>
 document.getElementById("copy-draft").addEventListener("click", function () {
-  navigator.clipboard.writeText(document.getElementById("draft-plain").value);
+  // 保存前に直した文も写す。印の付いた文には目印を付ける
+  var form = document.querySelector("form.draft");
+  var lines = [{{ d.title|tojson }}, "利用者: " + {{ user.name|tojson }}, "日: " + {{ d.event_date|tojson }}, "場所: " + form.place.value, "時間: " + form.start_time.value + "〜" + form.end_time.value, "出席者:"];
+  var orgs = form.querySelectorAll("[name=attendee_org]"), roles = form.querySelectorAll("[name=attendee_role]"), names = form.querySelectorAll("[name=attendee_name]");
+  names.forEach(function (n, i) { if (n.value.trim()) lines.push("  " + orgs[i].value + " " + roles[i].value + " " + n.value); });
+  var last = null;
+  form.querySelectorAll("textarea[data-label]").forEach(function (t) {
+    if (t.dataset.label !== last) { lines.push("", "【" + t.dataset.label + "】"); last = t.dataset.label; }
+    var flagged = t.parentElement.classList.contains("flagged");
+    if (t.value.trim()) lines.push((flagged ? "【確かめる】" : "") + t.value.trim());
+  });
+  navigator.clipboard.writeText(lines.join("\n"));
   this.textContent = "コピーしました";
 });
 </script>
 
-{% if d.status == 'open' %}
+{% if d.status == 'open' and not sample %}
 <form method="post" action="/drafts/{{ d.id }}/checked" class="no-print"><button class="plain">確かめ終わった（一覧から外す）</button></form>
 {% endif %}
 
 {% if d.held %}
 <section class="no-print">
   <h2>下書きに入れなかった文</h2>
-  <p class="muted small">薬、診断、受診の判断に関わるので、AI の下書きには入れていません。文字起こしの内容は人が確かめてください。</p>
-  {% for h in d.held %}<p class="small">{{ h.text }}{% if h.quote %} <span class="muted">（元の発言: {{ h.quote }}）</span>{% endif %}</p>{% endfor %}
+  <p class="muted small">薬、診断、受診の判断や、過去の日付に関わる文が {{ d.held|length }} 件あったので、AI の文は入れていません。文字起こしの内容をご自身で確かめてください。</p>
+  {% for h in d.held if h.quote %}<p class="small">元の発言: {{ h.quote }}</p>{% endfor %}
 </section>
 {% endif %}
 

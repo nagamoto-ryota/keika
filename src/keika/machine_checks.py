@@ -99,8 +99,10 @@ def _monthly_visits(user: User, records: list[Record], on: date) -> list[Finding
 def _pending_visits(conn: sqlite3.Connection, user_id: str) -> list[str]:
     """記録の確認で待っている話のうち、この利用者の居宅訪問の日。"""
     days = []
-    for row in conn.execute("SELECT entry FROM review_items WHERE status = 'open'"):
+    for row in conn.execute("SELECT entry, warnings FROM review_items WHERE status = 'open'"):
         entry = json.loads(row["entry"])
+        if HOME_VISIT in json.loads(row["warnings"]):  # 訪問だと AI が読んだだけで、話に訪問の語が無い
+            continue
         if entry.get("user_id") == user_id and entry.get("kind_read") == HOME_VISIT and entry.get("event_date"):
             days.append(entry["event_date"])
     return days
@@ -112,9 +114,11 @@ def _waiting_in_review(visits: list[Finding], days: list[str]) -> list[Finding]:
     for f in visits:
         first, _, last = f.period.partition("〜")
         day = next((d for d in days if first and first <= d[:7] <= (last or first)), None)
-        if day and f.kind in ("nudge", "finding"):
-            f = f.model_copy(update={"kind": "nudge", "todo": "訪問の話を記録にする", "evidence": [],
+        if day and f.kind == "nudge":
+            f = f.model_copy(update={"todo": "訪問の話を記録にする", "evidence": [],
                                      "message": f"{day} の訪問の話が「記録の確認」で待っています。確かめて記録にしてください。"})
+        elif day and f.kind == "finding":  # 別の食い違いを消さない。待っている話があることだけ足す
+            f = f.model_copy(update={"message": f"{f.message}{day} の訪問の話が「記録の確認」で待っています。"})
         out.append(f)
     return out
 
@@ -224,18 +228,19 @@ def _cert_renewal(user: User, on: date) -> list[Finding]:
 _MEETING_IN_TEXT = re.compile(r"担当者会議[：:\s]*(\d{4}-\d{2}-\d{2})")
 
 
-def _meetings_in_text(s: Settings, facts: list[tuple[DocRef, DocFacts]]) -> list[tuple[str, DocRef]]:
+def _meetings_in_text(s: Settings, facts: list[tuple[DocRef, DocFacts]], on: date) -> list[tuple[str, DocRef]]:
     """読み取りが拾わなかった開催の記載を、書類の文字から探す。"""
     from keika.claude_checks import _ref_text  # 循環を避ける
 
     found = []
     for ref, _ in facts:
         for day in _MEETING_IN_TEXT.findall(_ref_text(s, ref) or ""):
-            found.append((day, ref))
+            if (_parse(day) or on) <= on:  # 先の予定は開催の記載ではない
+                found.append((day, ref))
     return found
 
 
-def _missing_docs(s: Settings, user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocFacts]]) -> list[Finding]:
+def _missing_docs(s: Settings, user: User, refs: list[DocRef], facts: list[tuple[DocRef, DocFacts]], on: date) -> list[Finding]:
     if not facts:
         return []  # まだ読み取っていない書類を「無い」と言わない
     folder = "/".join(refs[0].rel_path.split("/")[:2])
@@ -247,7 +252,7 @@ def _missing_docs(s: Settings, user: User, refs: list[DocRef], facts: list[tuple
     if len(facts) < len(refs):
         return [Finding(rule_id="R33", user_id=user.id, kind="unknown", searched_scope=scope,
                         message=f"まだ読み取っていない書類が {len(refs) - len(facts)} 件あるので、{'・'.join(missing)}の有無はまだ分かりません。")]
-    meetings = [(a.date, ref) for ref, f in facts for a in f.activities if "担当者会議" in a.title and a.date] or _meetings_in_text(s, facts)
+    meetings = [(a.date, ref) for ref, f in facts for a in f.activities if "担当者会議" in a.title and a.date] or _meetings_in_text(s, facts, on)
     found = []
     for t in missing:
         if t == "サービス担当者会議の要点" and meetings:  # 他の書類に開催の記載があれば「無い」とは言わない
@@ -315,7 +320,7 @@ def run_machine_checks(conn: sqlite3.Connection, s: Settings, user_id: str | Non
         visits = _waiting_in_review(visits, _pending_visits(conn, user.id))
         out += visits + _signatures(user, facts, on) + _consent(user, facts) + _plan_expiry(user, facts, on) + _cert_renewal(user, on)
         if refs:
-            out += _missing_docs(s, user, refs, facts)
+            out += _missing_docs(s, user, refs, facts, on)
     if user_id is None:
         office = stored_facts(conn, [r for r in scan(s) if r.scope == "office"])
         out += _infection_committee(office, on)

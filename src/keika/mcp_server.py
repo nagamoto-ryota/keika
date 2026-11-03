@@ -1,7 +1,7 @@
 """Claude Desktop から話した内容を受け取る MCP サーバー。
 
 別の抜け道にしないため、入口のファイルと同じ process_text を通す。
-架空データの実演専用。データベースと同じフォルダに鍵のファイルが無ければ、Claude にもデータベースにも触らずに断る。
+架空データの実演専用。そのデータベース専用の鍵のファイル（keika.db なら keika.db.mcp_on）が無ければ、Claude にもデータベースにも触らずに断る。
 """
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from keika.ledger import get_user
 from keika.settings import Settings
 
 REPO = Path(__file__).resolve().parents[2]
-KEY_NAME = "mcp_on"
 LOCKED = "この道具は止めています。何も記録していません。架空データの実演の時だけ、準備をした上で使えます。"
 TOOL_DESCRIPTION = (
     "架空データの実演専用の道具です。実在の利用者の話には使いません。"
@@ -25,8 +24,12 @@ TOOL_DESCRIPTION = (
 )
 
 
+def key_path(s: Settings) -> Path:
+    return s.db_path.with_name(s.db_path.name + ".mcp_on")
+
+
 def enabled(s: Settings) -> bool:
-    return (s.db_path.parent / KEY_NAME).is_file()
+    return key_path(s).is_file()
 
 
 def record_text(s: Settings, client: Any, text: str) -> str:

@@ -5,3 +5,4 @@ __pycache__/
 data/
 .env
 eval/results/*.tmp
+eval/results/20261102-223216-read-sonnet.json

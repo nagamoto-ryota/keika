@@ -4,8 +4,10 @@
 <p class="muted"><a href="/users/{{ user.id }}">{{ user.name }}</a></p>
 <h1>次の手順と下書き</h1>
 <article class="card finding"><p class="msg">{{ f.message|hdate }}</p></article>
-{% if not plan %}
+{% if not plan and failed %}
 <p class="notice">作れませんでした。お知らせはそのまま残っています。時間をおいて、もう一度押してください。</p>
+{% elif not plan %}
+<p class="muted">まだ作っていません。利用者のページの「次の手順と下書きを作る」を押してください。</p>
 {% else %}
 <p class="draft-note">AI の案です。当たっていないこともあります。実際に行った事だけを残し、どうするかはご自身で決めてください。</p>
 <h2>手順</h2>
@@ -16,7 +18,7 @@
 {% for doc in plan.docs %}
 <section class="card">
   <p class="todo-line">{{ doc.title }} <span class="muted small">{{ doc.kind }}</span></p>
-  {% if doc.flag %}<p class="small draft-flag">この言葉は記録や書類にありません。確かめてください: {{ doc.flag }}</p>{% endif %}
+  {% if doc.flag %}<p class="small draft-flag">確かめてください: {{ doc.flag }}</p>{% endif %}
   <textarea rows="6" class="plan-doc">{{ doc.body }}</textarea>
   <button type="button" class="plain" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); this.textContent='コピーしました'">文章をコピーする</button>
 </section>

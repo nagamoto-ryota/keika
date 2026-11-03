@@ -48,7 +48,7 @@ def test_plan_is_saved_and_returned_by_fingerprint(env):
     s, c = env
     made = make(s, c, plan())
     assert [x["text"] for x in made["steps"]][0].startswith("週3回")
-    assert get_plan(c, fingerprint(finding())) == made
+    assert get_plan(c, finding()) == made
 
 
 def test_second_request_uses_saved_plan_without_calling_claude(env):
@@ -92,7 +92,7 @@ def test_person_name_in_sources_is_not_flagged(env):
 def test_failure_returns_none_and_saves_nothing(env):
     s, c = env
     assert make_plan(c, FakeClient(RuntimeError("切断")), s, finding()) is None
-    assert get_plan(c, fingerprint(finding())) is None
+    assert get_plan(c, finding()) is None
 
 
 def test_prompt_has_finding_and_records_and_treats_them_as_material(env):

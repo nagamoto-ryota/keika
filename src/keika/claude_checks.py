@@ -20,7 +20,7 @@ import pypdf
 from keika.claude import FALLBACK_BETA, METER, MODEL
 from keika.db import connect
 from keika.files import DocRef, to_payload
-from keika.findings import Evidence, Finding
+from keika.findings import Evidence, Finding, fingerprint
 from keika.ledger import find_person, get_user
 from keika.machine_checks import run_machine_checks, user_refs
 from keika.reading import stored_facts
@@ -40,6 +40,7 @@ _MEDICAL = re.compile(
     r"|すぐ.{0,8}(受診|病院)|救急|緊急(性|度)|(症|病|炎|不全|がん|癌)の可能性"
     r"|受診した方|受診を検討|病院[へに]行くよう|病院[へに]行く必要|至急|重篤"
     r"|聞き間違い|の間違いのよう|のことですね"
+    r"|(診てもらう|受診).{0,10}(勧め|すすめ)"
 )
 DISEASE = r"(?:[一-龥ァ-ヶー]{0,10}(?:症(?!状)|病(?![院棟室気])|炎|不全|がん|癌|疾患|梗塞)|うつ病|パーキンソン|高血圧|低血圧|貧血|糖尿|脱水|不整脈|狭心)"
 _DISEASE_GUESS = re.compile(DISEASE + r"(?:の症状)?(?:かもしれ|と思われ|のよう|の疑い|の可能性|が進んで)")
@@ -63,7 +64,7 @@ def line_crossings(text: str, said: str = "") -> list[str]:
 
 def crosses_line(text: str | None, said: str = "") -> bool:
     return bool(text) and bool(line_crossings(text, said))
-_BACKDATE = re.compile(r"過去の日付|さかのぼ|遡って|遡り|前日付|\d+月\d+日付|\d+月の日付|\d{4}[-/]\d{1,2}[-/]\d{1,2}付")
+_BACKDATE = re.compile(r"過去の日付|さかのぼ|遡って|遡り|前日付|前の日付|\d+月\d+日付|\d+月の日付|\d{4}[-/]\d{1,2}[-/]\d{1,2}付|に合わせて?(?:書き直|記入|修正)|日付.{0,6}合わせ|として書き直")
 MIN_QUOTE = 2  # 1文字の引用はどの原文にも当たるので根拠にならない
 MIN_CLOSING_QUOTE = 4  # 指摘を消す時はもっと確かな語句を求める
 _SPACE = re.compile(r"\s+")
@@ -466,7 +467,7 @@ def run_claude_checks(conn: sqlite3.Connection, client: Any, s: Settings, user_i
                 message = stream.get_final_message()
             METER.add(message.usage)
             if message.stop_reason == "end_turn":
-                if not second_look_asked:
+                if not second_look_asked and message.content:
                     second_look_asked = True
                     messages += [{"role": "assistant", "content": message.content}, {"role": "user", "content": SECOND_LOOK}]
                     continue
@@ -540,14 +541,19 @@ def _accept_finding(data: dict, user_id: str, allowed: set[str], texts: dict, ru
     if checked is None:
         run.dropped.append({**data, "why": "検査で落ちた"})
         return "受け付けませんでした: 引用が原文に無いか、箇所がないか、医療の判断に踏み込んでいます。直すなら原文を確かめて報告し直してください。"
+    fp = fingerprint(checked)
+    same = next((n for n, (f, _) in run.reported.items() if fingerprint(f) == fp and any(x is f for x in run.findings)), None)
+    if same:  # 見直しの周で言い回しだけ変えた出し直しは、重ねない
+        return f"同じ指摘をすでに受け付けています（番号 {same}）。"
     run.findings.append(checked)
     number = f"N{len(run.reported) + 1}"
-    run.reported[number] = (checked, data.get("replaces", ""))
+    run.reported[number] = (checked, "")
     # 同じ点検項目の時だけ出し直しと認める。無関係な指摘で前回の指摘を消させない
     ids = {f"P{i}": f for i, f in enumerate(prior, start=1)}
     target = ids.get(data.get("replaces", ""))
     if target is not None and target.rule_id == checked.rule_id:
         run.replaced.append(data["replaces"])
+        run.reported[number] = (checked, data["replaces"])
     return f"受け付けました（番号 {number}）。"
 
 
