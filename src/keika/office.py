@@ -68,6 +68,14 @@ def _within_year(docs: list[Doc], kind: str, topic: str, on: date) -> bool:
     return any(on - _parse(a.date) <= YEAR for a, _ in _activities(docs, kind, topic))
 
 
+def _yearly_step(docs: list[Doc], label: str, kind: str, topic: str) -> str:
+    """年1回の活動が切れている時の案内。前回があれば、いつで切れたかも伝える。"""
+    days = [a.date for a, _ in _activities(docs, kind, topic)]
+    if days:
+        return f"{label}の{kind}は最後が {max(days, key=_parse)} で、1年を超えています。年1回以上行って記録する"
+    return f"{label}の{kind}を年1回以上行って記録する"
+
+
 def _guide(docs: list[Doc], pattern: str) -> Doc | None:
     hits = [d for d in docs if _about(d, pattern) and d[1].doc_type not in ("委員会の記録", "研修の記録")]
     return next((d for d in hits if _real(d)), hits[0] if hits else None)
@@ -86,7 +94,7 @@ def _bcp(docs: list[Doc], on: date) -> dict:
         steps.append("災害編は表紙や目次だけのようです。本文を作る" if draft else "災害編の計画を作る")
     for kind in ("研修", "訓練"):
         if not _within_year(docs, kind, "業務継続|BCP", on):
-            steps.append(f"BCP の{kind}を年1回以上行って記録する")
+            steps.append(_yearly_step(docs, "BCP", kind, "業務継続|BCP"))
     first = infection or disaster or draft
     return {"steps": steps, "evidence": draft if draft and not disaster else first}
 
@@ -103,7 +111,7 @@ def _infection(docs: list[Doc], on: date) -> dict:
         steps.append("感染症対策の委員会をおおむね6か月に1回開いて記録する")
     for kind in ("研修", "訓練"):
         if not _within_year(docs, kind, "感染", on):
-            steps.append(f"感染症の{kind}を年1回以上行って記録する")
+            steps.append(_yearly_step(docs, "感染症", kind, "感染"))
     rows = _committee_dates(docs, "感染")
     return {"steps": steps, "evidence": rows[-1][1:] if rows else guide}
 
@@ -124,7 +132,7 @@ def _abuse(conn: sqlite3.Connection, s: Settings, docs: list[Doc], on: date) -> 
     if not _committee_dates(docs, "虐待"):
         steps.append("虐待防止の委員会を定期的に開いて記録する")
     if not _within_year(docs, "研修", "虐待", on):
-        steps.append("虐待防止の研修を年1回以上行って記録する")
+        steps.append(_yearly_step(docs, "虐待防止", "研修", "虐待"))
     if _regulation_mentions(s, docs, "虐待") is False:
         steps.append("運営規程に虐待防止の措置を書く")
     trainings = list(_activities(docs, "研修", "虐待"))

@@ -209,3 +209,22 @@ def test_training_recorded_under_another_kind_still_counts(env):
     s, c = env
     _abuse_docs(s, c, [activity("会議", "虐待防止研修", "2026-07-10", "真柴 洋子、井波 拓真")])
     assert row(s, c, "R25").status == "done"
+
+
+def test_old_training_says_when_it_was_last_done(env):
+    s, c = env
+    _abuse_docs(s, c, [activity("研修", "虐待防止研修", "2025-03-10", "真柴 洋子、井波 拓真")])
+    assert "虐待防止の研修は最後が 2025-03-10 で、1年を超えています" in row(s, c, "R25").next_step
+
+
+def test_latest_of_several_old_trainings_is_named(env):
+    s, c = env
+    _abuse_docs(s, c, [activity("研修", "虐待防止研修", "2024-03-10"), activity("研修", "虐待防止研修", "2025-03-10")])
+    assert "最後が 2025-03-10" in row(s, c, "R25").next_step
+
+
+def test_training_within_a_year_is_not_called_old(env):
+    s, c = env
+    _abuse_docs(s, c, [activity("研修", "虐待防止研修", "2026-07-10", "真柴 洋子、井波 拓真")])
+    assert "1年を超えています" not in row(s, c, "R25").next_step
+

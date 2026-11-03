@@ -1,0 +1,1295 @@
+{
+ "at": "20261103-094248",
+ "label": "var-1",
+ "users": null,
+ "with_inbox": false,
+ "fresh": true,
+ "seconds": 504,
+ "cost_usd": 8.63,
+ "runs": {
+  "U01": {
+   "seconds": 40,
+   "cost": 0.938,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": []
+  },
+  "U02": {
+   "seconds": 62,
+   "cost": 1.235,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": [
+    {
+     "rule_id": "R06",
+     "period": "2026-09",
+     "reason": "9/5〜10/12 入院中で居宅訪問ができない特段の事情が記録され、病棟で本人と面会している",
+     "record_date": "2026-09-18",
+     "quote": "入院中のため今月は居宅を訪問しての面接ができない。今月のモニタリングは病棟での本人との面会、奥様と MSW からの聞き取りで行った。"
+    }
+   ]
+  },
+  "U03": {
+   "seconds": 85,
+   "cost": 1.861,
+   "not_run": false,
+   "error": null,
+   "dropped": 1,
+   "dismissed": []
+  },
+  "U04": {
+   "seconds": 63,
+   "cost": 1.264,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": []
+  },
+  "U05": {
+   "seconds": 47,
+   "cost": 0.968,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": []
+  },
+  "U06": {
+   "seconds": 61,
+   "cost": 1.075,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": []
+  },
+  "U07": {
+   "seconds": 37,
+   "cost": 0.775,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": []
+  },
+  "U08": {
+   "seconds": 52,
+   "cost": 0.509,
+   "not_run": false,
+   "error": null,
+   "dropped": 0,
+   "dismissed": []
+  }
+ },
+ "score": {
+  "hits": [
+   "H01",
+   "H02",
+   "H03",
+   "H06",
+   "H09",
+   "H10",
+   "H14",
+   "H19",
+   "O01",
+   "O02",
+   "O03"
+  ],
+  "misses": [
+   "H04",
+   "H05",
+   "H07",
+   "H08",
+   "H11",
+   "H15",
+   "H16",
+   "H17",
+   "H18",
+   "O05"
+  ],
+  "reason_review": [
+   [
+    "H04",
+    "2026-09の利用票の署名欄が空のようです。署名をいただいているか確認してください。"
+   ],
+   [
+    "H04",
+    "9/9からデイが週3回（月・水・木）になっていますが、計画書は週2回（月・木）のままのようです。計画の変更・担当者会議・アセスメントのやり直しをどう扱ったかの記録が見当たりません。確認してください。"
+   ],
+   [
+    "H05",
+    "2026-09の利用票の署名欄が空のようです。署名をいただいているか確認してください。"
+   ],
+   [
+    "H07",
+    "アセスメントで挙げた夜間のトイレ・失禁・次女様の睡眠不足と夜間の転倒の危険が、第2表の課題に入っていないようです。プランに位置付けない理由があるかも含めて確認してください。"
+   ],
+   [
+    "H08",
+    "アセスメントで挙げた夜間のトイレ・失禁・次女様の睡眠不足と夜間の転倒の危険が、第2表の課題に入っていないようです。プランに位置付けない理由があるかも含めて確認してください。"
+   ],
+   [
+    "H08",
+    "本人・次女様と4事業所への交付は記録がありますが、久留島医師への交付の記録は見当たりません。別の場所に記録があれば確認してください。"
+   ],
+   [
+    "H11",
+    "個人情報使用同意書の家族代表欄が空いたままのようです。長女の由佳様はキーパーソンで、会議の出席や電話での情報のやりとりがあります。家族分の同意をどう取るか確認してください。"
+   ],
+   [
+    "H15",
+    "Drive の 利用者/U07_波多江トシ子/ にサービス担当者会議の要点が見当たりません。別の場所にあれば確認してください。"
+   ],
+   [
+    "H16",
+    "2026-08〜2026-10（3か月に1回）に居宅を訪問しての面接の記録が見当たりません。特段の事情があれば、その記録があるか確認してください。"
+   ],
+   [
+    "H16",
+    "Drive の 利用者/U08_宇佐美清/ にサービス担当者会議の要点が見当たりません。別の場所にあれば確認してください。"
+   ],
+   [
+    "H17",
+    "2026-08〜2026-10（3か月に1回）に居宅を訪問しての面接の記録が見当たりません。特段の事情があれば、その記録があるか確認してください。"
+   ],
+   [
+    "H17",
+    "2026-10の利用票の署名欄が空のようです。署名をいただいているか確認してください。"
+   ],
+   [
+    "H17",
+    "Drive の 利用者/U08_宇佐美清/ にサービス担当者会議の要点が見当たりません。別の場所にあれば確認してください。"
+   ],
+   [
+    "H18",
+    "Drive の 利用者/U08_宇佐美清/ にサービス担当者会議の要点が見当たりません。別の場所にあれば確認してください。"
+   ],
+   [
+    "H18",
+    "重要事項説明書に複数事業所の紹介・選定理由の説明は書かれていますが、その理解確認欄の利用者署名が空欄のようです。交付の署名はあります。確認してください。"
+   ],
+   [
+    "O05",
+    "虐待防止の研修を年1回以上行って記録する。井波 拓真さんの新規採用時の虐待防止研修（2026-07-01 入職）を確かめる。確認してください。"
+   ]
+  ],
+  "nudge_hits": [],
+  "nudge_misses": [
+   "H12",
+   "H13"
+  ],
+  "false_positives": [],
+  "silent_ok": [
+   "T01",
+   "T02",
+   "T03",
+   "T05",
+   "T06"
+  ],
+  "silent_review": [],
+  "unknown_item_correct": [
+   "O04"
+  ],
+  "unknown_item_errors": [],
+  "by_kind": {
+   "claude": {
+    "hit": 6,
+    "total": 12
+   },
+   "machine": {
+    "hit": 5,
+    "total": 9
+   }
+  },
+  "per_user": {
+   "U01": 2,
+   "U02": 4,
+   "U03": 5,
+   "U04": 5,
+   "U05": 5,
+   "U06": 6,
+   "U07": 2,
+   "U08": 5
+  }
+ },
+ "unknowns": [
+  {
+   "rule_id": "R19",
+   "user_id": "U01",
+   "kind": "unknown",
+   "period": "2024-03-12 契約時",
+   "message": "複数事業所の説明と署名はあります。ただ、説明日が令和6年3月12日の書類に令和6年10月1日の指定の記載があり、実際に説明した時の版かどうか書類だけでは判断できません。確認してください。",
+   "todo": "重要事項説明書の版と説明日を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U01_杉森ハル/重要事項説明書_2024-03-12.pdf",
+     "page": 1,
+     "quote": "指定介護予防支援事業者（令和6年10月1日）",
+     "record_date": null,
+     "unverified": true
+    },
+    {
+     "file": "利用者/U01_杉森ハル/重要事項説明書_2024-03-12.pdf",
+     "page": 2,
+     "quote": "令和 6 年 3 月 12 日",
+     "record_date": null,
+     "unverified": true
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "今日の日付で「重要事項説明書（令和6年3月12日署名）の指定欄に令和6年10月1日の記載がある経緯：〇〇」と残す。説明をやり直す場合は、今日の日付で説明・署名を取得し、経緯を残す。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U08",
+   "kind": "unknown",
+   "period": "2026-05〜2026-07",
+   "message": "2026-05〜2026-07 の訪問は、この期間の前半の記録が取り込まれていないので分かりません。確認してください。",
+   "todo": null,
+   "evidence": [],
+   "searched_scope": "2026-05〜2026-07 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R27",
+   "user_id": null,
+   "kind": "unknown",
+   "period": "",
+   "message": "ウェブサイトへの掲載は Drive では分かりません。ご自身で確かめて申告してください。確認してください。",
+   "todo": "ウェブサイトへの掲載は Drive では分かりません",
+   "evidence": [
+    {
+     "file": "事業所/重要事項の掲示_2026-07-01.pdf",
+     "page": null,
+     "quote": null,
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  }
+ ],
+ "unlisted": [
+  {
+   "rule_id": "R06",
+   "user_id": "U01",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "杉森 ハルさんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U02",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "古賀 正蔵さんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R11",
+   "user_id": "U03",
+   "kind": "finding",
+   "period": "2026-11",
+   "message": "11月分利用票の余白に、浴室の床が滑るため滑り止めマット・手すりを検討するとのメモがあります。11/2の署名時のやりとりを含め、支援経過には記録が見当たりません。会議で「次回再検討」とした課題なので、計画の見直しや担当者会議が要るか検討済みか確認してください。",
+   "todo": "浴室の滑りへの対応を支援経過に残す",
+   "evidence": [
+    {
+     "file": "利用者/U03_綿貫キヨ/利用票_2026-11.pdf",
+     "page": 1,
+     "quote": "滑り止めマット・手すり 検討",
+     "record_date": null,
+     "unverified": true
+    },
+    {
+     "file": "利用者/U03_綿貫キヨ/サービス担当者会議の要点_2026-07-30.docx",
+     "page": null,
+     "quote": "手すり・滑り止めマット等の福祉用具の検討は本人が今は不要とのこと。次回再検討",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": "支援経過 2026-08-01〜2026-11-03（最後の記録は2026-10-20）",
+   "suggestion": null,
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U03",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "綿貫 キヨさんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R11",
+   "user_id": "U04",
+   "kind": "finding",
+   "period": "2026-10〜2026-11",
+   "message": "10月から夜間のトイレが3回に増え（アセスメントでは夜間2回）、奥様も起こされているようです。すくみ足もあるので、デイ等との情報共有や、次の計画での夜間の課題の位置付けを検討済みか確認してください。",
+   "todo": "夜間のトイレ増加を次の計画で検討する",
+   "evidence": [
+    {
+     "file": "利用者/U04_柚木茂/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "10月に入ってから夜間のトイレが3回に増え、奥様も起こされるとの話あり",
+     "record_date": "2026-10-15",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U04_柚木茂/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "まだ効果ははっきりしない",
+     "record_date": "2026-10-26",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U04_柚木茂/アセスメント_2025-11-20.pdf",
+     "page": 1,
+     "quote": "夜間2回",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "（今日の日付で）夜間のトイレが3回に増えた件：10/22の受診後の様子を〇〇。デイサービスこなら坂への共有は〇〇。次の計画で夜間の移動・排泄と奥様の負担を〇〇として検討する。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U04",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "柚木 茂さんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R45",
+   "user_id": "U04",
+   "kind": "nudge",
+   "period": "2026-11-30",
+   "message": "計画の期間が 2026-11-30 で終わります。あと26日です。見直しの準備を確認してください。",
+   "todo": "計画の見直しの準備",
+   "evidence": [
+    {
+     "file": "利用者/U04_柚木茂/居宅サービス計画書_2025-11-27.pdf",
+     "page": 1,
+     "quote": "計画の期間：2025-12-01〜2026-11-30",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U05",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "戸叶 フミさんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U06",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "鷺沼 勝利さんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R45",
+   "user_id": "U06",
+   "kind": "nudge",
+   "period": "2026-11-30",
+   "message": "計画の期間が 2026-11-30 で終わります。あと26日です。見直しの準備を確認してください。",
+   "todo": "計画の見直しの準備",
+   "evidence": [
+    {
+     "file": "利用者/U06_鷺沼勝利/居宅サービス計画書_2026-08-06.pdf",
+     "page": 1,
+     "quote": "計画の期間：2026-08-06〜2026-11-30",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R44",
+   "user_id": "U06",
+   "kind": "nudge",
+   "period": "2026-11-30",
+   "message": "認定の有効期間が 2026-11-30 で終わります。30日前の 2026-10-31 を過ぎています。更新の申請の状況を確認してください。",
+   "todo": "認定の更新申請の援助",
+   "evidence": [],
+   "searched_scope": "台帳の認定有効期間",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U07",
+   "kind": "nudge",
+   "period": "2026-09〜2026-11",
+   "message": "波多江 トシ子さんの3か月に1回の訪問は、2026-09〜2026-11 の分がまだのようです。今月が最後の月です。",
+   "todo": "3か月に1回の訪問",
+   "evidence": [],
+   "searched_scope": "2026-09〜2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  }
+ ],
+ "findings": [
+  {
+   "rule_id": "R19",
+   "user_id": "U01",
+   "kind": "unknown",
+   "period": "2024-03-12 契約時",
+   "message": "複数事業所の説明と署名はあります。ただ、説明日が令和6年3月12日の書類に令和6年10月1日の指定の記載があり、実際に説明した時の版かどうか書類だけでは判断できません。確認してください。",
+   "todo": "重要事項説明書の版と説明日を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U01_杉森ハル/重要事項説明書_2024-03-12.pdf",
+     "page": 1,
+     "quote": "指定介護予防支援事業者（令和6年10月1日）",
+     "record_date": null,
+     "unverified": true
+    },
+    {
+     "file": "利用者/U01_杉森ハル/重要事項説明書_2024-03-12.pdf",
+     "page": 2,
+     "quote": "令和 6 年 3 月 12 日",
+     "record_date": null,
+     "unverified": true
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "今日の日付で「重要事項説明書（令和6年3月12日署名）の指定欄に令和6年10月1日の記載がある経緯：〇〇」と残す。説明をやり直す場合は、今日の日付で説明・署名を取得し、経緯を残す。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U01",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "杉森 ハルさんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R04",
+   "user_id": "U02",
+   "kind": "finding",
+   "period": "2026-10-14〜2026-12-31",
+   "message": "第2表の特殊寝台には必要な理由がありますが、歩行器は「福祉用具貸与（歩行器）」だけで、どこで何のために使うかが書かれていないようです。会議の要点も「追加することで合意」のみです。確認してください。",
+   "todo": "歩行器の必要な理由を第2表に書く",
+   "evidence": [
+    {
+     "file": "利用者/U02_古賀正蔵/居宅サービス計画書_2026-10-14.xlsx",
+     "page": null,
+     "quote": "福祉用具貸与（歩行器）",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U02_古賀正蔵/居宅サービス計画書_2026-10-14.xlsx",
+     "page": null,
+     "quote": "特殊寝台・付属品（ベッド柵）の貸与（左片麻痺があり、平らな布団からの起き上がりが困難なため。背上げと柵を使えば自力で起き上がれる）",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U02_古賀正蔵/アセスメント_2026-10-14.pdf",
+     "page": 1,
+     "quote": "歩行器なし\nでは左足の振り出しが不十分でふらつく。",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "第2表 歩行器のサービス内容の案：「歩行器の貸与（〇〇のため、居間〜トイレ約8mの屋内移動に使用。歩行器なしでは左足の振り出しが不十分でふらつく）」。今日の日付で支援経過に「歩行器の必要な理由を第2表に追記。〇〇」と経緯を残す。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R21",
+   "user_id": "U02",
+   "kind": "finding",
+   "period": "2026-10-14〜",
+   "message": "計画書の第1表に長男 達也様の連絡先が載っており、各事業所に送っています。個人情報使用同意書の署名は本人と妻だけのようです。長男様の同意の扱いを確認してください。",
+   "todo": "長男の個人情報使用の同意を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U02_古賀正蔵/居宅サービス計画書_2026-10-14.xlsx",
+     "page": null,
+     "quote": "長男 達也様 000-0000-2103",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U02_古賀正蔵/個人情報使用同意書_2025-02-10.pdf",
+     "page": 1,
+     "quote": "家族代表（続柄：妻）",
+     "record_date": null,
+     "unverified": true
+    }
+   ],
+   "searched_scope": "個人情報使用同意書_2025-02-10.pdf、契約書、重要事項説明書",
+   "suggestion": "長男 達也様から今日の日付で同意を取得し、支援経過に「長男 達也様に個人情報使用同意について〇〇で説明し、〇〇月〇〇日に同意書を取得」と経緯を残す。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R14",
+   "user_id": "U02",
+   "kind": "finding",
+   "period": "2026-10-14〜2026-12-31",
+   "message": "アセスメントでは妻が主介護者で家事を担っており、受診の付き添いもしています。第2表の援助内容には家族の支援が見当たらないようです。位置付けるか確認してください。",
+   "todo": "妻の支援を第2表に位置付ける",
+   "evidence": [
+    {
+     "file": "利用者/U02_古賀正蔵/アセスメント_2026-10-14.pdf",
+     "page": 1,
+     "quote": "家事は妻。",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U02_古賀正蔵/居宅サービス計画書_2026-10-14.xlsx",
+     "page": null,
+     "quote": "月1回 くぬぎ台内科医院受診（妻・タクシー）",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": "居宅サービス計画書_2026-10-14.xlsx 第2表",
+   "suggestion": "第2表の各ニーズに家族の支援として「妻：〇〇（家事、受診の付き添い、〇〇）」を加える案。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U02",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "古賀 正蔵さんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U03",
+   "kind": "finding",
+   "period": "2026-10",
+   "message": "2026-10に居宅を訪問しての面接の記録が見当たりません。2026-10-20 は種別が「訪問」ですが、本文は「電話」と読めます。特段の事情があれば、その記録があるか確認してください。",
+   "todo": "2026-10の居宅訪問の記録を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U03_綿貫キヨ/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "デイ利用中の本人と面会。体操に参加中で表情は明るい。岩舘相談員より、入浴は問題なし、最近は昼食を残さず食べているとのこと",
+     "record_date": "2026-10-08",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U03_綿貫キヨ/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "長男様より電話あり。本日は電話にてモニタリング実施。母は変わりなく過ごしている、ヘルパーさんもデイも休まず使えているとの",
+     "record_date": "2026-10-20",
+     "unverified": false
+    }
+   ],
+   "searched_scope": "2026-10 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R10",
+   "user_id": "U03",
+   "kind": "finding",
+   "period": "2026-08-01",
+   "message": "計画の開始日 2026-08-01 より後の 2026-08-05 が同意日になっているようです。説明と同意の順番を確認してください。",
+   "todo": "説明と同意の順番を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U03_綿貫キヨ/居宅サービス計画書_2026-07-30.docx",
+     "page": null,
+     "quote": "2026-08-05 本人・長男に説明し同意を得た",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R11",
+   "user_id": "U03",
+   "kind": "finding",
+   "period": "2026-11",
+   "message": "11月分利用票の余白に、浴室の床が滑るため滑り止めマット・手すりを検討するとのメモがあります。11/2の署名時のやりとりを含め、支援経過には記録が見当たりません。会議で「次回再検討」とした課題なので、計画の見直しや担当者会議が要るか検討済みか確認してください。",
+   "todo": "浴室の滑りへの対応を支援経過に残す",
+   "evidence": [
+    {
+     "file": "利用者/U03_綿貫キヨ/利用票_2026-11.pdf",
+     "page": 1,
+     "quote": "滑り止めマット・手すり 検討",
+     "record_date": null,
+     "unverified": true
+    },
+    {
+     "file": "利用者/U03_綿貫キヨ/サービス担当者会議の要点_2026-07-30.docx",
+     "page": null,
+     "quote": "手すり・滑り止めマット等の福祉用具の検討は本人が今は不要とのこと。次回再検討",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": "支援経過 2026-08-01〜2026-11-03（最後の記録は2026-10-20）",
+   "suggestion": null,
+   "source": "claude"
+  },
+  {
+   "rule_id": "R02",
+   "user_id": "U03",
+   "kind": "finding",
+   "period": "2026-08-01〜2027-07-31",
+   "message": "同居の長男がいる中で生活援助を位置付けていますが、第1表の生活援助中心型の算定理由欄は、どれを選んだか読み取れず、「その他」の括弧も空欄のようです。アセスメントにある長男の平日不在などの理由が欄に書かれているか確認してください。",
+   "todo": "生活援助の算定理由欄の記載を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U03_綿貫キヨ/居宅サービス計画書_2026-07-30.docx",
+     "page": null,
+     "quote": "1. 一人暮らし　2. 家族等が障害、疾病等　3. その他（　　　　）",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U03_綿貫キヨ/アセスメント_2026-07-22.docx",
+     "page": null,
+     "quote": "長男（60歳、会社員）と二人暮らし。長男は平日 7:30〜20:00 頃不在。",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "生活援助中心型の算定理由：3. その他（〇〇）",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U03",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "綿貫 キヨさんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R13",
+   "user_id": "U04",
+   "kind": "finding",
+   "period": "2026-09",
+   "message": "2026-09の利用票の署名欄が空のようです。署名をいただいているか確認してください。",
+   "todo": "2026-09の利用票の署名を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U04_柚木茂/利用票_2026-09_変更.pdf",
+     "page": 1,
+     "quote": "利用者氏名（署名）",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R11",
+   "user_id": "U04",
+   "kind": "finding",
+   "period": "2026-09〜2026-11",
+   "message": "9/9からデイが週3回（月・水・木）になっていますが、計画書は週2回（月・木）のままのようです。計画の変更・担当者会議・アセスメントのやり直しをどう扱ったかの記録が見当たりません。確認してください。",
+   "todo": "週3回への変更を計画に反映する",
+   "evidence": [
+    {
+     "file": "利用者/U04_柚木茂/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "9/9 から水曜も追加でデイを利用することで了承をもらった",
+     "record_date": "2026-09-02",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U04_柚木茂/居宅サービス計画書_2025-11-27.pdf",
+     "page": 1,
+     "quote": "変更の記録：なし",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U04_柚木茂/利用票_2026-11.pdf",
+     "page": 1,
+     "quote": "月・水・木",
+     "record_date": null,
+     "unverified": true
+    }
+   ],
+   "searched_scope": "支援経過 2026-08-01〜2026-11-03、居宅サービス計画書 2025-11-27（変更の記録欄）、フォルダ内の全書類",
+   "suggestion": "（今日の日付で）2026-09-09から通所介護を週2回から週3回（月・水・木）に増やした経緯：奥様の腰痛による介護負担のため。計画の扱いは〇〇（変更する／軽微な変更とする理由〇〇）。11/30で計画期間が終わるため、〇〇日にアセスメントを行い、〇〇日に担当者会議を開いて週3回を位置付けた計画を作る予定。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R11",
+   "user_id": "U04",
+   "kind": "finding",
+   "period": "2026-10〜2026-11",
+   "message": "10月から夜間のトイレが3回に増え（アセスメントでは夜間2回）、奥様も起こされているようです。すくみ足もあるので、デイ等との情報共有や、次の計画での夜間の課題の位置付けを検討済みか確認してください。",
+   "todo": "夜間のトイレ増加を次の計画で検討する",
+   "evidence": [
+    {
+     "file": "利用者/U04_柚木茂/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "10月に入ってから夜間のトイレが3回に増え、奥様も起こされるとの話あり",
+     "record_date": "2026-10-15",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U04_柚木茂/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "まだ効果ははっきりしない",
+     "record_date": "2026-10-26",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U04_柚木茂/アセスメント_2025-11-20.pdf",
+     "page": 1,
+     "quote": "夜間2回",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "（今日の日付で）夜間のトイレが3回に増えた件：10/22の受診後の様子を〇〇。デイサービスこなら坂への共有は〇〇。次の計画で夜間の移動・排泄と奥様の負担を〇〇として検討する。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U04",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "柚木 茂さんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R45",
+   "user_id": "U04",
+   "kind": "nudge",
+   "period": "2026-11-30",
+   "message": "計画の期間が 2026-11-30 で終わります。あと26日です。見直しの準備を確認してください。",
+   "todo": "計画の見直しの準備",
+   "evidence": [
+    {
+     "file": "利用者/U04_柚木茂/居宅サービス計画書_2025-11-27.pdf",
+     "page": 1,
+     "quote": "計画の期間：2025-12-01〜2026-11-30",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R02",
+   "user_id": "U05",
+   "kind": "finding",
+   "period": "2026-08-01〜2027-07-31",
+   "message": "アセスメントで挙げた夜間のトイレ・失禁・次女様の睡眠不足と夜間の転倒の危険が、第2表の課題に入っていないようです。プランに位置付けない理由があるかも含めて確認してください。",
+   "todo": "夜間排泄と次女の疲れを計画に入れる",
+   "evidence": [
+    {
+     "file": "利用者/U05_戸叶フミ/アセスメント_2026-07-21.docx",
+     "page": null,
+     "quote": "夜間のトイレと失禁、次女の睡眠不足・介護疲れ（夜間の転倒の危険）",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U05_戸叶フミ/居宅サービス計画書_2026-07-29.xlsx",
+     "page": null,
+     "quote": "デイや受診に出かけたい",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "2026-11-04 アセスメント（7/21）で挙げた夜間のトイレ・失禁と次女様の介護負担について、第2表への位置付けを〇〇（検討の内容）。〇〇（計画の変更の有無と理由）。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R11",
+   "user_id": "U05",
+   "kind": "finding",
+   "period": "2026-09〜2026-10",
+   "message": "9/11の夜間転倒の後、膝折れしそうなふらつきや更衣時の2人がかりに近い介助が記録されていますが、「計画どおり継続」のままのようです。担当者会議やプランの見直しを検討済みか、継続の理由を残しているか確認してください。",
+   "todo": "転倒後の状態変化で計画見直しを検討する",
+   "evidence": [
+    {
+     "file": "利用者/U05_戸叶フミ/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "手引き歩行でも膝折れしそうになるとのこと",
+     "record_date": "2026-09-16",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U05_戸叶フミ/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "更衣のときに2人がかりに近い介助になる日があるとのこと",
+     "record_date": "2026-10-02",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U05_戸叶フミ/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "計画どおり継続。11月分の利用票を説明し",
+     "record_date": "2026-10-19",
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "2026-11-04 9/11の転倒以降のふらつきと介助量の増加について、〇〇（各事業所・主治医との確認の内容）。計画の見直しは〇〇（見直す／見直さない理由）。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R07",
+   "user_id": "U05",
+   "kind": "finding",
+   "period": "2026-08-01〜2027-07-31",
+   "message": "本人・次女様と4事業所への交付は記録がありますが、久留島医師への交付の記録は見当たりません。別の場所に記録があれば確認してください。",
+   "todo": "主治医への計画の交付を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U05_戸叶フミ/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "ヘルパーステーションほたるい、みずなら訪問看護ステーション、デイサービスこなら坂、ぶなの木レンタルへ FAX で送付し",
+     "record_date": "2026-08-03",
+     "unverified": false
+    }
+   ],
+   "searched_scope": "支援経過 2026-08-01〜2026-11-03、居宅サービス計画書 2026-07-29",
+   "suggestion": "2026-11-04 更新後の居宅サービス計画書（7/29同意）の主治医（くぬぎ台内科医院 久留島医師）への交付について、〇〇（交付日・方法、または今後の交付予定）。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R04",
+   "user_id": "U05",
+   "kind": "finding",
+   "period": "2026-08-01〜2027-07-31",
+   "message": "計画書には品目ごとの理由がありますが、会議の要点は「変更なく継続」だけで、継続が必要な理由の検討が読み取れないようです。確認してください。",
+   "todo": "福祉用具の継続理由を品目ごとに残す",
+   "evidence": [
+    {
+     "file": "利用者/U05_戸叶フミ/サービス担当者会議の要点_2026-07-29.docx",
+     "page": null,
+     "quote": "福祉用具: 特殊寝台・付属品、車いすともに変更なく継続。",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U05",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "戸叶 フミさんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R01",
+   "user_id": "U06",
+   "kind": "finding",
+   "period": "2026-08-06〜2026-11-30",
+   "message": "欠席したヘルパーステーションほたるいの欄が「電話照会」だけで、何を尋ねて何と答えたかが書かれていないようです。8/3の電話の記録も日程の相談だけです。照会の中身と回答が別の場所に残っていないか確認してください。",
+   "todo": "ほたるいへの照会の中身を記録に残す",
+   "evidence": [
+    {
+     "file": "利用者/U06_鷺沼勝利/サービス担当者会議の要点_2026-08-06.pdf",
+     "page": 1,
+     "quote": "4. 訪問介護: 電話照会。",
+     "record_date": null,
+     "unverified": false
+    },
+    {
+     "file": "利用者/U06_鷺沼勝利/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "8/6（木）夕方の担当者会議の日程を相談したが、その時間は別の利用者の会議と重なり出席できないとのこと。",
+     "record_date": "2026-08-03",
+     "unverified": false
+    }
+   ],
+   "searched_scope": "サービス担当者会議の要点_2026-08-06.pdf、支援経過 2026-08-01〜2026-11-03",
+   "suggestion": "2026-11-04 8/6担当者会議を欠席したヘルパーステーションほたるい 能登サ責への照会について経緯を残す。照会日〇〇、照会した内容〇〇、回答〇〇。会議の要点に回答の記載が無かった理由〇〇。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R07",
+   "user_id": "U06",
+   "kind": "finding",
+   "period": "2026-08-06〜2026-11-30",
+   "message": "8/7の交付は「各事業所」とだけ書かれていて、どこに渡したのかが分からないようです。主治医（さわらぎ診療所 沢良木医師）に渡した記録も見当たりません。別の場所にあれば確認してください。",
+   "todo": "計画書の交付先と主治医への交付を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U06_鷺沼勝利/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "各事業所に計画書を交付した。",
+     "record_date": "2026-08-07",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U06_鷺沼勝利/居宅サービス計画書_2026-08-06.pdf",
+     "page": 1,
+     "quote": "交付：支援経過 2026-08-07 参照",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": "支援経過 2026-08-01〜2026-11-03、居宅サービス計画書_2026-08-06.pdf",
+   "suggestion": "2026-11-04 8/6作成の計画書の交付先を整理して残す。ヘルパーステーションほたるい：〇〇（交付日・方法〇〇）、リハビリデイののはな：〇〇（交付日・方法〇〇）、さわらぎ診療所 沢良木医師：〇〇。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R21",
+   "user_id": "U06",
+   "kind": "finding",
+   "period": "",
+   "message": "個人情報使用同意書の家族代表欄が空いたままのようです。長女の由佳様はキーパーソンで、会議の出席や電話での情報のやりとりがあります。家族分の同意をどう取るか確認してください。",
+   "todo": "長女の個人情報の同意を取得する",
+   "evidence": [
+    {
+     "file": "利用者/U06_鷺沼勝利/個人情報使用同意書_2026-08-01.pdf",
+     "page": 1,
+     "quote": "家族代表（　　）",
+     "record_date": null,
+     "unverified": true
+    },
+    {
+     "file": "利用者/U06_鷺沼勝利/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "個人情報の使用について説明し、本人の同意書に署名をもらった。",
+     "record_date": "2026-08-01",
+     "unverified": false
+    }
+   ],
+   "searched_scope": "個人情報使用同意書_2026-08-01.pdf、支援経過 2026-08-01〜2026-11-03",
+   "suggestion": "2026-11-04 長女 由佳様に個人情報使用同意書の家族代表欄について〇〇し、署名を今日の日付で〇〇。8/1に家族欄が空欄だった経緯：〇〇。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U06",
+   "kind": "nudge",
+   "period": "2026-11",
+   "message": "鷺沼 勝利さんの今月の居宅訪問はまだのようです。今月はあと26日です。",
+   "todo": "今月の居宅訪問",
+   "evidence": [],
+   "searched_scope": "2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R45",
+   "user_id": "U06",
+   "kind": "nudge",
+   "period": "2026-11-30",
+   "message": "計画の期間が 2026-11-30 で終わります。あと26日です。見直しの準備を確認してください。",
+   "todo": "計画の見直しの準備",
+   "evidence": [
+    {
+     "file": "利用者/U06_鷺沼勝利/居宅サービス計画書_2026-08-06.pdf",
+     "page": 1,
+     "quote": "計画の期間：2026-08-06〜2026-11-30",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R44",
+   "user_id": "U06",
+   "kind": "nudge",
+   "period": "2026-11-30",
+   "message": "認定の有効期間が 2026-11-30 で終わります。30日前の 2026-10-31 を過ぎています。更新の申請の状況を確認してください。",
+   "todo": "認定の更新申請の援助",
+   "evidence": [],
+   "searched_scope": "台帳の認定有効期間",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R33",
+   "user_id": "U07",
+   "kind": "finding",
+   "period": "サービス担当者会議の要点",
+   "message": "Drive の 利用者/U07_波多江トシ子/ にサービス担当者会議の要点が見当たりません。別の場所にあれば確認してください。",
+   "todo": "サービス担当者会議の要点を確かめる",
+   "evidence": [],
+   "searched_scope": "利用者/U07_波多江トシ子/ の読み取り済みの書類",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U07",
+   "kind": "nudge",
+   "period": "2026-09〜2026-11",
+   "message": "波多江 トシ子さんの3か月に1回の訪問は、2026-09〜2026-11 の分がまだのようです。今月が最後の月です。",
+   "todo": "3か月に1回の訪問",
+   "evidence": [],
+   "searched_scope": "2026-09〜2026-11 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U08",
+   "kind": "finding",
+   "period": "2026-08〜2026-10",
+   "message": "2026-08〜2026-10（3か月に1回）に居宅を訪問しての面接の記録が見当たりません。特段の事情があれば、その記録があるか確認してください。",
+   "todo": "2026-08〜2026-10の居宅訪問の記録を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U08_宇佐美清/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "状況確認の電話。暑くて畑は朝だけにしている。ののはなは毎週行っており、エルゴは 15 分こげるようになった。トイレの手す",
+     "record_date": "2026-08-18",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U08_宇佐美清/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "状況確認の電話。\n本人より、9/6 に仲間と釣りに行った、帰りに足がしびれて車まで休み休み歩いたとのこと。ののはなは休ま",
+     "record_date": "2026-09-15",
+     "unverified": false
+    },
+    {
+     "file": "利用者/U08_宇佐美清/支援経過_2026-08-01_2026-11-03.csv",
+     "page": null,
+     "quote": "今月は自宅を訪問する予定で日程を相談したが、本人より「稲刈りの手伝いで忙しいので電話でいい」とのこと。電話にて状況確認。",
+     "record_date": "2026-10-13",
+     "unverified": false
+    }
+   ],
+   "searched_scope": "2026-08〜2026-10 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R13",
+   "user_id": "U08",
+   "kind": "finding",
+   "period": "2026-10",
+   "message": "2026-10の利用票の署名欄が空のようです。署名をいただいているか確認してください。",
+   "todo": "2026-10の利用票の署名を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U08_宇佐美清/利用票_2026-10.pdf",
+     "page": 1,
+     "quote": "利用者氏名（署名）",
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R33",
+   "user_id": "U08",
+   "kind": "finding",
+   "period": "サービス担当者会議の要点",
+   "message": "Drive の 利用者/U08_宇佐美清/ にサービス担当者会議の要点が見当たりません。別の場所にあれば確認してください。",
+   "todo": "サービス担当者会議の要点を確かめる",
+   "evidence": [],
+   "searched_scope": "利用者/U08_宇佐美清/ の読み取り済みの書類",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R19",
+   "user_id": "U08",
+   "kind": "finding",
+   "period": "2026-03-18 契約時",
+   "message": "重要事項説明書に複数事業所の紹介・選定理由の説明は書かれていますが、その理解確認欄の利用者署名が空欄のようです。交付の署名はあります。確認してください。",
+   "todo": "複数事業所の説明の確認署名を確かめる",
+   "evidence": [
+    {
+     "file": "利用者/U08_宇佐美清/重要事項説明書_2026-03-18.pdf",
+     "page": 2,
+     "quote": "「選定理由の説明を求めることができること」について、",
+     "record_date": null,
+     "unverified": true
+    },
+    {
+     "file": "利用者/U08_宇佐美清/重要事項説明書_2026-03-18.pdf",
+     "page": 1,
+     "quote": "複数の事業所の紹介と選定理由の説明",
+     "record_date": null,
+     "unverified": true
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": "（今日の日付で）重要事項説明書の「複数の事業所の紹介を求めることができること」「選定理由の説明を求めることができること」の理解確認欄が空欄であったため、〇〇月〇〇日に本人へ改めて説明し、署名を取得した。経緯：〇〇。",
+   "source": "claude"
+  },
+  {
+   "rule_id": "R06",
+   "user_id": "U08",
+   "kind": "unknown",
+   "period": "2026-05〜2026-07",
+   "message": "2026-05〜2026-07 の訪問は、この期間の前半の記録が取り込まれていないので分かりません。確認してください。",
+   "todo": null,
+   "evidence": [],
+   "searched_scope": "2026-05〜2026-07 の支援経過",
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R23",
+   "user_id": null,
+   "kind": "finding",
+   "period": "",
+   "message": "災害編は表紙や目次だけのようです。本文を作る。確認してください。",
+   "todo": "災害編は表紙や目次だけのようです",
+   "evidence": [
+    {
+     "file": "事業所/BCP_自然災害編_下書き.docx",
+     "page": null,
+     "quote": null,
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R24",
+   "user_id": null,
+   "kind": "finding",
+   "period": "",
+   "message": "感染症対策の委員会は 2026-03-10 の次の記録が、今日までの間に見当たりません（おおむね6か月に1回）。確認してください。",
+   "todo": "感染症対策の委員会は 2026-03-10 の次の記録が、今日までの間に見当たりません（おおむね6か月に1回）",
+   "evidence": [
+    {
+     "file": "事業所/感染症対策委員会_議事録_2026-03-10.docx",
+     "page": null,
+     "quote": null,
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R25",
+   "user_id": null,
+   "kind": "finding",
+   "period": "",
+   "message": "虐待防止の研修を年1回以上行って記録する。井波 拓真さんの新規採用時の虐待防止研修（2026-07-01 入職）を確かめる。確認してください。",
+   "todo": "虐待防止の研修を年1回以上行って記録する",
+   "evidence": [
+    {
+     "file": "事業所/委員会・研修・訓練の実施記録.xlsx",
+     "page": null,
+     "quote": null,
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  },
+  {
+   "rule_id": "R27",
+   "user_id": null,
+   "kind": "unknown",
+   "period": "",
+   "message": "ウェブサイトへの掲載は Drive では分かりません。ご自身で確かめて申告してください。確認してください。",
+   "todo": "ウェブサイトへの掲載は Drive では分かりません",
+   "evidence": [
+    {
+     "file": "事業所/重要事項の掲示_2026-07-01.pdf",
+     "page": null,
+     "quote": null,
+     "record_date": null,
+     "unverified": false
+    }
+   ],
+   "searched_scope": null,
+   "suggestion": null,
+   "source": "machine"
+  }
+ ]
+}
