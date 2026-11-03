@@ -6,7 +6,7 @@
   const state = document.getElementById("mic-state");
   if (!Recognition || !mic || !text || !Recognition.available) return;
   const LOCAL = { langs: ["ja-JP"], processLocally: true };
-  const GAP = /(?<=[ぁ-ゖァ-ヺー一-龠々])[ 　]+(?=[ぁ-ゖァ-ヺー一-龠々\d])|(?<=\d)[ 　]+(?=[ぁ-ゖァ-ヺー一-龠々])/g;
+  const GAP = /(?<=[ぁ-ゖァ-ヺー一-龠々])(?:[^\S\r\n]|​)+(?=[ぁ-ゖァ-ヺー一-龠々\d])|(?<=\d)(?:[^\S\r\n]|​)+(?=[ぁ-ゖァ-ヺー一-龠々])/g;
 
   // 認識結果の単語の間の空白を外す（サーバーの join_spoken と同じ規則）
   function joinSpoken(s) {

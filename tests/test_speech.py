@@ -1,6 +1,8 @@
 """音声入力: OS 標準を主な入口にする。ブラウザのボタンは端末内の認識専用で、外部へ送る認識に切り替えない。"""
 from pathlib import Path
 
+import pytest
+
 from test_intake import app_client, entry, env, run  # noqa: F401
 
 from keika.intake import _SPOKEN_GAP, WireIntake, join_spoken
@@ -55,3 +57,19 @@ def test_not_taken_with_spaces_still_catches_the_reversed_meaning(env):  # noqa:
 def test_button_joins_spoken_words_on_screen():
     js = JS.read_text(encoding="utf-8")
     assert "joinSpoken(finals + interim)" in js and f"/{_SPOKEN_GAP.pattern}/g" in js
+
+
+@pytest.mark.parametrize("gap", [" ", "　", " ", " ", " ", " ", "​", "  "])
+def test_any_kind_of_gap_from_recognition_is_removed(gap):
+    assert join_spoken(f"今日{gap}お{gap}宅{gap}に{gap}1{gap}錠") == "今日お宅に1錠"
+
+
+def test_line_breaks_are_kept_between_spoken_lines():
+    assert join_spoken("一行目\n二行目") == "一行目\n二行目"
+
+
+def test_browser_always_asks_for_the_latest_script(env):  # noqa: F811
+    s, c = env
+    r = app_client(s, WireIntake(entries=[])).get("/static/speech.js")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+

@@ -24,7 +24,8 @@ from keika.med_names import KATAKANA, MEDICINE_SENTENCE, register_checks
 _DISEASE = re.compile(DISEASE)
 _DOSE = re.compile(r"(?:\d+|半)\s*(?:錠|mg|ミリグラム|ミリ|グラム|g|包|カプセル|単位|滴)")
 _JA = r"ぁ-ゖァ-ヺー一-龠々"
-_SPOKEN_GAP = re.compile(rf"(?<=[{_JA}])[ 　]+(?=[{_JA}\d])|(?<=\d)[ 　]+(?=[{_JA}])")
+_GAP = r"(?:[^\S\r\n]|​)+"
+_SPOKEN_GAP = re.compile(rf"(?<=[{_JA}]){_GAP}(?=[{_JA}\d])|(?<=\d){_GAP}(?=[{_JA}])")
 _NOT_TAKEN = re.compile(r"(?:飲め|飲ん|服用|内服)[^。]{0,6}ない|飲み忘れ")
 _VISIT_WORDS = re.compile(r"訪問|行っ|行き|伺|お宅|宅|家")
 _WHEN_WORDS = re.compile(r"昨日|一昨日|おととい|先週|先日|前回|曜")

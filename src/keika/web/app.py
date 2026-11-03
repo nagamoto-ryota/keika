@@ -167,7 +167,10 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         origin = request.headers.get("origin")
         if request.method == "POST" and origin and urlparse(origin).netloc != host:
             return PlainTextResponse("外のページからは送信できません", status_code=403)
-        return await call_next(request)
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"  # 直した JS が古いまま動かないように、毎回確かめさせる
+        return response
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
