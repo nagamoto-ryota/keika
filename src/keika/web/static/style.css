@@ -30,6 +30,8 @@ th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: l
 th { font-size: 14px; color: var(--muted); font-weight: 500; }
 .summary { margin-bottom: 16px; font-size: 15px; }
 .board th, .board td { padding: 8px 10px; font-size: 15px; }
+main:has(.board) { max-width: 1000px; }
+.board th:first-child, .board td:first-child { position: sticky; left: 0; background: var(--paper); }
 .cell { text-align: center; }
 .cell.done { color: var(--accent); }
 .cell.todo { background: var(--finding-soft); color: var(--finding); font-weight: 600; }

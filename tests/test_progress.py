@@ -1,3 +1,4 @@
+from pathlib import Path
 from datetime import date
 
 import pytest
@@ -146,3 +147,8 @@ def test_dashboard_shows_progress_board(env):
         assert label in body
     assert "杉森 ハル" in body
 
+
+def test_board_gets_room_for_all_its_columns_and_keeps_the_name_in_view():
+    css = (Path(__file__).parent.parent / "src" / "keika" / "web" / "static" / "style.css").read_text(encoding="utf-8")
+    assert "main:has(.board) { max-width: 1000px; }" in css
+    assert ".board th:first-child, .board td:first-child { position: sticky; left: 0;" in css
