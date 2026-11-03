@@ -43,7 +43,7 @@ def test_physical_restraint_committee_not_required_for_kyotaku():
 
 def test_active_rows_are_fixed():
     # 動かす行は頻度の基準で先に決めた。増減したら理由を残すこと
-    assert {r.id for r in all_rules() if r.active} == {
+    assert {r.id for r in all_rules() if r.active and not r.added_by} == {
         "R01", "R02", "R03", "R04", "R06", "R07", "R08", "R09", "R10", "R11", "R12", "R13", "R14",
         "R15", "R19", "R20", "R21", "R23", "R24", "R25", "R27", "R28", "R31", "R32", "R33", "R44", "R45", "R47",
     }

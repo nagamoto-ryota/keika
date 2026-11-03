@@ -556,3 +556,120 @@
   done_when: 訪問の記録から、様子と変化の判断が分かること
   active: true
   applies_to: kyotaku
+- id: R48
+  title: 入院時に担当ケアマネの名前と連絡先を伝えてもらう依頼
+  plain: 契約の時に、入院することになったら担当ケアマネの名前と連絡先を病院に伝えてほしいと、本人か家族にあらかじめお願いします。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑵（基準第4条第3項）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: 重要事項説明書などに、入院時に担当ケアマネの名前と連絡先を病院へ伝えてもらう依頼があり、本人か家族に説明した記録がある
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R49
+  title: オンラインの担当者会議に本人・家族が出る時の同意
+  plain: 担当者会議をテレビ電話などで開き、本人や家族が参加する場合は、テレビ電話などを使うことについて本人や家族の同意をもらいます。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑻⑨（基準第13条第9号）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: オンラインで開いた担当者会議に本人・家族が参加した回について、テレビ電話などを使う同意をもらった記録がある
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R50
+  title: オンライン面接の文書での同意
+  plain: 訪問しない月にテレビ電話などで面接する場合は、本人から文書で同意をもらいます。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑻⑮（基準第13条第14号）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: オンライン面接をしている利用者について、本人の文書の同意書がある
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R51
+  title: オンライン面接について関係者の合意に至った過程の記録
+  plain: テレビ電話などでの面接について、主治医・担当者などの合意をもらう時は、担当者会議でも照会でも、合意に至るまでの過程を記録します。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑻⑮（基準第13条第14号）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: オンライン面接をしている利用者について、主治医・担当者などとの合意に至るまでの過程の記録がある
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R52
+  title: 対象福祉用具の貸与か購入かを選べることの情報提供
+  plain: 対象福祉用具をプランに入れる時は、貸与と購入のどちらかを選べること、それぞれのメリット・デメリットなど、選ぶのに必要な情報を本人に伝えます。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑻㉔（基準第13条第5号・第22号・第23号）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: 対象福祉用具を位置付けた利用者について、貸与か購入かを選べることとメリット・デメリットを伝えた記録がある
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R53
+  title: 身体的拘束等の3要件を確かめた手続きの記録
+  plain: やむを得ず身体的拘束等をする時は、切迫性・非代替性・一時性の3つの要件を満たすかを事業所として確かめ、その手続きの具体的な内容を記録します。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑻③（基準第13条第2の2号・第2の3号）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: 身体的拘束等をした事例について、3つの要件を確かめた手続きの内容が記録されている
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R54
+  title: 感染対策担当者を決める
+  plain: 感染対策委員会のメンバーの責任と役割分担をはっきりさせ、感染対策の担当者を決めておきます。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⒄イ（基準第21条の2）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: 感染対策担当者の氏名が委員会の記録や指針などで分かる
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R55
+  title: 利用者数に応じた介護支援専門員の配置
+  plain: 常勤のケアマネを1人以上置き、利用者数（介護予防支援の利用者は3分の1で数える）44人ごと、データ連携システムを使い事務職員を置いていれば49人ごとに1人増やします。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の2⑴（基準第2条）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: 利用者数（予防は1/3で換算）と勤務表のケアマネの人数を照らし、基準の人数を満たしている
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+- id: R56
+  title: 区分支給限度額に対する割合が高いプランの届出
+  plain: プランのサービスの合計単位数が区分支給限度額に占める割合や訪問介護の割合が国の基準に当てはまる時は、その必要性をプランに書き、市に届け出ます。
+  layer: 利用者書類
+  legal_basis: 老企第22号 第2の3⑻㉑（基準第13条第18号の3）
+  basis_confirmed: false
+  source: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
+  source_url: https://www.mhlw.go.jp/content/12300000/001227941.pdf
+  judge: claude
+  done_when: 基準に当てはまるプランについて、必要性の記載と市への届出の控えがある
+  active: true
+  applies_to: kyotaku
+  added_by: 令和6年度改定の解釈通知（老企第22号の新旧対照表）
