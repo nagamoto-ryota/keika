@@ -131,8 +131,8 @@ def test_finished_homework_leaves_and_survives_edit(env):
     finish_homework(c, i, h.item_id)
     assert open_homework(c, "U04") == []
     item = get_draft(c, i).sections["remaining"][0]
-    update_draft(c, i, place="", start_time="", end_time="", attendees=[], sections={"remaining": [{"id": item["id"], "text": "直した課題。"}]})
-    assert open_homework(c, "U04") == []
+    update_draft(c, i, place="", start_time="", end_time="", attendees=[], sections={"remaining": [{"id": item["id"], "text": item["text"]}]})
+    assert open_homework(c, "U04") == []  # 文を変えずに保存しても、済みのまま
 
 
 def test_edited_text_shows_in_homework(env):

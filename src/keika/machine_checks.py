@@ -59,6 +59,14 @@ def _is_yobo(user: User) -> bool:
     return "予防" in str(user.data.get("type", ""))
 
 
+def belongs_to(f: DocFacts, user: User) -> bool:
+    """読み取った氏名が利用者と違う書類は、本人の物として扱わない。氏名が読めなければ本人の物とする。"""
+    if not f.user_name:
+        return True
+    a, b = squash(user.name), re.sub(r"(様|さん|殿)$", "", squash(f.user_name))
+    return a in b or b in a
+
+
 def _latest_plan(facts: list[tuple[DocRef, DocFacts]]) -> tuple[DocRef, DocFacts] | None:
     plans = [(r, f) for r, f in facts if f.doc_type in PLAN_TYPES and f.period_start]
     return max(plans, key=lambda p: p[1].period_start) if plans else None

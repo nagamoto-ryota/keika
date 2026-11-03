@@ -49,7 +49,7 @@
       {% if t.homework %}
         {% for h in t.homework %}
         <div class="homework">
-          <p>{{ h.text }} <span class="small muted">（{{ h.event_date|hdate }} の<a href="/drafts/{{ h.draft_id }}">{{ h.title }}</a>）</span></p>
+          <p>{% if h.flag %}【確かめる】{% endif %}{{ h.text }} <span class="small muted">（{{ h.event_date|hdate }} の<a href="/drafts/{{ h.draft_id }}">{{ h.title }}</a>）</span></p>
           {% if not sample %}<form method="post" action="/drafts/{{ h.draft_id }}/items/{{ h.item_id }}/done"><button class="plain">済んだ</button></form>{% endif %}
         </div>
         {% endfor %}

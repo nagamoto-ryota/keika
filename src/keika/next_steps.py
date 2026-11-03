@@ -14,7 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from keika.claude import ask_structured
-from keika.claude_checks import _BACKDATE, _first_message, crosses_line
+from keika.claude_checks import _BACKDATE, crosses_line, record_context
 from keika.findings import Finding, fingerprint
 from keika.intake import _name_parts, invented_terms
 from keika.ledger import get_user
@@ -84,7 +84,7 @@ def make_plan(conn: sqlite3.Connection, client: Any, s: Settings, finding: Findi
         return saved
     user = get_user(conn, finding.user_id)
     rule = get_rule(finding.rule_id)
-    context = _first_message(conn, s, finding.user_id, user_refs(conn, s, user), [], [])
+    context = record_context(conn, s, finding.user_id, user_refs(conn, s, user))
     said = "\n".join(e.quote or "" for e in finding.evidence)
     prompt = (
         f"## お知らせ\n{finding.message}\n根拠の語句: {said}\n\n"

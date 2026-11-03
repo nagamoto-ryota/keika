@@ -10,6 +10,7 @@
   <span class="small muted">メモ帳や Google ドキュメントに貼って、各行に書き込めます</span>
 </div>
 
+{% if sheet.foreign %}<p class="notice">別の人の名前が読めた書類があるので、この1枚には使っていません: {{ sheet.foreign|join('、') }}</p>{% endif %}
 <table class="sheet-dates">
   <tr><th>前回の訪問</th><td>{{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'まだありません' }}</td>
       <th>今月の訪問</th><td>{{ sheet.visited_this_month|hdate ~ ' に済み' if sheet.visited_this_month else 'まだです' }}</td></tr>
@@ -19,7 +20,7 @@
 
 <h2>宿題・持ち越し</h2>
 {% if sheet.homework %}
-<ul class="asks">{% for h in sheet.homework %}{{ ask(h.text) }}{% endfor %}</ul>
+<ul class="asks">{% for h in sheet.homework %}{{ ask(('【確かめる】' if h.flag else '') ~ h.text) }}{% endfor %}</ul>
 {% else %}<p class="muted">まだありません。</p>{% endif %}
 
 <h2>今確かめること</h2>
@@ -40,6 +41,7 @@
 </form>
 {% endif %}
 {% if failed %}<p class="notice no-print">作れませんでした。時間をおいて、もう一度押してください。</p>{% endif %}
+{% if stale %}<p class="notice no-print">洗い出しの後に書類か記録が変わっています。作り直してください。</p>{% endif %}
 
 {% if q and q.assessment %}
 <h2>アセスメントで聞けていないこと</h2>
@@ -57,7 +59,7 @@
 <h2>基本チェックリスト</h2>
 <table class="sheet-check">
   <tr><th>No</th><th>質問</th><th>前回</th><th>今回</th></tr>
-  {% for c in q.checklist %}<tr><td>{{ c.no }}</td><td>{{ c.question }}</td><td>{% if c.past %}前回: {{ c.past }}{% else %}<span class="muted">－</span>{% endif %}</td><td class="sheet-answer">はい・いいえ</td></tr>{% endfor %}
+  {% for c in q.checklist %}<tr><td>{{ c.no }}</td><td>{{ c.question }}</td><td>{% if c.past %}前回: {{ c.past }}{% else %}<span class="muted">－</span>{% endif %}</td><td class="sheet-answer">{{ '身長　　cm　体重　　kg' if c.no == 12 else 'はい・いいえ' }}</td></tr>{% endfor %}
 </table>
 {% endif %}
 
@@ -75,7 +77,7 @@
 前回の訪問 {{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'なし' }} ／ 計画の期限 {{ sheet.plan_end|hdate if sheet.plan_end else '不明' }} ／ 認定の期限 {{ sheet.cert_end|hdate if sheet.cert_end else '不明' }}
 {% if sheet.homework %}
 【宿題・持ち越し】
-{% for h in sheet.homework %}□ {{ h.text }}
+{% for h in sheet.homework %}□ {{ '【確かめる】' if h.flag }}{{ h.text }}
 →
 {% endfor %}{% endif %}{% if sheet.checks %}
 【今確かめること】

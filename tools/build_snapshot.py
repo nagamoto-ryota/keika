@@ -30,6 +30,7 @@ def main() -> int:
     from keika.reading import read_docs
     from keika.records import import_csv
     from keika.settings import Settings
+    from keika.visit_questions import make_questions
     from keika.watcher import date_hint, scan_inbox
     from keika.web.app import current_findings
 
@@ -60,6 +61,8 @@ def main() -> int:
         found, _ = current_findings(conn, s, "U04")
         target = next((f for f in found if "週3回" in f.message), None)
         plan = make_plan(conn, client, s, target) if target else None
+        for user_id in ("U04", "U07"):  # 訪問前の1枚に、聞くことも入れておく
+            make_questions(conn, client, s, user_id)
         bad = conn.execute("SELECT (SELECT COUNT(*) FROM records WHERE source = 'intake:mcp') + (SELECT COUNT(*) FROM review_items WHERE source = 'mcp')").fetchone()[0]
         print("下書き:", [(d.title, d.flagged) for d in list_drafts(conn)], "手順の案:", bool(plan), "点検の失敗:", failed, "mcp の行:", bad, f"約 ${METER.cost_usd:.2f}")
         if failed or bad or not plan:

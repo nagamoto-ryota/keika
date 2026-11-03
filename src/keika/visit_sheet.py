@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from keika.drafts import Homework, open_homework
 from keika.ledger import get_user
-from keika.machine_checks import HOME_VISIT, _latest_plan, user_refs
+from keika.machine_checks import HOME_VISIT, _latest_plan, belongs_to, user_refs
 from keika.reading import stored_facts
 from keika.records import Record, list_records
 from keika.responses import sort_findings
@@ -30,6 +30,7 @@ class Sheet:
     services: list[str] = field(default_factory=list)
     plan_end: str | None = None
     cert_end: str | None = None
+    foreign: list[str] = field(default_factory=list)  # 別の人の名前が読めた書類
 
 
 def _service(s) -> str:
@@ -49,7 +50,7 @@ def build_sheet(conn: sqlite3.Connection, s: Settings, user_id: str) -> Sheet | 
     visits = [r for r in records if r.kind_read == HOME_VISIT]
     if visits:
         sheet.last_visit = visits[-1]
-        sheet.since_visit = [r for r in records if (r.event_date, r.id) > (visits[-1].event_date, visits[-1].id)]
+        sheet.since_visit = records[records.index(visits[-1]) + 1:]
         month = today(s).isoformat()[:7]
         if visits[-1].event_date.startswith(month):
             sheet.visited_this_month = visits[-1].event_date
@@ -61,7 +62,9 @@ def build_sheet(conn: sqlite3.Connection, s: Settings, user_id: str) -> Sheet | 
         if f.kind in KIND_ORDER:
             sheet.checks.append({"title": f.todo or f.message, "message": f.message, "kind": f.kind, "rule": f.rule_id})
     sheet.checks.sort(key=lambda x: KIND_ORDER[x["kind"]])
-    plan = _latest_plan(stored_facts(conn, user_refs(conn, s, user)))
+    facts_all = stored_facts(conn, user_refs(conn, s, user))
+    sheet.foreign = [r.rel_path.rsplit("/", 1)[-1] for r, f in facts_all if not belongs_to(f, user)]
+    plan = _latest_plan([(r, f) for r, f in facts_all if belongs_to(f, user)])
     if plan:
         facts = plan[1]
         sheet.goals = [g.text for g in facts.goals]

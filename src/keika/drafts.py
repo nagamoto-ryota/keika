@@ -31,6 +31,8 @@ SECTIONS = {
     "monitoring": {"condition": "本人・家族の様子", "services": "サービスの利用状況", "goals": "目標に対する変化", "plan_change": "計画を変える必要の有無", "next": "次に確かめること"},
 }
 HOMEWORK_SECTION = {"meeting": "remaining", "monitoring": "next"}  # やることへ載せる欄
+_NOTHING = re.compile(r"(特に)?(なし|無し|ありません|ない)。?")
+_NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 SectionKey = Literal["items", "discussion", "conclusion", "remaining", "condition", "services", "goals", "plan_change", "next"]
 
 
@@ -131,6 +133,21 @@ def _names_said_in_kana(conn: sqlite3.Connection, text: str) -> str:
     return " ".join(found)
 
 
+def _shares_kanji(text: str, quote: str) -> bool:
+    """ひらがなだけの並びを除いて、語の重なりがあるか。「あります」のような語では関係を認めない。"""
+    a, b = squash(_normal(text)), squash(_normal(quote))
+    return any(a[i:i + 2] in b and not re.fullmatch(r"[ぁ-ゖ]{2}", a[i:i + 2]) for i in range(len(a) - 1))
+
+
+def _changed_numbers(text: str, quote: str) -> list[str]:
+    """元の発言の「週2回」を「週3回」と書いたような、同じ単位で変わった数字。"""
+    pairs = re.compile(r"(\d+)\s*([^\d\s])")
+    said: dict[str, set[str]] = {}
+    for number, unit in pairs.findall(_normal(quote)):
+        said.setdefault(unit, set()).add(number)
+    return [n for n, u in pairs.findall(_normal(text)) if u in said and n not in said[u]]
+
+
 def _nearby(quote: str, text: str) -> str:
     """元の発言とその前後。見つからなければ元の発言だけ。"""
     at = text.find(quote)
@@ -149,6 +166,7 @@ def _checked_item(item: WireItem, text: str, names: list[str], kana_names: str =
     # 長い話にはたいていの数字が出てくるので、数字は元の発言の近くと照らす
     near = _nearby(quote, text)
     extra = invented_terms(text + " " + kana_names, item.text, names) + sorted(_digits(_without_spoken_clocks(near, item.text)) - _digits(near))
+    extra += [n for n in _changed_numbers(item.text, quote) if n not in extra]
     if extra:
         flags.append("文字起こしにありません: " + "、".join(extra))
     return {"text": item.text.strip(), "quote": quote if real else "", "flag": " / ".join(flags)}, None
@@ -325,7 +343,7 @@ def update_draft(conn: sqlite3.Connection, draft_id: int, *, place: str, start_t
             if before and _tidy(before["text"]) == text:
                 items.append(before)
             elif before:
-                items.append({**before, "text": text, "flag": ""})
+                items.append({**before, "text": text, "flag": "", "done": False})
             else:
                 items.append({"id": f"i{next_id}", "text": text, "quote": "", "flag": ""})
                 next_id += 1
@@ -350,13 +368,19 @@ def mark_checked(conn: sqlite3.Connection, draft_id: int) -> None:
 
 def sync_review(conn: sqlite3.Connection, review_id: int, user_id: str | None, record_id: int | None) -> None:
     """確認待ちの話の行き先に、下書きを合わせる。記録にしないなら一覧から外し、別の人なら移す。"""
-    for row in conn.execute("SELECT id, payload FROM drafts WHERE status = 'open'").fetchall():
+    for row in conn.execute("SELECT id, payload FROM drafts WHERE status IN ('open', 'checked')").fetchall():
         if json.loads(row["payload"]).get("review_id") != review_id:
             continue
         if user_id is None:
             conn.execute("UPDATE drafts SET status = 'set_aside' WHERE id = ?", (row["id"],))
         else:
             conn.execute("UPDATE drafts SET user_id = ?, record_id = ? WHERE id = ?", (user_id, record_id, row["id"]))
+    conn.commit()
+
+
+def move_record_drafts(conn: sqlite3.Connection, record_id: int, user_id: str) -> None:
+    """記録の利用者を直したら、そこから作った下書きと宿題も移す。"""
+    conn.execute("UPDATE drafts SET user_id = ? WHERE record_id = ?", (user_id, record_id))
     conn.commit()
 
 
@@ -367,6 +391,7 @@ class Homework:
     text: str
     title: str
     event_date: str
+    flag: str = ""
 
 
 def open_homework(conn: sqlite3.Connection, user_id: str) -> list[Homework]:
@@ -374,8 +399,8 @@ def open_homework(conn: sqlite3.Connection, user_id: str) -> list[Homework]:
     found = []
     for draft in list_drafts(conn, user_id, status=None):
         for item in draft.sections.get(HOMEWORK_SECTION[draft.kind], []):
-            if item["text"] != BLANK and not item.get("done"):
-                found.append(Homework(draft.id, item["id"], item["text"], draft.title, draft.event_date))
+            if item["text"] != BLANK and not item.get("done") and not _NOTHING.fullmatch(item["text"].strip()):
+                found.append(Homework(draft.id, item["id"], item["text"], draft.title, draft.event_date, item["flag"]))
     return found
 
 
@@ -394,17 +419,18 @@ def finish_homework(conn: sqlite3.Connection, draft_id: int, item_id: str) -> No
 
 def to_docx(draft: Draft, user_name: str, author: str) -> bytes:
     """Word の下書き。確かめていない文には目印を付けたまま書き出す。"""
+    clean = lambda value: _NOT_XML.sub("", value or "")  # noqa: E731  Word に入らない制御文字を除く
     doc = docx.Document()
     doc.add_heading(draft.title, level=1)
     when = "〜".join(x for x in (draft.start_time, draft.end_time) if x)
-    head = doc.add_table(rows=2, cols=4)
+    head = doc.add_table(rows=3 if draft.kind == "meeting" else 2, cols=4)
     head.style = "Table Grid"
     place_label = "開催場所" if draft.kind == "meeting" else "訪問先"
     date_label = "開催日" if draft.kind == "meeting" else "訪問日"
-    rows = [("利用者", user_name, "作成者", author or BLANK), (date_label, f"{draft.event_date} {when}".strip(), place_label, draft.place)]
+    rows = [("利用者", user_name, "作成者", author or BLANK), (date_label, f"{draft.event_date} {when}".strip(), place_label, draft.place), ("開催回数", BLANK, "", "")]
     for row, values in zip(head.rows, rows):
         for cell, value in zip(row.cells, values):
-            cell.text = value
+            cell.text = clean(value)
     if draft.attendees:
         doc.add_heading("出席者" if draft.kind == "meeting" else "同席した人", level=2)
         people = doc.add_table(rows=1, cols=3)
@@ -413,11 +439,11 @@ def to_docx(draft: Draft, user_name: str, author: str) -> bytes:
             cell.text = value
         for a in draft.attendees:
             for cell, value in zip(people.add_row().cells, (a["org"], a["role"], a["name"])):
-                cell.text = value
+                cell.text = clean(value)
     for key, label in draft.headings.items():
         doc.add_heading(label, level=2)
         for item in draft.sections[key]:
-            doc.add_paragraph(("【確かめる】" if item["flag"] else "") + item["text"])
+            doc.add_paragraph(clean(("【確かめる】" if item["flag"] else "") + item["text"]))
     out = io.BytesIO()
     doc.save(out)
     return out.getvalue()

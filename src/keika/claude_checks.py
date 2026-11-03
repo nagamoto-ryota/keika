@@ -40,7 +40,7 @@ _MEDICAL = re.compile(
     r"|すぐ.{0,8}(受診|病院)|救急|緊急(性|度)|(症|病|炎|不全|がん|癌)の可能性"
     r"|受診した方|受診を検討|病院[へに]行くよう|病院[へに]行く必要|至急|重篤"
     r"|聞き間違い|の間違いのよう|のことですね"
-    r"|(診てもらう|受診).{0,10}(勧め|すすめ)"
+    r"|(診てもらう|受診).{0,10}(勧め|すすめ|必要)|病院に行くべき|認知症かどうか|(中止|減ら|増や)(す)?べき"
 )
 DISEASE = r"(?:[一-龥ァ-ヶー]{0,10}(?:症(?!状)|病(?![院棟室気])|炎|不全|がん|癌|疾患|梗塞)|うつ病|パーキンソン|高血圧|低血圧|貧血|糖尿|脱水|不整脈|狭心)"
 _DISEASE_GUESS = re.compile(DISEASE + r"(?:の症状)?(?:かもしれ|と思われ|のよう|の疑い|の可能性|が進んで)")
@@ -375,6 +375,11 @@ def _first_message(conn: sqlite3.Connection, s: Settings, user_id: str, refs: li
         f"## 人が確認して問題なしとしたもの（同じことを出さない）\n{json.dumps(confirmed, ensure_ascii=False)}\n\n"
         "点検項目を順に確かめ、必要なものを report_finding で報告してください。終わったら一言で終えてください。"
     )
+
+
+def record_context(conn: sqlite3.Connection, s: Settings, user_id: str, refs: list[DocRef]) -> str:
+    """点検以外の用途に渡す、記録と書類の要点。点検への指示は含めない。"""
+    return _first_message(conn, s, user_id, refs, [], []).split("\n\n## 機械の点検の候補")[0]
 
 
 def _prior_list(prior: list[Finding]) -> list[dict]:

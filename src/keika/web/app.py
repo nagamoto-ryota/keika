@@ -21,9 +21,9 @@ from keika.claude import make_client
 from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
-from keika.visit_questions import get_questions, make_questions
+from keika.visit_questions import get_questions, make_questions, questions_key
 from keika.visit_sheet import build_sheet
-from keika.drafts import SECTIONS, draft_for_results, finish_homework, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
+from keika.drafts import SECTIONS, draft_for_results, finish_homework, move_record_drafts, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
 from keika.findings import Finding, fingerprint
@@ -288,12 +288,16 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(404, str(e)) from None
         return RedirectResponse("/", status_code=303)
 
+    def _sheet_view(sheet, failed: bool) -> dict:
+        q = get_questions(conn, sheet.user.id)
+        return {"sheet": sheet, "q": q, "failed": failed, "stale": bool(q) and q.get("key") != questions_key(conn, s, sheet.user)}
+
     @app.get("/users/{user_id}/visit")
     def visit_page(request: Request, user_id: str):
         sheet = build_sheet(conn, s, user_id)
         if sheet is None:
             raise HTTPException(404, "利用者が見つかりません")
-        return templates.TemplateResponse(request, "visit_sheet.html", {"sheet": sheet, "q": get_questions(conn, user_id), "failed": False})
+        return templates.TemplateResponse(request, "visit_sheet.html", _sheet_view(sheet, False))
 
     @app.post("/users/{user_id}/visit/questions")
     def post_questions(request: Request, user_id: str):
@@ -305,7 +309,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         except RuntimeError:  # キーが無い時
             made = None
         if made is None:
-            return templates.TemplateResponse(request, "visit_sheet.html", {"sheet": sheet, "q": get_questions(conn, user_id), "failed": True})
+            return templates.TemplateResponse(request, "visit_sheet.html", _sheet_view(sheet, True))
         return RedirectResponse(f"/users/{user_id}/visit", status_code=303)
 
     @app.post("/drafts/{draft_id}/checked")
@@ -368,6 +372,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             edit_record(conn, record_id, changes, editor=author or "画面")
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
+        if before.user_id != user_id:
+            move_record_drafts(conn, record_id, user_id)
         for uid in {before.user_id, user_id}:
             background.add_task(_check_in_background, uid)
         return RedirectResponse(f"/users/{user_id}", status_code=303)
