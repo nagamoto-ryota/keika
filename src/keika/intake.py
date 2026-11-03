@@ -36,6 +36,7 @@ _BARE_TIME = re.compile(r"^\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?[ \t　]+", re.M)
 _SPEAKER_TIME = re.compile(r"^((?:話者|スピーカー|Speaker)[ \t]*\w*)[ \t　]+[\[(（]?\d{1,2}:\d{2}(?::\d{2})?[\])）]?[ \t　]*[:：]?[ \t　]*", re.M)
 _KANJI_DIGITS = str.maketrans("〇一二三四五六七八九", "0123456789")
 _LIST_MARKS = re.compile("[①-⑳]")  # ①②。そのまま数字にすると次の数字とつながる
+_BLANK_MARKS = re.compile("(?<![一二三四五六七八九〇0-9])〇{2,}(?![一二三四五六七八九0-9])")  # 空欄の〇〇は 00 ではない
 # 語: 話の中にこのどれかがあれば、平たい言い方を直しただけとみなす
 _CAREFUL_WORDS = {
     "受診": ("受診", "病院", "診"), "入院": ("入院",), "退院": ("退院",), "転倒": ("転倒", "転ん", "転び", "転ぶ", "尻もち", "こけ"),
@@ -110,7 +111,7 @@ def join_spoken(text: str) -> str:
 
 
 def _normal(text: str) -> str:
-    return unicodedata.normalize("NFKC", _LIST_MARKS.sub(" ", text)).translate(_KANJI_DIGITS)
+    return unicodedata.normalize("NFKC", _BLANK_MARKS.sub(" ", _LIST_MARKS.sub(" ", text))).translate(_KANJI_DIGITS)
 
 
 def _digits(text: str) -> set[str]:

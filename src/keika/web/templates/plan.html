@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}次の手順と下書き - ケイカ{% endblock %}
+{% block main %}
+<p class="muted"><a href="/users/{{ user.id }}">{{ user.name }}</a></p>
+<h1>次の手順と下書き</h1>
+<article class="card finding"><p class="msg">{{ f.message|hdate }}</p></article>
+{% if not plan %}
+<p class="notice">作れませんでした。お知らせはそのまま残っています。時間をおいて、もう一度押してください。</p>
+{% else %}
+<p class="draft-note">AI の案です。当たっていないこともあります。実際に行った事だけを残し、どうするかはご自身で決めてください。</p>
+<h2>手順</h2>
+<ol class="plan-steps">
+  {% for step in plan.steps %}<li>{{ step.text }}{% if step.who %} <span class="muted small">{{ step.who }}</span>{% endif %}</li>{% endfor %}
+</ol>
+{% if plan.docs %}<h2>文の下書き</h2>{% endif %}
+{% for doc in plan.docs %}
+<section class="card">
+  <p class="todo-line">{{ doc.title }} <span class="muted small">{{ doc.kind }}</span></p>
+  {% if doc.flag %}<p class="small draft-flag">記録や書類に見当たりません: {{ doc.flag }}</p>{% endif %}
+  <textarea rows="6" class="plan-doc">{{ doc.body }}</textarea>
+  <button type="button" class="plain" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); this.textContent='写しました'">文字を写す</button>
+</section>
+{% endfor %}
+{% if plan.removed %}<p class="muted small">薬、診断、受診の判断に関わる案や、過去の日付で書く案を {{ plan.removed }} 件、外しました。</p>{% endif %}
+{% endif %}
+<p><a href="/users/{{ user.id }}">戻る</a></p>
+{% endblock %}

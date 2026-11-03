@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS med_checks (
     id INTEGER PRIMARY KEY, record_id INTEGER NOT NULL, heard TEXT NOT NULL, status TEXT NOT NULL,
     chosen TEXT, editor TEXT, created_at TEXT NOT NULL, decided_at TEXT
 );
+CREATE TABLE IF NOT EXISTS finding_plans (
+  fingerprint TEXT PRIMARY KEY, user_id TEXT, payload TEXT NOT NULL, created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS drafts (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, kind TEXT NOT NULL, record_id INTEGER, event_date TEXT NOT NULL,
   payload TEXT NOT NULL, original TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL

@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from keika.claude import make_client
 from keika.claude_checks import CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
+from keika.next_steps import get_plan, make_plan
 from keika.drafts import SECTIONS, draft_for_results, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
@@ -370,6 +371,23 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if record:
             background.add_task(_check_in_background, record.user_id)
         return RedirectResponse("/#kakunin", status_code=303)
+
+    @app.post("/users/{user_id}/plan")
+    def post_plan(request: Request, user_id: str, fp: str = Form(...)):
+        if sample:
+            raise HTTPException(403, "見本モードでは作れません")
+        finding = _find(user_id, fp)
+        try:
+            made = make_plan(conn, client_factory(), s, finding)
+        except RuntimeError:  # キーが無い時
+            made = None
+        if made is None:
+            return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": finding, "plan": None})
+        return RedirectResponse(f"/users/{user_id}/plan/{fp}", status_code=303)
+
+    @app.get("/users/{user_id}/plan/{fp}")
+    def plan_page(request: Request, user_id: str, fp: str):
+        return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": _find(user_id, fp), "plan": get_plan(conn, fp)})
 
     @app.get("/board")
     def board_page(request: Request, cm: str | None = None):

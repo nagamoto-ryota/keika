@@ -133,3 +133,5 @@ form.draft table input[size] { width: auto; }
   .draft textarea, .draft input { border: none; resize: none; }
   .draft textarea { field-sizing: content; }
 }
+.plan-steps li { margin-bottom: 6px; }
+.plan-doc { width: 100%; box-sizing: border-box; }

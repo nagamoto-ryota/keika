@@ -310,3 +310,8 @@ def test_review_about_who_makes_no_draft(env):
     client = FakeClient(answer(WireIntake(entries=[unsure])), answer(wire()))
     handle_file(c, client, s, path)
     assert list_drafts(c) == []
+
+
+def test_blank_marks_are_not_read_as_a_number():
+    assert invented_terms("訪問した", "〇〇に訪問した") == []
+    assert invented_terms("二〇二六年", "二〇二六年に訪問した") == []

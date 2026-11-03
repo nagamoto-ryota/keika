@@ -17,6 +17,12 @@
 {% endif %}
 {% if v.f.suggestion %}<div class="suggest"><span class="muted small">書き足し案。実際に行った事だけを残してください。</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
 <div class="actions">
+  {% if not sample and v.f.user_id %}
+  <form method="post" action="/users/{{ uid }}/plan" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（1分ほど）';">
+    <input type="hidden" name="fp" value="{{ v.fp }}">
+    <button>次の手順と下書きを作る</button>
+  </form>
+  {% endif %}
   <form method="post" action="/users/{{ uid }}/respond">
     <input type="hidden" name="fp" value="{{ v.fp }}">
     <input type="hidden" name="back" value="{{ back }}">
