@@ -7,7 +7,7 @@ import re
 import sqlite3
 from datetime import date, timedelta
 
-from keika.files import DocRef, scan, to_payload
+from keika.files import DocRef, scan
 from keika.findings import Evidence, Finding
 from keika.ledger import User, get_user, list_users, squash
 from keika.reading import DocFacts, Source, stored_facts
@@ -226,10 +226,11 @@ _MEETING_IN_TEXT = re.compile(r"担当者会議[：:\s]*(\d{4}-\d{2}-\d{2})")
 
 def _meetings_in_text(s: Settings, facts: list[tuple[DocRef, DocFacts]]) -> list[tuple[str, DocRef]]:
     """読み取りが拾わなかった開催の記載を、書類の文字から探す。"""
+    from keika.claude_checks import _ref_text  # 循環を避ける
+
     found = []
     for ref, _ in facts:
-        text = to_payload(s, ref).text
-        for day in _MEETING_IN_TEXT.findall(text or ""):
+        for day in _MEETING_IN_TEXT.findall(_ref_text(s, ref) or ""):
             found.append((day, ref))
     return found
 

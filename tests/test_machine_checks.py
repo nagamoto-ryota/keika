@@ -415,3 +415,16 @@ def test_expired_certification_is_a_finding(tmp_path):
     found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R44"]
     c.close()
     assert len(found) == 1 and found[0].kind == "finding" and "過ぎて" in found[0].message
+
+
+def test_meeting_written_in_pdf_plan_softens_missing_minutes(machine_env, monkeypatch):
+    s, c = machine_env
+    folder = s.drive_root / "利用者" / "U01_杉森ハル"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "計画書.pdf").write_bytes(b"%PDF-1.4 x")
+    ref = [r for r in scan(s) if r.rel_path.endswith("計画書.pdf")][0]
+    _save(c, ref, DocFacts(doc_type="居宅サービス計画書", summary="計画書"))
+    monkeypatch.setattr("keika.claude_checks._pdf_text", lambda data: "担当者会議：2026-03-26（本人宅）")
+    monkeypatch.setattr("keika.files._check_pdf", lambda raw: None)
+    found = [f for f in run_machine_checks(c, s, "U01") if f.rule_id == "R33" and "要点" in f.message]
+    assert found and found[0].kind == "unknown" and "2026-03-26" in found[0].message
