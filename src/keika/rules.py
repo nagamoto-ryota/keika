@@ -28,6 +28,7 @@ class Rule(BaseModel):
     active: bool
     not_required: bool = False
     applies_to: str = "both"  # kyotaku / yobo / both
+    added_by: str | None = None  # 通知から足した行は、その通知の名前
 
 
 @lru_cache

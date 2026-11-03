@@ -35,9 +35,6 @@ from keika.records import import_csv  # noqa: E402
 from keika.settings import Settings  # noqa: E402
 from keika.web.app import current_findings  # noqa: E402
 
-USERS = ["V01", "V02", "V03"]
-
-
 def restyle_copy(root: Path) -> dict[str, int]:
     """中身を画面に出さないよう、道具の出力は捨てて件数だけ返す。"""
     counts: Counter = Counter()
@@ -74,7 +71,8 @@ def main() -> int:
         if ref.ext == "csv" and facts.doc_type == "支援経過":
             imported_errors += bool(import_csv(conn, client, s, ref).error)
     runs, findings = {}, []
-    for uid in USERS:
+    users = [u["id"] for u in json.loads((source / "ledger_add.json").read_text(encoding="utf-8"))["users"]]  # ID だけ読む
+    for uid in users:
         run = run_claude_checks(conn, client, s, uid)
         save_run(conn, uid, run)
         found, _ = current_findings(conn, s, uid)

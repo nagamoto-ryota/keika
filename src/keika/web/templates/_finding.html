@@ -1,5 +1,6 @@
 {# 指摘の中身。v は _view の結果、uid は利用者 ID、back は押した後に戻る場所 #}
 <p class="msg">{{ v.f.message|hdate }}</p>
+{% if v.added_by %}<p class="small muted">この点検は「{{ v.added_by }}」から足しました。</p>{% endif %}
 {% if v.changed %}<p class="notice small">根拠の書類が変更されました。もう一度確かめてください。</p>{% endif %}
 {% if v.evidence %}
 <div class="evi">

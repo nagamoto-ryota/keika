@@ -108,7 +108,7 @@ def _view(s: Settings, item: Item, records: list, year: int) -> dict:
     rule = get_rule(f.rule_id)
     return {
         "f": f, "fp": item.fingerprint, "changed": item.evidence_changed, "record_id": item.record_id,
-        "label": KIND_LABEL[f.kind], "title": rule.title, "plain": rule.plain, "basis": basis_text(rule),
+        "label": KIND_LABEL[f.kind], "title": rule.title, "plain": rule.plain, "basis": basis_text(rule), "added_by": rule.added_by,
         "evidence": [evidence_view(s, e, records, year) for e in f.evidence],
     }
 
