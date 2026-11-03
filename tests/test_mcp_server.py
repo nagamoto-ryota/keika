@@ -52,6 +52,11 @@ def test_tool_tells_claude_to_pass_the_words_as_spoken():
     assert "そのまま" in TOOL_DESCRIPTION and "直さない" in TOOL_DESCRIPTION
 
 
+def test_tool_is_found_when_voice_input_hears_keika_as_keika_the_word():
+    # 音声入力は「ケイカ」を「経過」と書く
+    assert "ケイカ" in TOOL_DESCRIPTION and "「経過」" in TOOL_DESCRIPTION
+
+
 def test_real_protocol_lists_the_tool(tmp_path):
     pytest.importorskip("mcp")
     from mcp import ClientSession, StdioServerParameters
