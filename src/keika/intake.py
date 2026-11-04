@@ -18,6 +18,7 @@ from keika.claude import model_for, StructuredError, ask_structured
 from keika.ledger import find_person, get_user, list_people, list_users, squash
 from keika.records import KindRead, Record, RecordIn, add_record
 from keika.settings import Settings, now_real, today
+from keika.text_compare import compare
 from keika.claude_checks import DISEASE, line_crossings
 from keika.med_names import KATAKANA, MEDICINE_SENTENCE, register_checks
 
@@ -343,8 +344,14 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
                       "note": r["note"].replace(UNSPOKEN_NOTE, "").replace("話に無い語が入っているかもしれません", "").strip(),
                       "hints": [{"word": w, "context": term_context(entry.get("body") or "", w),
                                  "fix": next((f for f in entry.get("name_fixes", []) if w in f["fixed"]), None)} for w in warnings],
-                      "name_fixes": [f for f in entry.get("name_fixes", []) if squash(f["heard"]) != squash(f["fixed"])]})
+                      "tidied": bool(entry.get("body")),
+                      "compare": compare(r["original"], entry.get("body") or r["original"])})
     return items
+
+
+def review_original(conn: sqlite3.Connection, review_id: int) -> str | None:
+    row = conn.execute("SELECT original FROM review_items WHERE id = ? AND status = 'open'", (review_id,)).fetchone()
+    return row["original"] if row else None
 
 
 def resolve_review(conn: sqlite3.Connection, review_id: int, *, user_id: str | None, body: str | None = None, s: Settings | None = None) -> Record | None:

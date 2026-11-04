@@ -246,7 +246,8 @@ def test_review_card_shows_names_changed_to_ledger_spelling(env):
     fix = WireFix(heard="ゆのきさん", fixed="柚木 茂")
     run(s, c, "ゆのきさん宅を訪問。変わりなし。", entry(spoken_name="ゆのきさん", name_fixes=[fix], ambiguous=True, body="柚木様宅を訪問した。"))
     page = TestClient(create_app(s)).get("/").text
-    assert "台帳の書き方に直した名前" in page and "ゆのきさん" in page and "柚木 茂" in page
+    assert "台帳の書き方に直した名前" not in page  # 別の行で探させず、本文の左右の印で見せる
+    assert "ゆのきさん" in page and "柚木" in page and "diff-new" in page
 
 
 def test_nickname_in_kana_corrected_to_ledger_is_not_flagged(env):

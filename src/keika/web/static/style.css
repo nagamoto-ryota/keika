@@ -204,3 +204,18 @@ main:has(.plan-sheet) { max-width: 1240px; }
   .sheet-wrap { overflow: visible; }
   .plan-sheet.wide { min-width: 0; }
 }
+
+/* 記録の確認: 左に元の文、右に整えた文 */
+.compare-cards { width: min(1240px, calc(100vw - 32px)); position: relative; left: 50%; transform: translateX(-50%); }
+.compare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.compare-side { min-width: 0; }
+.compare-side h3 { margin: 0 0 4px; }
+.compare-text { display: block; width: 100%; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 16px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
+.compare-left { background: var(--bg); }
+.compare-edit { position: relative; }
+.compare-mirror { background: var(--paper); color: transparent; }
+.compare-edit textarea { position: absolute; top: 0; left: 0; height: 100%; background: transparent; overflow: hidden; resize: none; border-color: var(--accent); }
+mark.diff-old { background: var(--finding-soft); color: inherit; text-decoration: underline 2px var(--finding); text-underline-offset: 3px; }
+mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: underline 2px var(--nudge); text-underline-offset: 3px; }
+.compare-mirror mark.diff-new { color: transparent; }
+@media (max-width: 760px) { .compare { grid-template-columns: minmax(0, 1fr); } }

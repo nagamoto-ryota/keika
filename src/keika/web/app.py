@@ -33,7 +33,8 @@ from keika.claude_checks import crosses_line
 from keika.legal_texts import basis_for
 from keika.med_names import decide_fix, decide_keep, decisions, message as med_message, open_checks, unconfirmed_record_ids
 from keika.visit_notes import get_notes, mark_used, save_note, sheet_items, to_record_text
-from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, to_review
+from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, review_original, to_review
+from keika.text_compare import compare
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
 from keika.office import declare, office_rows
@@ -452,6 +453,15 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     @app.get("/review")
     def review(request: Request):
         return RedirectResponse("/#kakunin", status_code=303)
+
+    @app.post("/review/{review_id}/compare")
+    def post_review_compare(review_id: int, body: str = Form("")):
+        """整えた文を直している間の印の付け直し。計算するだけで、何も保存しない。"""
+        original = review_original(conn, review_id)
+        if original is None:
+            raise HTTPException(404, "要確認の項目が見つかりません")
+        c = compare(original, body)
+        return {"mode": c.mode, "left": c.left, "right": c.right, "legend": c.legend}
 
     @app.post("/review/{review_id}")
     def post_review(review_id: int, background: BackgroundTasks, user_id: str = Form(""), body: str = Form(""), action: str = Form("save")):
