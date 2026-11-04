@@ -1,19 +1,26 @@
 <article class="card unknown compare-card" data-compare="/review/{{ it.id }}/compare">
   {% if it.note %}<p class="todo-line">{{ it.note }}</p>{% endif %}
-  {% for h in it.hints %}
-  {% if h.fix %}
-  <p class="todo-line">「{{ h.word }}」という書き方は、入力した文章にありません。</p>
-  <p class="small muted">入力では「{{ h.fix.heard }}」でした。AI が「{{ h.fix.fixed }}」さんのことだと判断して書き換えました。この人で合っていれば、そのまま記録してください。違っていれば、整えた文を直してください。</p>
-  {% else %}
-  <p class="todo-line">「{{ h.word }}」は、入力した文章にありません。</p>
-  <p class="small muted">AI が書き足したのかもしれません。事実と合っていれば、そのまま記録してください。違っていれば、整えた文を直してください。</p>
-  {% endif %}
-  {% endfor %}
   <form method="post" action="/review/{{ it.id }}">
     <p><select name="user_id" required>
       <option value="">誰の記録か選ぶ</option>
       {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if it.entry.get('user_id') == u.id }}>{{ u.name }}</option>{% endfor %}
     </select></p>
+    {% if it.judgements %}
+    <table class="judge-table">
+      <tr><th>入力</th><th>AI の判断</th></tr>
+      {% for j in it.judgements %}
+      <tr>
+        {% if j.heard %}<td>「{{ j.heard }}」</td>{% else %}<td class="muted">入力にありません</td>{% endif %}
+        <td>「{{ j.judged }}」{% if j.context %}<span class="small muted judge-context">{{ j.context }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    <div class="write-actions">
+      <button name="action" value="save">この内容で記録する</button>
+    </div>
+    <details class="compare-fold"{% if not it.judgements %} open{% endif %}>
+    <summary>全文を見て直す</summary>
     <div class="compare">
       <div class="compare-side">
         <h3>入力した元の文</h3>
@@ -28,9 +35,7 @@
       </div>
     </div>
     <p class="small muted compare-legend">{{ it.compare.legend }}</p>
-    <div class="write-actions">
-      <button name="action" value="save">この内容で記録する</button>
-    </div>
+    </details>
   </form>
   <form method="post" action="/review/{{ it.id }}">
     <input type="hidden" name="action" value="set_aside">

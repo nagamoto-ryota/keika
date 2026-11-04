@@ -335,6 +335,18 @@ def term_context(body: str, term: str) -> str:
     return body[start:end]
 
 
+def _judgements(entry: dict, warnings: list[str]) -> list[dict]:
+    """確認の画面に出す「入力」と「AI の判断」の対。読み替えた名前と、入力に無かった言葉だけを並べる。"""
+    fixes = [f for f in entry.get("name_fixes", []) if squash(f["heard"]) != squash(f["fixed"])]
+    rows = [{"heard": f["heard"], "judged": f["fixed"], "context": ""} for f in fixes]
+    for word in warnings:
+        if any(word in f["fixed"] for f in fixes):
+            continue  # 読み替えの行で分かる
+        context = term_context(entry.get("body") or "", word)
+        rows.append({"heard": "", "judged": word, "context": "" if context == word else context})
+    return rows
+
+
 def open_reviews(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute("SELECT * FROM review_items WHERE status = 'open' ORDER BY id")
     items = []
@@ -342,8 +354,7 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
         entry, warnings = json.loads(r["entry"]), json.loads(r["warnings"])
         items.append({"id": r["id"], "original": r["original"], "source": r["source"], "entry": entry, "warnings": warnings,
                       "note": r["note"].replace(UNSPOKEN_NOTE, "").replace("話に無い語が入っているかもしれません", "").strip(),
-                      "hints": [{"word": w, "context": term_context(entry.get("body") or "", w),
-                                 "fix": next((f for f in entry.get("name_fixes", []) if w in f["fixed"]), None)} for w in warnings],
+                      "judgements": _judgements(entry, warnings),
                       "tidied": bool(entry.get("body")),
                       "compare": compare(r["original"], entry.get("body") or r["original"])})
     return items

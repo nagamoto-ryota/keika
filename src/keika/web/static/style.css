@@ -206,7 +206,6 @@ main:has(.plan-sheet) { max-width: 1240px; }
 }
 
 /* 記録の確認: 左に元の文、右に整えた文 */
-.compare-cards { width: min(1240px, calc(100vw - 32px)); position: relative; left: 50%; transform: translateX(-50%); }
 .compare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .compare-side { min-width: 0; }
 .compare-side h3 { margin: 0 0 4px; }
@@ -219,3 +218,8 @@ mark.diff-old { background: var(--finding-soft); color: inherit; text-decoration
 mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: underline 2px var(--nudge); text-underline-offset: 3px; }
 .compare-mirror mark.diff-new { color: transparent; }
 @media (max-width: 760px) { .compare { grid-template-columns: minmax(0, 1fr); } }
+.judge-table { margin: 8px 0; }
+.judge-table th, .judge-table td { white-space: normal; overflow-wrap: anywhere; padding: 6px 10px; width: 50%; }
+.judge-context { display: block; }
+.compare-fold { margin: 8px 0 12px; }
+.compare-fold summary { cursor: pointer; color: var(--accent); margin-bottom: 8px; }

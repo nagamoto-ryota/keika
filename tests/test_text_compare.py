@@ -91,17 +91,43 @@ def item(c, original="本日訪問。古河さんが元気。", body="本日訪�
     return to_review(c, original, "typed", entry, list(warnings), note)
 
 
-def test_card_shows_both_texts_side_by_side_with_marks_and_says_what_to_do(env):
+def item_with_fix(c):
+    fix = {"heard": "古河さん", "fixed": "古賀 正蔵"}
+    entry = {"user_id": "U02", "body": "本日訪問。古賀 正蔵さんが元気。", "name_fixes": [fix, {"heard": "輝子さん", "fixed": "古賀 照子"}], "event_date": "2026-11-04", "event_time": "", "kind_read": "居宅訪問", "monitoring": False, "partner": ""}
+    return to_review(c, "本日訪問。古河さんが元気。", "typed", entry, [], "「古河さん」が誰か確かめてください")
+
+
+def test_card_shows_only_what_was_heard_and_what_ai_judged_with_the_full_text_folded(env):
     s, c = env
-    item(c)
+    item_with_fix(c)
     page = TestClient(create_app(s)).get("/").text
     assert "AI が迷った記録です" in page
-    assert "入力した元の文" in page and "AI が整えた文" in page
-    assert '<mark class="diff-old">古河</mark>' in page and '<mark class="diff-new">古賀 正蔵</mark>' in page
-    assert "<details class=\"more\"><summary>入力した元の文章" not in page
-    assert "台帳の書き方に直した名前" not in page
-    assert "「古河さん」が誰か確かめてください" in page
-    assert "この内容で記録する" in page and "記録にしない" in page and 'name="user_id"' in page
+    assert "<th>入力</th>" in page and "<th>AI の判断</th>" in page
+    assert "<td>「古河さん」</td>" in page and "「古賀 正蔵」" in page and "「古賀 照子」" in page
+    assert '<details class="compare-fold">' in page and "全文を見て直す" in page
+    assert '<mark class="diff-old">古河</mark>' in page  # 開けば、印つきで見比べられる
+    assert 'name="body"' in page and "この内容で記録する" in page and "記録にしない" in page and 'name="user_id"' in page
+
+
+def test_word_not_in_the_input_is_shown_with_the_sentence_around_it(env):
+    s, c = env
+    item(c, original="歩行器で歩いた。", body="歩行器で99歩歩いた。", warnings=["99"], note="")
+    page = TestClient(create_app(s)).get("/").text
+    assert "入力にありません" in page and "「99」" in page and "歩行器で99歩歩いた" in page
+
+
+def test_card_with_nothing_to_list_opens_the_full_text(env):
+    s, c = env
+    item(c, original="話の内容", body="", note="整えられませんでした（理由）")
+    page = TestClient(create_app(s)).get("/").text
+    assert '<details class="compare-fold" open>' in page and "<th>入力</th>" not in page
+
+
+def test_spelling_that_did_not_change_is_not_listed(env):
+    s, c = env
+    entry = {"user_id": "U02", "body": "古賀 正蔵さん", "name_fixes": [{"heard": "古賀正蔵", "fixed": "古賀 正蔵"}]}
+    to_review(c, "古賀正蔵さん", "typed", entry, [], "")
+    assert TestClient(create_app(s)).get("/").text.count("<th>入力</th>") == 0
 
 
 def test_text_on_the_card_is_escaped(env):
