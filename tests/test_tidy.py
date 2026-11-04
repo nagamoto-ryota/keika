@@ -140,4 +140,4 @@ def test_warning_is_shown_in_plain_words(env):
     body = TestClient(create_app(s)).get("/").text
     assert "入力にありません" in body and "15時から訪問した" in body
     assert "話に無いかもしれない語" not in body
-    assert open_reviews(c)[0]["judgements"][0]["context"] == "15時から訪問した"
+    assert open_reviews(c)[0]["judgements"][0]["written"] == "15時から訪問した"

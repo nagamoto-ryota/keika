@@ -327,7 +327,7 @@ def term_context(body: str, term: str) -> str:
     if at < 0:
         return term
     start = at
-    while start > 0 and at - start < 6 and body[start - 1] not in "。、\n【】":
+    while start > 0 and at - start < 12 and body[start - 1] not in "。、\n【】":
         start -= 1
     end = at + len(term)
     while end < len(body) and end - at < 16 and body[end] not in "。、\n【】":
@@ -335,15 +335,39 @@ def term_context(body: str, term: str) -> str:
     return body[start:end]
 
 
-def _judgements(entry: dict, warnings: list[str]) -> list[dict]:
-    """確認の画面に出す「入力」と「AI の判断」の対。読み替えた名前と、入力に無かった言葉だけを並べる。"""
+_TITLE = r"(?:さん|様|氏|医師|先生|看護師|相談員|ケアマネ)?"
+
+
+def written_form(body: str, name: str) -> str:
+    """台帳の名前が、記録の文でどう書かれているかを返す。無ければ空。1字の名前は別の語に紛れるので探さない。"""
+    parts = name.split()
+    whole = re.search(r"[\s　]*".join(re.escape(p) for p in parts) + _TITLE, body) if parts else None
+    if whole:
+        return whole[0]
+    for part in sorted(reversed(parts), key=len, reverse=True):  # 同じ長さなら下の名前から（家族で名字が同じため）
+        found = re.search(re.escape(part) + _TITLE, body) if len(part) >= 2 else None
+        if found:
+            return found[0]
+    return ""
+
+
+def _judgements(conn: sqlite3.Connection, entry: dict, warnings: list[str]) -> list[dict]:
+    """確認の画面に出す「入力」と「記録での書き方」の対。読み替えた名前と、入力に無かった言葉だけを並べる。"""
+    body = entry.get("body") or ""
     fixes = [f for f in entry.get("name_fixes", []) if squash(f["heard"]) != squash(f["fixed"])]
-    rows = [{"heard": f["heard"], "judged": f["fixed"], "context": ""} for f in fixes]
+    chosen = get_user(conn, entry.get("user_id") or "")
+    rows = []
+    for f in fixes:
+        written = written_form(body, f["fixed"])
+        note = ""
+        if not written:
+            note = "名前は書いていません（上で選んだ人の記録です）" if chosen and squash(chosen.name) == squash(f["fixed"]) else "記録の文には出ていません"
+        rows.append({"heard": f["heard"], "written": written, "count": body.count(written) if written else 0, "note": note})
     for word in warnings:
         if any(word in f["fixed"] for f in fixes):
             continue  # 読み替えの行で分かる
-        context = term_context(entry.get("body") or "", word)
-        rows.append({"heard": "", "judged": word, "context": "" if context == word else context})
+        context = term_context(body, word)
+        rows.append({"heard": "", "written": context, "count": body.count(context), "note": ""})
     return rows
 
 
@@ -354,7 +378,7 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
         entry, warnings = json.loads(r["entry"]), json.loads(r["warnings"])
         items.append({"id": r["id"], "original": r["original"], "source": r["source"], "entry": entry, "warnings": warnings,
                       "note": r["note"].replace(UNSPOKEN_NOTE, "").replace("話に無い語が入っているかもしれません", "").strip(),
-                      "judgements": _judgements(entry, warnings),
+                      "judgements": _judgements(conn, entry, warnings),
                       "tidied": bool(entry.get("body")),
                       "compare": compare(r["original"], entry.get("body") or r["original"])})
     return items

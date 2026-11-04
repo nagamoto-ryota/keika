@@ -12,7 +12,7 @@
 {% if reviews %}
 <section class="person" id="kakunin">
   <h2>記録の確認 <span class="muted small">{{ reviews|length }}件</span></h2>
-  <p>AI が迷った記録です。AI の判断が合っていれば、そのまま記録してください。違っていれば「全文を見て直す」で直せます。</p>
+  <p>AI が迷った記録です。記録での書き方が合っていれば、そのまま記録してください。違っていれば、その場で打ち直せます。</p>
   <div class="compare-cards">{% for it in reviews %}{% include "_review_card.html" %}{% endfor %}</div>
   <script src="/static/review_card.js"></script>
 </section>

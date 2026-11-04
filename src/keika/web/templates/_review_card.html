@@ -7,11 +7,11 @@
     </select></p>
     {% if it.judgements %}
     <table class="judge-table">
-      <tr><th>入力</th><th>AI の判断</th></tr>
+      <tr><th>入力</th><th>記録での書き方</th></tr>
       {% for j in it.judgements %}
       <tr>
         {% if j.heard %}<td>「{{ j.heard }}」</td>{% else %}<td class="muted">入力にありません</td>{% endif %}
-        <td>「{{ j.judged }}」{% if j.context %}<span class="small muted judge-context">{{ j.context }}</span>{% endif %}</td>
+        <td>{% if j.written %}<input class="judge-input" value="{{ j.written }}" aria-label="記録での書き方を直す">{% if j.count > 1 %}<span class="small muted judge-count">{{ j.count }}か所まとめて直ります</span>{% endif %}{% else %}<span class="small muted">{{ j.note }}</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </table>

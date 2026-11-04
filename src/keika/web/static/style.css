@@ -220,6 +220,8 @@ mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: 
 @media (max-width: 760px) { .compare { grid-template-columns: minmax(0, 1fr); } }
 .judge-table { margin: 8px 0; }
 .judge-table th, .judge-table td { white-space: normal; overflow-wrap: anywhere; padding: 6px 10px; width: 50%; }
-.judge-context { display: block; }
+.judge-table .judge-input { width: 100%; max-width: none; box-sizing: border-box; font: inherit; padding: 2px 8px; border: 1px solid var(--accent); border-radius: 4px; background: var(--paper); }
+.judge-input:read-only { border-color: var(--line); color: var(--muted); }
+.judge-count { display: block; }
 .compare-fold { margin: 8px 0 12px; }
 .compare-fold summary { cursor: pointer; color: var(--accent); margin-bottom: 8px; }

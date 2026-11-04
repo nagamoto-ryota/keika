@@ -237,7 +237,7 @@ def test_review_card_says_which_word_and_what_to_do(env):
     s, c = env
     run(s, c, "柚木さん宅を訪問。変わりなし。", entry(body="柚木様宅を訪問した。歩行は99歩だった。"))
     page = TestClient(create_app(s)).get("/").text
-    assert "入力にありません" in page and "「99」" in page and "歩行は99歩だった" in page
+    assert "入力にありません" in page and 'value="歩行は99歩だった"' in page
 
 
 def test_review_card_shows_names_changed_to_ledger_spelling(env):
@@ -245,7 +245,7 @@ def test_review_card_shows_names_changed_to_ledger_spelling(env):
     fix = WireFix(heard="ゆのきさん", fixed="柚木 茂")
     run(s, c, "ゆのきさん宅を訪問。変わりなし。", entry(spoken_name="ゆのきさん", name_fixes=[fix], ambiguous=True, body="柚木様宅を訪問した。"))
     page = TestClient(create_app(s)).get("/").text
-    assert "「ゆのきさん」" in page and "「柚木 茂」" in page
+    assert "「ゆのきさん」" in page and 'value="柚木様"' in page
 
 
 def test_nickname_in_kana_corrected_to_ledger_is_not_flagged(env):
@@ -260,4 +260,4 @@ def test_name_warning_says_what_ai_took_the_spoken_word_for(env):
     fix = {"heard": "ゆかさん", "fixed": "鷺沼 由佳"}
     to_review(c, "ゆかさんは不在", "typed", {"user_id": "U06", "body": "鷺沼由佳さんは不在であった。", "name_fixes": [fix]}, ["由佳"], "")
     item = open_reviews(c)[0]
-    assert item["judgements"] == [{"heard": "ゆかさん", "judged": "鷺沼 由佳", "context": ""}]
+    assert item["judgements"] == [{"heard": "ゆかさん", "written": "鷺沼由佳さん", "count": 1, "note": ""}]

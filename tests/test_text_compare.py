@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from keika.db import connect
 from keika.ledger import seed_from_json
-from keika.intake import to_review
+from keika.intake import open_reviews, to_review, written_form
 from keika.settings import Settings
 from keika.text_compare import compare
 from keika.web.app import create_app
@@ -92,28 +92,62 @@ def item(c, original="本日訪問。古河さんが元気。", body="本日訪�
 
 
 def item_with_fix(c):
-    fix = {"heard": "古河さん", "fixed": "古賀 正蔵"}
-    entry = {"user_id": "U02", "body": "本日訪問。古賀 正蔵さんが元気。", "name_fixes": [fix, {"heard": "輝子さん", "fixed": "古賀 照子"}], "event_date": "2026-11-04", "event_time": "", "kind_read": "居宅訪問", "monitoring": False, "partner": ""}
-    return to_review(c, "本日訪問。古河さんが元気。", "typed", entry, [], "「古河さん」が誰か確かめてください")
+    fixes = [{"heard": "苦島先生", "fixed": "久留島 誠"}, {"heard": "輝子さん", "fixed": "古賀 照子"}, {"heard": "古河さん", "fixed": "古賀 正蔵"}, {"heard": "渋屋さん", "fixed": "渋谷 一郎"}]
+    entry = {"user_id": "U02", "body": "本人は元気。照子氏より話あり。久留島医師の受診時に確認する。照子氏は安心。", "name_fixes": fixes, "event_date": "2026-11-04", "event_time": "", "kind_read": "居宅訪問", "monitoring": False, "partner": ""}
+    return to_review(c, "古河さんは元気。輝子さんの話。苦島先生の受診。", "typed", entry, [], "「古河さん」が誰か確かめてください")
 
 
-def test_card_shows_only_what_was_heard_and_what_ai_judged_with_the_full_text_folded(env):
+def rows_of(c):
+    return {j["heard"]: j for j in open_reviews(c)[0]["judgements"]}
+
+
+def test_row_shows_how_the_record_actually_writes_the_person(env):
+    s, c = env
+    item_with_fix(c)
+    rows = rows_of(c)
+    assert rows["苦島先生"]["written"] == "久留島医師" and rows["苦島先生"]["count"] == 1
+    assert rows["輝子さん"]["written"] == "照子氏" and rows["輝子さん"]["count"] == 2
+
+
+def test_chosen_person_not_named_in_the_record_says_so(env):
+    s, c = env
+    item_with_fix(c)
+    rows = rows_of(c)
+    assert rows["古河さん"]["written"] == "" and "上で選んだ人" in rows["古河さん"]["note"]
+    assert rows["渋屋さん"]["written"] == "" and "出ていません" in rows["渋屋さん"]["note"]
+
+
+def test_one_letter_name_part_is_not_used_to_find_the_person():
+    assert written_form("誠実に対応した。", "久留島 誠") == ""
+    assert written_form("みずなら東クリニック 通所リハビリテーションへ連絡。", "みずなら東クリニック 通所リハビリテーション") == "みずなら東クリニック 通所リハビリテーション"
+    assert written_form("柚木　茂さんを訪問。", "柚木 茂") == "柚木　茂さん"
+
+
+def test_card_lists_heard_and_written_with_a_box_to_correct_and_the_full_text_folded(env):
     s, c = env
     item_with_fix(c)
     page = TestClient(create_app(s)).get("/").text
-    assert "AI が迷った記録です" in page
-    assert "<th>入力</th>" in page and "<th>AI の判断</th>" in page
-    assert "<td>「古河さん」</td>" in page and "「古賀 正蔵」" in page and "「古賀 照子」" in page
+    assert "<th>入力</th>" in page and "<th>記録での書き方</th>" in page and "AI の判断" not in page
+    assert "<td>「苦島先生」</td>" in page and 'class="judge-input" value="久留島医師"' in page
+    assert "2か所" in page  # 同じ書き方はまとめて直ると分かるように
+    assert "久留島 誠" not in page.split('<details class="compare-fold"')[0].split('<table class="judge-table">')[1]
     assert '<details class="compare-fold">' in page and "全文を見て直す" in page
-    assert '<mark class="diff-old">古河</mark>' in page  # 開けば、印つきで見比べられる
     assert 'name="body"' in page and "この内容で記録する" in page and "記録にしない" in page and 'name="user_id"' in page
+
+
+def test_correction_box_is_not_sent_with_the_form(env):
+    s, c = env
+    item_with_fix(c)
+    page = TestClient(create_app(s)).get("/").text
+    box = page[page.index('class="judge-input"') - 40:page.index('class="judge-input"') + 60]
+    assert "name=" not in box
 
 
 def test_word_not_in_the_input_is_shown_with_the_sentence_around_it(env):
     s, c = env
     item(c, original="歩行器で歩いた。", body="歩行器で99歩歩いた。", warnings=["99"], note="")
     page = TestClient(create_app(s)).get("/").text
-    assert "入力にありません" in page and "「99」" in page and "歩行器で99歩歩いた" in page
+    assert "入力にありません" in page and 'value="歩行器で99歩歩いた"' in page
 
 
 def test_card_with_nothing_to_list_opens_the_full_text(env):
