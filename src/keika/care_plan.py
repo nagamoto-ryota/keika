@@ -48,12 +48,16 @@ WANTED = (  # 種類ごとに一番新しい物を読ませる
 NOT_FOUND = "元の書類と確かめられません"
 COMPARE = "元の文と見比べてください: "
 OLD_PLAN = "前の計画の期間です。新しい期間を確かめてください"
-_RECOMMEND = re.compile(r"おすすめ|お勧め|お薦め|勧めます|勧める|薦めます|推奨|望ましい|最適|がいいです|(?:方|の)が(?:よい|良い|いい)|と(?:よい|良い)です|すべき|を提案します")
-_DONE = re.compile(r"同意を得|同意し|同意済|交付し|交付済|交付を受け|署名を得|署名済")  # 済みにするのは人
-_JUDGE = re.compile(r"受診(?:を促|が必要|を検討|につなげ|を勧|してください|していただ)|検査が必要|(?:中止|減量|増量|休薬)(?:します|する|してください)|疑われ|(?:症|病|がん)と(?:考え|思わ)|入院が(?:望ましい|必要)|手術を(?:受け|勧|検討)")
-_LABEL = re.compile(r"([一-龥]{1,4})(?:さん|様)?[はがの]?[：:「]")
+_RECOMMEND = re.compile(r"おすすめ|お勧め|お薦め|勧めます|勧める|薦めます|推奨|望ましい|最適|がいいです|(?:方|の)が(?:よい|良い|いい)|と(?:よい|良い)(?:です|でしょう)|すべき|を提案します")
+_DONE = re.compile(r"同意を得|同意を(?:いただ|頂)|同意し|同意済|交付|説明済|署名を得|署名済|お渡しし|手渡し")  # 済みにするのは人。書類にあっても新しい計画の事実にしない
+_JUDGE = re.compile(r"受診(?:を促|が必要|を検討|につなげ|を勧|してください|していただ|しましょう)|通院が必要|検査が必要|(?:中止|減量|増量|休薬)(?:します|する|してください|すべき)|疑い|疑われ|(?:症|病|がん)と(?:考え|思わ)|入院が(?:望ましい|必要)|手術を(?:受け|勧|検討)")
+_LABEL = re.compile(r"(?:お)?([一-龥]{1,4})(?:さん|様)?[はがの]?[：:「]")
+_NOT_SPEAKER = {"意向", "希望", "主訴", "要望", "目標", "内容", "課題", "結果", "本人の意向", "利用者"}
 _NOT_USED = re.compile(r"見学|合わなかった|断った|断られ|やめた|中止した|検討中")
-_UNIT = re.compile(r"週|月|毎|日|回|時")
+_NUMERIC = re.compile(r"\d|毎|隔")
+_SENTENCE_ENDED = re.compile(r"(?:たい|ほしい|です|ます|ない|した|いる|ある|だ|[。」])$")
+_TERMS = re.compile(r"[一-龥]{2,}|[ァ-ヶー]{3,}")
+_PLAN_WORDS = {"支援", "配慮", "継続", "維持", "確認", "利用", "生活", "安全", "安心", "改善", "向上", "軽減", "負担", "家族", "本人", "計画", "サービス", "目標", "必要", "自立", "状況", "状態", "機会", "環境", "調整", "連携", "相談", "見守", "参加", "活動", "提供", "実施", "方針", "課題", "意向", "保持", "予防", "軽減", "日常", "自宅", "在宅"}
 _SPACE = re.compile(r"\s+")
 _DAY = "月火水木金土日"
 _RANGE = re.compile(rf"([{_DAY}])[〜~～\-ー]([{_DAY}])")
@@ -252,18 +256,25 @@ def _same_lines(quote: str, source: str) -> tuple[str, str]:
     return head, "\n".join(whole)
 
 
-def _whole_words(who: str, quote: str, source: str | None) -> str:
-    """意向の言葉を文の終わりまで読み、話者の名前と括弧を除く。引用が行の終わりで切れていることがある。"""
+def _whole_words(who: str, quote: str, source: str | None) -> tuple[str, bool]:
+    """意向の言葉と、行をまたいで読んだか。引用が PDF の行の終わりで切れている時だけ、文の終わりまで読む。
+
+    言い終わっている文は伸ばさない。伸ばした先に別の人の言葉や判断があれば、伸ばさない。
+    """
     words = _SPACE.sub("", quote)
     plain = _SPACE.sub("", source or "")
     at = plain.find(words)
-    if at >= 0 and not re.search(r"[。」]$", words):
+    crossed = False
+    if at >= 0 and not _SENTENCE_ENDED.search(words):
         rest = re.search(r"^[^。」]{0,80}", plain[at + len(words):])[0]
-        next_person = _LABEL.search(rest)  # 改行を消したので、次の人の言葉まで読まない
-        words += rest[:next_person.start()] if next_person else rest
+        next_person = _LABEL.search(rest)
+        rest = rest[:next_person.start()] if next_person else rest
+        if rest and not (crosses_line(rest) or _DONE.search(rest) or _JUDGE.search(rest) or _RECOMMEND.search(rest)):
+            crossed = _same_lines(words + rest, source or "")[1].count("\n") > 0
+            words += rest
     if who:
-        words = re.sub(rf"^{re.escape(who)}[：:「]?", "", words)
-    return words.lstrip("「").rstrip("」。")
+        words = re.sub(rf"^{re.escape(who)}(?:さん|様)?[はがの]?[：:「]?", "", words)
+    return words.lstrip("「").rstrip("」。"), crossed
 
 
 class _Checker:
@@ -323,9 +334,11 @@ class _Checker:
 
     def _over_the_line(self, text: str, said: str) -> bool:
         """元の文にそのままある言葉は、書類の事実として許す。AI が足した判断と推奨は入れない。"""
+        if _DONE.search(text):
+            return True
         if squash(text) in squash(said) and said:
             return crosses_line(text, said)
-        return crosses_line(text, said) or bool(_BACKDATE.search(text) or _RECOMMEND.search(text) or _DONE.search(text) or _JUDGE.search(text))
+        return crosses_line(text, said) or bool(_BACKDATE.search(text) or _RECOMMEND.search(text) or _JUDGE.search(text))
 
     def _verbatim(self, who: str, quote: str, file: str, kind: str | None) -> dict | None:
         if kind is None:
@@ -333,7 +346,9 @@ class _Checker:
         flags = [SCAN_NOTE.strip("（）")] if kind == "scan" else []
         if kind == "text" and not self._said_by(who, quote, file):
             flags.append("誰の言葉か確かめてください")
-        words = _whole_words(who, quote, self.texts.get(file))
+        words, crossed = _whole_words(who, quote, self.texts.get(file))
+        if crossed:
+            flags.append("行をまたいで読みました。元の書類と見比べてください")
         return {"id": self._next(), "text": f"{who}: {words}" if who else words, "quote": quote, "file": file, "flag": " / ".join(flags)}
 
     def _said_by(self, who: str, quote: str, file: str) -> bool:
@@ -342,16 +357,23 @@ class _Checker:
         spoken = _LABEL.findall(before)
         own = _LABEL.match(_SPACE.sub("", quote))
         name = own[1] if own else (spoken[-1] if spoken else "")
+        if not name and not before:  # 話者だけの行の次に、言葉の行があることがある
+            above = _lines_around(quote, self.texts[file]).splitlines()
+            head = _LABEL.fullmatch(_SPACE.sub("", above[0])) if len(above) > 1 and above[0] not in line else None
+            name = head[1] if head else ""
+        if name in _NOT_SPEAKER:
+            name = ""
         if name:
             return bool(who) and (who in name or name in who)
         return who in ("", "本人") or who in line
 
     def _strict(self, text: str, quote: str, file: str, kind: str | None, key: str) -> dict | None:
-        if kind is None or squash(_normal(text)) not in squash(_normal(quote)):
+        plain_text, plain_quote = squash(_normal(text)), squash(_normal(quote))
+        if kind is None or plain_text not in plain_quote or _NOT_USED.search(quote):
             return None
-        if key == "frequency" and not _UNIT.search(text):
+        if key == "frequency" and (not _NUMERIC.search(text) or not re.search(r"[週月日回毎]", text) or re.search(rf"[隔か月ヶカ\d]{re.escape(plain_text)}", plain_quote)):
             return None
-        if key == "provider" and (len(squash(text)) < MIN_QUOTE or _NOT_USED.search(quote)):
+        if key == "provider" and len(plain_text) < MIN_QUOTE:
             return None
         flags = [SCAN_NOTE.strip("（）")] if kind == "scan" else []
         if key in PERIODS and file in self.plan_files:
@@ -367,6 +389,7 @@ class _Checker:
         near = _same_lines(quote, self.texts.get(file) or "")[1] if kind else ""
         extra = invented_terms(self.material, text, self.names) + sorted(_digits(_without_spoken_clocks(near, text)) - _digits(near))
         extra += [n for n in _changed_numbers(text, quote) if n not in extra]
+        extra += [w for w in _TERMS.findall(text) if w not in self.material and w not in _PLAN_WORDS and w not in extra]
         if extra:
             flags.append(COMPARE + "、".join(dict.fromkeys(extra)))
         return {"id": self._next(), "text": text, "quote": quote if kind else "", "file": file if kind else "", "flag": " / ".join(flags)}
@@ -393,12 +416,17 @@ class _Checker:
 
 
 def _DAY_WORD(day: str) -> re.Pattern:
-    """曜日として書かれた字か。「4月」「水分」を曜日と読まない。"""
-    return re.compile(rf"(?<![\d来今先毎翌再])(?<![一-龥]){day}(?:曜|[、・,／/\s〜~～\-]|$)")
+    """曜日として書かれた字か。「4月」「水分」「毎月」を曜日と読まない。"""
+    edge = rf"[\s、・,／/〜~～\-()（）{_DAY}]"
+    return re.compile(rf"{day}曜|(?:^|{edge}){day}(?=$|{edge})", re.M)
 
 
 def _days_read(days: str, said: str) -> bool:
-    return bool(days) and (("毎日" in days and "毎日" in said) or (any(d in days for d in _DAY) and all(_DAY_WORD(d).search(said) for d in days if d in _DAY)))
+    if not days:
+        return False
+    if "毎日" in days or "平日" in days:
+        return days in said
+    return any(d in days for d in _DAY) and all(_DAY_WORD(d).search(said) for d in days if d in _DAY)
 
 
 def _lines_around(quote: str, source: str) -> str:
@@ -416,7 +444,7 @@ def _time_read(value: str, said: str) -> str:
     if not m:
         return BLANK
     hour, minute = int(m[1]), m[2]
-    words = [rf"0?{hour}:{minute}"] + ([rf"{hour}時(?!\d)"] if minute == "00" else []) + ([rf"{hour}時半"] if minute == "30" else [])
+    words = [rf"0?{hour}:{minute}", rf"0?{hour}時{minute}分", rf"0?{hour}時{int(minute)}分"] + ([rf"0?{hour}時(?!\d)"] if minute == "00" else []) + ([rf"0?{hour}時半"] if minute == "30" else [])
     return value.strip() if any(re.search(rf"(?<!\d){w}", said) for w in words) else BLANK
 
 
@@ -571,10 +599,11 @@ def edit_cell(conn: sqlite3.Connection, plan_id: int, item_id: str, text: str, b
                 break
         else:
             raise KeyError(item_id)
-        if before is not None and before.replace("\r\n", "\n") != cell["text"]:
-            raise EditConflict(cell["text"])
-        if text == cell["text"]:
+        now = cell["text"].replace("\r\n", "\n")
+        if text == now:  # 応答だけ失われて送り直した時も、ここで終わる
             return
+        if before is not None and before.replace("\r\n", "\n") != now:
+            raise EditConflict(cell["text"])
         _log(conn, plan_id, where, cell["text"], text)
         cell.update(text=text, flag="")
         _store(conn, plan_id, d)
@@ -672,7 +701,7 @@ def _days_of(text: str) -> list[str]:
     if "毎日" in text:
         return list(_DAY)
     found = list("月火水木金") if "平日" in text else []
-    text = text.replace("平日", "")
+    text = text.replace("平日", "").replace("曜日", "")
     for m in _RANGE.finditer(text):
         a, b = _DAY.index(m[1]), _DAY.index(m[2])
         found += list(_DAY[a:b + 1])
@@ -796,7 +825,8 @@ def to_docx(plan: CarePlan) -> bytes:
 def save_to_output(s: Settings, plan: CarePlan) -> str:
     """読み取りの対象の外に、Word を新しい名前で置く。今ある書類は書き換えない。置いた場所を返す。"""
     stamp = now_real().strftime("%Y%m%d-%H%M%S")
-    rel = f"{OUTPUT_DIR}/{plan.user_id}_ケアプラン下書き{plan.id}_{stamp}.docx"
+    owner = re.sub(r"[^\w\-]", "_", plan.user_id)  # 利用者番号に / があっても、出力先の外へ出さない
+    rel = f"{OUTPUT_DIR}/{owner}_ケアプラン下書き{plan.id}_{stamp}.docx"
     path = safe_path(s, rel)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("xb") as f:

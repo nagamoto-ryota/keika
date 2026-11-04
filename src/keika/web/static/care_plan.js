@@ -15,7 +15,7 @@
   }
 
   function show() {
-    if (conflict.size) state.textContent = "別の画面で直されたマスがあります。打った文を控えて、開き直してください。";
+    if (conflict.size) state.textContent = "別の画面で直されたか消されたマスがあります。打った文を控えて、開き直してください。";
     else if (dirty.size) state.textContent = "保存できていないマスがあります。つながりを確かめてください。";
     else if (sending.size || timers.size) state.textContent = "保存しています";
     else state.textContent = "保存しました";
@@ -38,9 +38,10 @@
     body.append("item", item);
     body.append("text", text);
     body.append("before", saved.get(item));
-    var job = fetch(url, { method: "POST", body: body, keepalive: text.length < 30000 }).then(function (r) {
+    body.append("before_sent", "1");
+    var job = fetch(url, { method: "POST", body: body, keepalive: new Blob([text]).size < 30000 }).then(function (r) {
       sending.delete(item);
-      if (r.status === 409) {
+      if (r.status === 409 || r.status === 404) {  // 別の画面で直された、または行ごと消された
         conflict.add(item);
         mark(box, true);
       } else if (!r.ok) {
@@ -81,7 +82,8 @@
   }
 
   sheet.querySelectorAll(".sheet-cell").forEach(function (box) {
-    saved.set(box.dataset.item, box.value.replace(/\r\n/g, "\n"));
+    saved.set(box.dataset.item, box.defaultValue.replace(/\r\n/g, "\n"));  // ブラウザが打った文を復元しても、未保存と分かるように
+    if (url && box.value !== saved.get(box.dataset.item)) dirty.add(box.dataset.item);
     grow(box);
     if (!url) return;
     box.addEventListener("input", function () {
@@ -107,6 +109,7 @@
           var button = form.querySelector("button");
           button.disabled = true;
           button.textContent = "作業しています（1〜2分）";
+          sheet.querySelectorAll(".sheet-cell").forEach(function (box) { box.readOnly = true; });  // 待つ間に打った文を失わない
         }
         form.submit();
       }).catch(show);

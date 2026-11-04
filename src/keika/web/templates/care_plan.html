@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ p.title }}の下書き - {{ user.name }} - ケイカ{% endblock %}
 {% macro cell(c, label) %}<div class="cell-box{{ ' flagged' if c.flag }}">
-  <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>{{ c.text }}</textarea>
+  <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>
+{{ c.text }}</textarea>
   <div class="cell-print">{{ c.text }}</div>
   {% if c.flag %}<p class="draft-flag no-print">{{ c.flag }}</p>{% endif %}
   {% for src in (c.sources if c.sources else ([c] if c.quote else [])) %}<details class="no-print"><summary class="muted">元の書類</summary>{% if src.file and src.file != records_name %}<a href="/doc?path={{ src.file|urlencode }}">{{ src.file.rsplit('/', 1)[-1] }}</a>{% else %}支援経過{% endif %}: {{ src.quote }}</details>{% endfor %}
@@ -99,7 +100,7 @@
 {% if p.held %}
 <section class="no-print">
   <h2>下書きに入れなかった文</h2>
-  <p class="muted small">薬、診断、受診の判断や、特定の事業所を勧める文が {{ p.held|length }} 件あったので、AI の文は入れていません。元の書類をご自身で確かめてください。</p>
+  <p class="muted small">薬、診断、受診の判断、特定の事業所を勧める文、同意や交付が済んだとする文が {{ p.held|length }} 件あったので、AI の文は入れていません。元の書類をご自身で確かめてください。</p>
   {% for h in p.held if h.quote %}<p class="small">元の書類: {{ h.quote }}</p>{% endfor %}
 </section>
 {% endif %}

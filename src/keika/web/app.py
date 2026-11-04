@@ -583,10 +583,10 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return _care_plan_page(request, _care_plan_or_404(plan_id), compare, saved)
 
     @app.post("/careplans/{plan_id}/cells")
-    def save_care_plan_cell(plan_id: int, item: str = Form(...), text: str = Form(""), before: str | None = Form(None)):
+    def save_care_plan_cell(plan_id: int, item: str = Form(...), text: str = Form(""), before: str = Form(""), before_sent: str = Form("")):
         _care_plan_or_404(plan_id)
-        try:
-            edit_cell(conn, plan_id, item, text, before)
+        try:  # 空の文は Form で None と区別できないので、送ったことを別に受ける
+            edit_cell(conn, plan_id, item, text, before if before_sent else None)
         except KeyError:
             raise HTTPException(404, "そのマスが見つかりません") from None
         except EditConflict:

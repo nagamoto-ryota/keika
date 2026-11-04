@@ -1,5 +1,6 @@
 """ケアプランの下書き: 書類に無い事を足さない、意向は書類の言葉だけ、頻度と期間は読めなければ空欄。"""
 import io
+import pathlib
 from datetime import date
 
 import docx
@@ -491,8 +492,8 @@ def test_cell_route_saves_and_reports_conflict(env):
     i = make(c, s)
     it = get_care_plan(c, i).sections["policy"][0]
     client = TestClient(create_app(s))
-    assert client.post(f"/careplans/{i}/cells", data={"item": it["id"], "text": "直した方針", "before": it["text"]}).status_code == 200
-    assert client.post(f"/careplans/{i}/cells", data={"item": it["id"], "text": "古い文", "before": it["text"]}).status_code == 409
+    assert client.post(f"/careplans/{i}/cells", data={"item": it["id"], "text": "直した方針", "before": it["text"], "before_sent": "1"}).status_code == 200
+    assert client.post(f"/careplans/{i}/cells", data={"item": it["id"], "text": "古い文", "before": it["text"], "before_sent": "1"}).status_code == 409
     assert client.post(f"/careplans/{i}/cells", data={"item": "i9999", "text": "x"}).status_code == 404
     assert get_care_plan(c, i).sections["policy"][0]["text"] == "直した方針"
 
@@ -847,3 +848,154 @@ def test_prevention_form_items_from_the_standard_are_there(env):
     for word in ("認定年月日", "初回作成日", "初回・紹介・継続", "認定済・申請中", "担当地域包括支援センター", "基本チェックリストの該当数", "必要な事業プログラム", "健康状態についての留意点", "総合的課題", "課題に対する目標と具体策の提案", "本来行うべき支援ができない場合",
                  "現在の状況", "本人・家族の意欲・意向", "領域における課題", "目標についての支援のポイント"):
         assert word in text, word
+
+
+# --- 2回目の独立レビュー ---
+
+
+def test_empty_cell_also_detects_an_edit_made_elsewhere(env):
+    s, c = env
+    i = make(c, s)
+    cell_id = get_care_plan(c, i).grid["午前"]["火"]["id"]
+    client = TestClient(create_app(s))
+    form = {"item": (None, cell_id), "text": (None, "画面Aの文"), "before": (None, ""), "before_sent": (None, "1")}
+    assert client.post(f"/careplans/{i}/cells", files=form).status_code == 200
+    form["text"] = (None, "画面Bの文")
+    assert client.post(f"/careplans/{i}/cells", files=form).status_code == 409
+    assert get_care_plan(c, i).grid["午前"]["火"]["text"] == "画面Aの文"
+
+
+def test_text_starting_with_a_line_break_survives_the_page(env):
+    s, c = env
+    i = make(c, s)
+    cell_id = get_care_plan(c, i).grid["午前"]["火"]["id"]
+    edit_cell(c, i, cell_id, "\n改行で始まる文")
+    page = TestClient(create_app(s)).get(f"/careplans/{i}").text
+    assert f'data-item="{cell_id}"' in page and '>\n\n改行で始まる文</textarea>' in page
+
+
+def test_resend_after_a_lost_answer_is_not_a_conflict(env):
+    s, c = env
+    i = make(c, s)
+    it = get_care_plan(c, i).sections["policy"][0]
+    edit_cell(c, i, it["id"], "直した方針", it["text"])
+    edit_cell(c, i, it["id"], "直した方針", it["text"])
+    assert len(edit_history(c, i)) == 1
+
+
+@pytest.mark.parametrize("next_line", ["医師は薬を中止すべきと話す。", "ケアマネ：デイの回数を増やしましょう。", "認知症の疑いと言われた。", "同意を得た。計画書を交付した。"])
+def test_finished_words_are_not_joined_to_the_next_line(env, next_line):
+    s, c = env
+    (s.drive_root / ASSESS).write_text(f"本人：家で暮らしたい\n{next_line}", encoding="utf-8")
+    p = plan_of(c, s, wire(sections=[WireSection(key="intent", items=[item("x", "家で暮らしたい", who="本人")])]))
+    assert texts(p.sections["intent"]) == ["本人: 家で暮らしたい"]
+
+
+def test_words_read_over_a_line_end_get_a_mark(env):
+    s, c = env
+    (s.drive_root / ASSESS).write_text("妻：自分も腰が弱いので、お\n風呂はデイでお願いしたい。", encoding="utf-8")
+    p = plan_of(c, s, wire(sections=[WireSection(key="intent", items=[item("x", "自分も腰が弱いので、お", who="妻")])]))
+    assert texts(p.sections["intent"]) == ["妻: 自分も腰が弱いので、お風呂はデイでお願いしたい"] and "行をまたいで" in p.sections["intent"][0]["flag"]
+
+
+@pytest.mark.parametrize("sentence, quote", [
+    ("前回の計画を説明し同意を得た", "前回の計画を説明し同意を得た"), ("計画に同意をいただきました", "長く歩くと休む"), ("計画は説明済みです", "長く歩くと休む"), ("計画書をお渡ししました", "長く歩くと休む"),
+    ("計画の交付を完了", "長く歩くと休む"), ("受診しましょう", "長く歩くと休む"), ("膝の痛みには通院が必要です", "膝が痛く、長く歩くと休む"), ("福祉用具を東西社で利用するとよいでしょう", "長く歩くと休む"),
+])
+def test_done_judgement_and_recommendation_are_held_even_if_quoted(env, sentence, quote):
+    s, c = env
+    (s.drive_root / ASSESS).write_text(A_TEXT + quote, encoding="utf-8")
+    assert texts(policy_of(c, s, sentence, quote).sections["policy"]) == [BLANK]
+
+
+def test_word_not_in_any_document_is_flagged(env):
+    s, c = env
+    p = policy_of(c, s, "膝の痛みに配慮し、東西社の杖を使います")
+    assert "東西社" in p.sections["policy"][0]["flag"] and "配慮" not in p.sections["policy"][0]["flag"]
+
+
+@pytest.mark.parametrize("line", ["本人の意向：自宅で暮らしたい。", "利用者の希望：自宅で暮らしたい。", "意向：自宅で暮らしたい。"])
+def test_form_labels_are_not_taken_for_speakers(env, line):
+    s, c = env
+    (s.drive_root / ASSESS).write_text(line, encoding="utf-8")
+    p = plan_of(c, s, wire(sections=[WireSection(key="intent", items=[item("x", "自宅で暮らしたい。", who="本人")])]))
+    assert not p.sections["intent"][0]["flag"]
+
+
+def test_speaker_on_the_line_above_is_seen(env):
+    s, c = env
+    (s.drive_root / ASSESS).write_text("長女：\n施設に入れたくない。", encoding="utf-8")
+    p = plan_of(c, s, wire(sections=[WireSection(key="intent", items=[item("x", "施設に入れたくない。", who="本人")])]))
+    assert "誰の言葉" in p.sections["intent"][0]["flag"]
+
+
+@pytest.mark.parametrize("line, words", [("長女さん：施設は考えていない。", "施設は考えていない"), ("長女は「施設は考えていない」", "施設は考えていない")])
+def test_speaker_words_are_removed_whole(env, line, words):
+    s, c = env
+    (s.drive_root / ASSESS).write_text(line, encoding="utf-8")
+    p = plan_of(c, s, wire(sections=[WireSection(key="intent", items=[item("x", line, who="長女")])]))
+    assert texts(p.sections["intent"]) == [f"長女: {words}"]
+
+
+@pytest.mark.parametrize("line, days", [("毎週月曜 9:00〜15:00 通所介護", "月"), ("通所水曜 9:00〜15:00", "水"), ("週2回(月・木) 9:00〜15:00", "月、木"), ("(月) 9:00〜15:00", "月"), ("月木 9:00〜15:00", "月、木"), ("平日 9:00〜15:00", "平日")])
+def test_usual_ways_of_writing_days_are_read(env, line, days):
+    s, c = env
+    (s.drive_root / PLAN).write_text(line, encoding="utf-8")
+    p = plan_of(c, s, wire(week=[WireWeek(days=days, start="9:00", end="15:00", service="通所介護", file=PLAN, quote=line)]))
+    assert p.week[0]["days"] == days
+
+
+def test_every_month_is_not_monday(env):
+    s, c = env
+    (s.drive_root / PLAN).write_text("毎月 9:00〜15:00 面談", encoding="utf-8")
+    p = plan_of(c, s, wire(week=[WireWeek(days="月", start="9:00", end="15:00", service="面談", file=PLAN, quote="毎月 9:00〜15:00 面談")]))
+    assert p.week[0]["days"] == BLANK
+
+
+def test_monday_written_in_full_is_not_sunday_too():
+    from keika.care_plan import _days_of
+    assert _days_of("月曜日") == ["月"]
+
+
+@pytest.mark.parametrize("line, start", [("月曜 9時30分〜15時", "9:30"), ("月曜 10時15分〜15時", "10:15"), ("月曜 9時00分〜15時", "9:00"), ("月曜 09:30〜15時", "9:30")])
+def test_time_written_with_minutes_is_read(env, line, start):
+    s, c = env
+    (s.drive_root / PLAN).write_text(line, encoding="utf-8")
+    p = plan_of(c, s, wire(week=[WireWeek(days="月", start=start, end="", service="通所介護", file=PLAN, quote=line)]))
+    assert p.week[0]["start"] == start
+
+
+@pytest.mark.parametrize("value, quote", [("週1回", "隔週1回"), ("月1回", "3か月1回"), ("週3回", "週3回の利用は断った"), ("週", "週2回")])
+def test_part_of_a_frequency_that_changes_the_meaning_is_blank(env, value, quote):
+    s, c = env
+    (s.drive_root / PLAN).write_text(quote, encoding="utf-8")
+    p = plan_of(c, s, wire(rows=[WireRow(cells=[cell("need", "歩きたい", "長く歩くと休む"), cell("frequency", value, quote, PLAN)])]))
+    assert p.rows[0]["frequency"]["text"] == BLANK
+
+
+@pytest.mark.parametrize("user_id", ["../利用者/U01_試験太郎/x", "../../外", "a/b"])
+def test_export_stays_in_its_folder_whatever_the_user_id_is(env, user_id):
+    from dataclasses import replace
+    s, c = env
+    p = replace(plan_of(c, s), user_id=user_id)
+    rel = save_to_output(s, p)
+    assert rel.count("/") == 1 and rel.startswith(OUTPUT_DIR + "/") and (s.drive_root / rel).is_file()
+
+
+def test_script_treats_a_removed_cell_as_a_conflict_and_marks_before():
+    from keika.web import app as web
+    js = (pathlib.Path(web.__file__).parent / "static" / "care_plan.js").read_text(encoding="utf-8")
+    assert 'body.append("before_sent", "1")' in js and "r.status === 404" in js and "defaultValue" in js and "new Blob" in js
+
+
+def test_saved_text_with_old_line_ends_can_be_edited(env):
+    s, c = env
+    i = make(c, s)
+    row = c.execute("SELECT payload FROM care_plans WHERE id = ?", (i,)).fetchone()
+    import json
+    d = json.loads(row["payload"])
+    d["sections"]["policy"][0]["text"] = "一行目\r\n二行目"
+    c.execute("UPDATE care_plans SET payload = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), i))
+    c.commit()
+    edit_cell(c, i, d["sections"]["policy"][0]["id"], "直した", "一行目\n二行目")
+    assert get_care_plan(c, i).sections["policy"][0]["text"] == "直した"
