@@ -218,10 +218,16 @@ mark.diff-old { background: var(--finding-soft); color: inherit; text-decoration
 mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: underline 2px var(--nudge); text-underline-offset: 3px; }
 .compare-mirror mark.diff-new { color: transparent; }
 @media (max-width: 760px) { .compare { grid-template-columns: minmax(0, 1fr); } }
-.judge-table { margin: 8px 0; }
-.judge-table th, .judge-table td { white-space: normal; overflow-wrap: anywhere; padding: 6px 10px; width: 50%; }
-.judge-table .judge-input { width: 100%; max-width: none; box-sizing: border-box; font: inherit; padding: 2px 8px; border: 1px solid var(--accent); border-radius: 4px; background: var(--paper); }
-.judge-input:read-only { border-color: var(--line); color: var(--muted); }
-.judge-count { display: block; }
 .compare-fold { margin: 8px 0 12px; }
 .compare-fold summary { cursor: pointer; color: var(--accent); margin-bottom: 8px; }
+.proposal { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+.card-reason { margin: 0 0 4px; }
+.card-ask label { display: block; margin-bottom: 6px; }
+.card-ask input { display: block; width: 100%; max-width: none; margin-top: 4px; box-sizing: border-box; }
+.review-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin: 10px 0 0; }
+.review-actions > button { padding: 6px 24px; }
+.ng > summary { list-style: none; cursor: pointer; display: inline-block; padding: 6px 24px; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); }
+.ng > summary::-webkit-details-marker { display: none; }
+.ng[open] { flex-basis: 100%; }
+.card-instruction { display: block; width: 100%; box-sizing: border-box; font: inherit; margin-top: 4px; }
+.minor > summary { cursor: pointer; margin: 16px 0 8px; color: var(--muted); }

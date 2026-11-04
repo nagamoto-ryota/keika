@@ -17,6 +17,11 @@ SNAPSHOT = REPO / "demo" / "snapshot" / "keika.db"
 TALKS = ["会議_柚木_20261105_1400.txt", "訪問_柚木_20261112.txt"]
 
 
+def review_cards(conn: sqlite3.Connection) -> int:
+    """確認カードの枚数。録画でカードの場面を撮るので、無ければ作り直しをやめる。"""
+    return conn.execute("SELECT COUNT(*) FROM review_items WHERE status = 'open'").fetchone()[0]
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     from keika.claude import METER, make_client
@@ -64,8 +69,10 @@ def main() -> int:
         for user_id in ("U04", "U07"):  # 訪問前の1枚に、聞くことも入れておく
             make_questions(conn, client, s, user_id)
         bad = conn.execute("SELECT (SELECT COUNT(*) FROM records WHERE source = 'intake:mcp') + (SELECT COUNT(*) FROM review_items WHERE source = 'mcp')").fetchone()[0]
-        print("下書き:", [(d.title, d.flagged) for d in list_drafts(conn)], "手順の案:", bool(plan), "点検の失敗:", failed, "mcp の行:", bad, f"約 ${METER.cost_usd:.2f}")
-        if failed or bad or not plan:
+        print("下書き:", [(d.title, d.flagged) for d in list_drafts(conn)], "手順の案:", bool(plan), "点検の失敗:", failed, "mcp の行:", bad, "確認カード:", review_cards(conn), f"約 ${METER.cost_usd:.2f}")
+        if not review_cards(conn):
+            print("確認カードがありません。録画に進まず報告してください。")
+        if failed or bad or not plan or not review_cards(conn):
             print("作り直しをやめました。今の見本はそのままです。")
             return 1
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")

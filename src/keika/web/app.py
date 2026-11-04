@@ -34,6 +34,7 @@ from keika.legal_texts import basis_for
 from keika.med_names import decide_fix, decide_keep, decisions, message as med_message, open_checks, unconfirmed_record_ids
 from keika.visit_notes import get_notes, mark_used, save_note, sheet_items, to_record_text
 from keika.intake import IntakeResult, open_reviews, original_of, process_text, resolve_review, review_original, to_review
+from keika.review_card import card_view, find_reason, revise
 from keika.text_compare import compare
 from keika.ledger import User, get_user, list_people, list_users, upsert_user
 from keika.machine_checks import HOME_VISIT, PLAN_TYPES, run_machine_checks, user_refs
@@ -190,12 +191,15 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
+    review_notices: dict[int, str] = {}
+
     def _reviews_for(cm: str | None) -> list[dict]:
         """担当の絞り込み中は、その人の分と、誰の話か決まっていない分を出す。"""
         if cm == OFFICE_TAB:
             return []
         mine = {u.id for u in list_users(conn, cm=cm)} if cm else None
-        return [it for it in open_reviews(conn) if mine is None or not it["entry"].get("user_id") or it["entry"]["user_id"] in mine]
+        items = [it for it in open_reviews(conn) if mine is None or not it["entry"].get("user_id") or it["entry"]["user_id"] in mine]
+        return [it | {"card": card_view(conn, it), "notice": review_notices.pop(it["id"], "")} for it in items]
 
     def _office_for(cm: str | None) -> list:
         if cm and cm != OFFICE_TAB:
@@ -463,8 +467,31 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         c = compare(original, body)
         return {"mode": c.mode, "left": c.left, "right": c.right, "legend": c.legend}
 
+    def _revise(review_id: int, instruction: str, answer: str, body: str):
+        try:
+            review_notices[review_id] = revise(conn, client_factory(), s, review_id, instruction=instruction, answer_text=answer, body=body)
+        except RuntimeError as e:  # キーが無い時
+            review_notices[review_id] = f"直せませんでした（{e}）"
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse("/#kakunin", status_code=303)
+
+    @app.post("/review/{review_id}/revise")
+    def post_review_revise(review_id: int, instruction: str = Form(""), answer: str = Form(""), body: str = Form("")):
+        return _revise(review_id, instruction, answer, body)
+
+    @app.post("/review/{review_id}/reason")
+    def post_review_reason(review_id: int):
+        """カードを開いた時に1回だけ作る。理由が取れなくてもカードはそのまま使える。"""
+        try:
+            return {"reason": find_reason(conn, client_factory(), s, review_id)}
+        except (RuntimeError, ValueError):
+            return {"reason": ""}
+
     @app.post("/review/{review_id}")
-    def post_review(review_id: int, background: BackgroundTasks, user_id: str = Form(""), body: str = Form(""), action: str = Form("save")):
+    def post_review(review_id: int, background: BackgroundTasks, user_id: str = Form(""), body: str = Form(""), action: str = Form("save"), instruction: str = Form(""), answer: str = Form("")):
+        if action == "save" and (instruction.strip() or answer.strip()):  # 書いた内容を捨てて記録しない
+            return _revise(review_id, instruction, answer, body)
         chosen = user_id if action == "save" and user_id else None
         try:
             record = resolve_review(conn, review_id, user_id=chosen, body=body or None, s=s)

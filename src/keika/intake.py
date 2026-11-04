@@ -269,6 +269,13 @@ def _save_entry(conn: sqlite3.Connection, s: Settings, e: WireEntry, source: str
     ))
 
 
+def checked_warnings(conn: sqlite3.Connection, s: Settings, said: str, entry: WireEntry, date_hint: str | None) -> list[str]:
+    """話した事に無い物を返す。取り込みと、確認カードで直した時に同じ検査を通すため。"""
+    names = _name_parts(conn)
+    fixed = " ".join(f.fixed for f in entry.name_fixes if squash(f.heard) in squash(said) and any(part in f.fixed for part in names))
+    return invented_terms(said + " " + fixed, entry.body, names) + _unspoken_fields(said, entry, s, date_hint)
+
+
 def process_text(
     conn: sqlite3.Connection, client: Any, s: Settings, text: str, source: str, *,
     date_hint: str | None = None, on_saved: Callable[[str], None] | None = None,
@@ -287,10 +294,8 @@ def process_text(
     if not wire.entries:
         return [IntakeResult(review_id=to_review(conn, original, source, {}, [], "記録にできる内容を読み取れませんでした"))]
     results, saved = [], []
-    names = _name_parts(conn)
     for entry in wire.entries:
-        fixed = " ".join(f.fixed for f in entry.name_fixes if squash(f.heard) in squash(text) and any(part in f.fixed for part in names))
-        warnings = invented_terms(text + " " + fixed, entry.body, names) + _unspoken_fields(text, entry, s, date_hint)
+        warnings = checked_warnings(conn, s, text, entry, date_hint)
         note = entry.ambiguity_note
         problem = not get_user(conn, entry.user_id) or entry.ambiguous or not _name_in_talk(text, entry.spoken_name, entry.name_fixes) or not _calls_this_user(conn, entry.spoken_name, entry.user_id, entry.name_fixes)
         if problem or warnings:
@@ -335,42 +340,6 @@ def term_context(body: str, term: str) -> str:
     return body[start:end]
 
 
-_TITLE = r"(?:さん|様|氏|医師|先生|看護師|相談員|ケアマネ)?"
-
-
-def written_form(body: str, name: str) -> str:
-    """台帳の名前が、記録の文でどう書かれているかを返す。無ければ空。1字の名前は別の語に紛れるので探さない。"""
-    parts = name.split()
-    whole = re.search(r"[\s　]*".join(re.escape(p) for p in parts) + _TITLE, body) if parts else None
-    if whole:
-        return whole[0]
-    for part in sorted(reversed(parts), key=len, reverse=True):  # 同じ長さなら下の名前から（家族で名字が同じため）
-        found = re.search(re.escape(part) + _TITLE, body) if len(part) >= 2 else None
-        if found:
-            return found[0]
-    return ""
-
-
-def _judgements(conn: sqlite3.Connection, entry: dict, warnings: list[str]) -> list[dict]:
-    """確認の画面に出す「入力」と「記録での書き方」の対。読み替えた名前と、入力に無かった言葉だけを並べる。"""
-    body = entry.get("body") or ""
-    fixes = [f for f in entry.get("name_fixes", []) if squash(f["heard"]) != squash(f["fixed"])]
-    chosen = get_user(conn, entry.get("user_id") or "")
-    rows = []
-    for f in fixes:
-        written = written_form(body, f["fixed"])
-        note = ""
-        if not written:
-            note = "名前は書いていません（上で選んだ人の記録です）" if chosen and squash(chosen.name) == squash(f["fixed"]) else "記録の文には出ていません"
-        rows.append({"heard": f["heard"], "written": written, "count": body.count(written) if written else 0, "note": note})
-    for word in warnings:
-        if any(word in f["fixed"] for f in fixes):
-            continue  # 読み替えの行で分かる
-        context = term_context(body, word)
-        rows.append({"heard": "", "written": context, "count": body.count(context), "note": ""})
-    return rows
-
-
 def open_reviews(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute("SELECT * FROM review_items WHERE status = 'open' ORDER BY id")
     items = []
@@ -378,7 +347,6 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
         entry, warnings = json.loads(r["entry"]), json.loads(r["warnings"])
         items.append({"id": r["id"], "original": r["original"], "source": r["source"], "entry": entry, "warnings": warnings,
                       "note": r["note"].replace(UNSPOKEN_NOTE, "").replace("話に無い語が入っているかもしれません", "").strip(),
-                      "judgements": _judgements(conn, entry, warnings),
                       "tidied": bool(entry.get("body")),
                       "compare": compare(r["original"], entry.get("body") or r["original"])})
     return items
@@ -387,6 +355,12 @@ def open_reviews(conn: sqlite3.Connection) -> list[dict]:
 def review_original(conn: sqlite3.Connection, review_id: int) -> str | None:
     row = conn.execute("SELECT original FROM review_items WHERE id = ? AND status = 'open'", (review_id,)).fetchone()
     return row["original"] if row else None
+
+
+def _written_on_card(entry: dict) -> str:
+    """確認カードで人が書いた事も、記録の元として残す。"""
+    written = entry.get("instructions", []) + [f"合っていると確認: {w}" for w in entry.get("confirmed", [])]
+    return "\n\n【確認で人が書いた内容】\n" + "\n".join(written) if written else ""
 
 
 def resolve_review(conn: sqlite3.Connection, review_id: int, *, user_id: str | None, body: str | None = None, s: Settings | None = None) -> Record | None:
@@ -405,7 +379,7 @@ def resolve_review(conn: sqlite3.Connection, review_id: int, *, user_id: str | N
         kind_read=None if entry["kind_read"] == "不明" else entry["kind_read"], monitoring=entry["monitoring"], partner=entry["partner"],
         body=body or entry["body"], author=_author(conn, user_id), source=f"intake:{row['source']}",
     ))
-    conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, row["original"]))
+    conn.execute("INSERT INTO intake_originals (record_id, original) VALUES (?, ?)", (record.id, row["original"] + _written_on_card(entry)))
     conn.execute("UPDATE review_items SET status = 'resolved' WHERE id = ?", (review_id,))
     conn.commit()
     if s:

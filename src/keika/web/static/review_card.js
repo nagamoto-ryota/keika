@@ -48,32 +48,39 @@
       timer = setTimeout(refresh, 250);
     });
 
-    // 表の欄で打ち直すと、記録の文の同じ書き方をまとめて置き換える
-    var inputs = Array.prototype.slice.call(card.querySelectorAll(".judge-input"));
-    function lockMissing() {  // 全文の方で直された語は、もう置き換えられない
-      inputs.forEach(function (input) {
-        input.readOnly = !input.dataset.current || box.value.indexOf(input.dataset.current) < 0;
-      });
-    }
-    inputs.forEach(function (input) {
-      input.dataset.current = input.value;
-      input.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") {  // Enter で記録してしまわないように
-          e.preventDefault();
-          input.blur();
-        }
-      });
-      input.addEventListener("change", function () {
-        if (input.readOnly) return;
-        box.value = box.value.split(input.dataset.current).join(input.value);
-        input.dataset.current = input.value;
-        box.dispatchEvent(new Event("input"));
-      });
+    var form = card.querySelector("form");
+    form.addEventListener("submit", function (e) {
+      var by = e.submitter;
+      if (by && by.classList.contains("card-revise")) {
+        by.textContent = "直しています…";
+        setTimeout(function () { by.disabled = true; }, 0);  // 二度押しで二重に呼ばない
+      }
     });
-    box.addEventListener("input", lockMissing);
+
+    var reason = card.querySelector(".card-reason");
+    if (card.dataset.reason) {
+      fetch(card.dataset.reason, { method: "POST" }).then(function (r) {
+        return r.ok ? r.json() : { reason: "" };
+      }).then(function (d) {
+        if (d.reason) {
+          reason.textContent = d.reason;
+          reason.hidden = false;
+        }
+      }).catch(function () {});  // 理由が取れなくてもカードは使える
+    }
     if (box.value !== mirror.textContent.replace(/\u200b$/, "")) {  // ブラウザが打った文を復元した時
       paint(mirror, [[box.value, false]], "diff-new", true);
       refresh();
     }
   });
+
+  // 畳んだ中へのリンク（#kusuri など）で来たら開く
+  if (location.hash) {
+    var target = document.querySelector(location.hash);
+    var fold = target && target.closest("details");
+    if (fold) {
+      fold.open = true;
+      target.scrollIntoView();
+    }
+  }
 })();

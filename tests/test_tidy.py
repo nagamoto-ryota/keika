@@ -8,6 +8,7 @@ from keika.claude_checks import CheckRun, ProgressMark, save_run
 from keika.db import connect
 from keika.files import scan
 from keika.intake import open_reviews, term_context, to_review
+from keika.review_card import card_view
 from keika.ledger import User, get_user, upsert_user
 from keika.progress import user_progress
 from keika.reading import DocFacts, _save
@@ -140,4 +141,4 @@ def test_warning_is_shown_in_plain_words(env):
     body = TestClient(create_app(s)).get("/").text
     assert "入力にありません" in body and "15時から訪問した" in body
     assert "話に無いかもしれない語" not in body
-    assert open_reviews(c)[0]["judgements"][0]["written"] == "15時から訪問した"
+    assert "15時から訪問した" in card_view(c, open_reviews(c)[0])["question"]

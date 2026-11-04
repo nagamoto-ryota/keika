@@ -9,14 +9,19 @@
 
 <h1 class="big">やること <span class="count">{{ board.total + reviews|length + office|length + med_checks|length + drafts|length }}</span></h1>
 
-{% if reviews %}
-<section class="person" id="kakunin">
-  <h2>記録の確認 <span class="muted small">{{ reviews|length }}件</span></h2>
-  <p>AI が迷った記録です。記録での書き方が合っていれば、そのまま記録してください。違っていれば、その場で打ち直せます。</p>
+<section class="person consult" id="kakunin">
+  <h2>ケイカからの相談 <span class="muted small">{{ reviews|length }}件</span></h2>
+  {% if reviews %}
+  <p class="small muted">AI が迷った記録の確認です。よければ〔いいよ〕、違えば〔違う〕を押してください。</p>
   <div class="compare-cards">{% for it in reviews %}{% include "_review_card.html" %}{% endfor %}</div>
-  <script src="/static/review_card.js"></script>
+  {% else %}
+  <p class="muted">今はありません。</p>
+  {% endif %}
 </section>
-{% endif %}
+<script src="/static/review_card.js"></script>
+
+<details class="minor"{% if not reviews %} open{% endif %}>
+<summary>細かい項目 <strong>{{ board.total + office|length + med_checks|length + drafts|length }}件</strong></summary>
 
 {% if drafts %}
 <section class="person" id="shitagaki">
@@ -87,4 +92,5 @@
 </details>
 {% endif %}
 
+</details>
 {% endblock %}
