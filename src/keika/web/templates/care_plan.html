@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }}の下書き - {{ user.name }} - ケイカ{% endblock %}
+{% macro cell(c, label) %}<div class="cell-box{{ ' flagged' if c.flag }}">
+  <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>{{ c.text }}</textarea>
+  <div class="cell-print">{{ c.text }}</div>
+  {% if c.flag %}<p class="draft-flag no-print">{{ c.flag }}</p>{% endif %}
+  {% for src in (c.sources if c.sources else ([c] if c.quote else [])) %}<details class="no-print"><summary class="muted">元の書類</summary>{% if src.file and src.file != records_name %}<a href="/doc?path={{ src.file|urlencode }}">{{ src.file.rsplit('/', 1)[-1] }}</a>{% else %}支援経過{% endif %}: {{ src.quote }}</details>{% endfor %}
+</div>{% endmacro %}
+{% macro lines(key, label) %}{% for c in p.sections[key] %}{{ cell(c, label) }}{% endfor %}{% if not sample %}<div class="line-add no-print"><form method="post" action="/careplans/{{ p.id }}/lines" class="flush-first"><input type="hidden" name="key" value="{{ key }}"><button class="plain small">行を足す</button></form></div>{% endif %}{% endmacro %}
+{% macro section_row(key) %}<tr><th>{{ p.headings[key] }}</th><td>{{ lines(key, p.headings[key]) }}</td></tr>{% endmacro %}
+{% block main %}
+<p class="muted no-print"><a href="/users/{{ user.id }}">{{ user.name }}</a> のページへ戻る</p>
+<h1>{{ p.title }}<span class="muted small">（下書き）</span></h1>
+<p class="draft-note">AI の案です。書類と記録から作りました。どのマスも、その場で打って直せます。確定は人が行います。説明、同意、交付はこの画面では扱いません。読み取れなかった欄は「〇〇」のままです。</p>
+{% if p.flagged %}<p class="todo-line no-print">元の書類と見比べたいマスが {{ p.flagged }} 件あります。左に赤い線の付いたマスを見てください。</p>{% endif %}
+
+<div class="write-actions no-print">
+  <span class="small muted" id="plan-state" role="status">{{ '見本のため保存されません' if sample else '打った内容は自動で保存します' }}</span>
+  <a class="plain-link flush-link" href="/careplans/{{ p.id }}/docx">Word で保存する</a>
+  <button type="button" class="plain" id="print-plan">印刷する</button>
+  {% if not sample %}
+  <form method="post" action="/careplans/{{ p.id }}/export" class="flush-first inline"><button class="plain">事業所のフォルダの出力先に置く</button></form>
+  <form method="post" action="/careplans/{{ p.id }}/compare" class="flush-first inline busy-button"><button class="plain">アセスメントと読み比べる</button></form>
+  {% endif %}
+</div>
+{% if saved == 'failed' %}<p class="notice no-print">出力先に置けませんでした。フォルダを確かめてください。</p>{% elif saved %}<p class="notice no-print">Word を置きました: {{ saved }}（読み取りの対象の外なので、点検はこの下書きを読みません。今ある書類は変えていません）</p>{% endif %}
+{% if compare == 'none' %}<p class="notice no-print">読み比べるアセスメントが見当たりません。</p>{% endif %}
+{% if compare == 'failed' %}<p class="notice no-print">読み比べられませんでした。時間をおいて、もう一度押してください。</p>{% endif %}
+{% if p.gaps is not none %}
+<section class="no-print">
+  <h2>アセスメントとの食い違い <small class="muted">{{ p.gaps|length }}件</small></h2>
+  {% if not p.gaps_fresh %}<p class="notice">読み比べた後に下書きを直しています。もう一度読み比べてください。</p>{% endif %}
+  {% if not p.gaps %}<p class="muted">読み比べた範囲では見つかりませんでした。</p>{% endif %}
+  {% for g in p.gaps %}
+  <article class="card finding">
+    <p>{{ g.note }}</p>
+    <p class="small">下書き: {{ g.plan_text }}</p>
+    <p class="small"><a href="/doc?path={{ g.file|urlencode }}">{{ g.file.rsplit('/', 1)[-1] }}</a>: {{ g.quote }}{% if g.unverified %}（スキャンのため現物で確かめてください）{% endif %}</p>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
+<div id="plan-sheet" data-url="{{ '' if sample else '/careplans/' ~ p.id ~ '/cells' }}">
+{% if p.kind == 'kyotaku' %}
+<h2>第１表　居宅サービス計画書（１）</h2>
+{% else %}
+<h2>介護予防サービス・支援計画書</h2>
+{% endif %}
+<table class="plan-sheet">
+  {% for pair in p.head.items()|batch(3) %}<tr>{% for label, c in pair %}<th>{{ label }}</th><td>{{ cell(c, label) }}</td>{% endfor %}</tr>{% endfor %}
+</table>
+<table class="plan-sheet">
+  <colgroup><col style="width: 24%"><col></colgroup>
+  {% if p.kind == 'kyotaku' %}
+  <tr><th>利用者及び家族の生活に対する意向を踏まえた課題分析の結果</th><td>{{ lines('intent', p.headings['intent']) }}{{ lines('analysis', p.headings['analysis']) }}</td></tr>
+  {{ section_row('opinion') }}{{ section_row('policy') }}{{ section_row('reason') }}
+  {% else %}
+  {% for key in p.headings if key != 'week_other' %}{{ section_row(key) }}{% endfor %}
+  {% endif %}
+</table>
+
+<h2>{{ '第２表　居宅サービス計画書（２）' if p.kind == 'kyotaku' else '支援計画' }}</h2>
+<div class="sheet-wrap">
+<table class="plan-sheet wide">
+  <tr>{% for key, label in p.title_columns().items() %}<th>{{ label }}</th>{% endfor %}{% if not sample %}<th class="no-print" style="width: 56px"></th>{% endif %}</tr>
+  {% for r in p.rows %}
+  <tr>{% for key, label in p.title_columns().items() %}<td>{{ cell(r[key], label) }}</td>{% endfor %}
+    {% if not sample %}<td class="no-print"><form method="post" action="/careplans/{{ p.id }}/rows/remove" class="flush-first"><input type="hidden" name="item" value="{{ r[p.title_columns()|first].id }}"><button class="plain small">消す</button></form></td>{% endif %}</tr>
+  {% endfor %}
+</table>
+</div>
+{% if p.kind == 'kyotaku' %}<p class="small muted">※1 保険給付の対象かどうかの区分　※2 当該サービス提供を行う事業所</p>{% endif %}
+{% if not sample %}<form method="post" action="/careplans/{{ p.id }}/rows" class="flush-first no-print"><button class="plain small">行を足す</button></form>{% endif %}
+
+<h2>{{ '第３表　週間サービス計画表' if p.kind == 'kyotaku' else '週間の予定' }}</h2>
+<div class="sheet-wrap">
+<table class="plan-sheet wide">
+  <tr><th style="width: 90px"></th>{% for d in '月火水木金土日' %}<th>{{ d }}</th>{% endfor %}</tr>
+  {% for band, days in p.grid.items() %}<tr><th>{{ band }}</th>{% for d in '月火水木金土日' %}<td>{{ cell(days[d], band ~ ' ' ~ d) }}</td>{% endfor %}</tr>{% endfor %}
+</table>
+</div>
+{% if p.week_extra %}
+<p class="todo-line small">曜日が読み取れず、表に置けなかった予定です。表に写すか、直してください。</p>
+<table class="plan-sheet"><tr><td>{% for c in p.week_extra %}{{ cell(c, '置けなかった予定') }}{% endfor %}</td></tr></table>
+{% endif %}
+<table class="plan-sheet">
+  <colgroup><col style="width: 24%"><col></colgroup>
+  {% if p.kind == 'kyotaku' %}{{ section_row('activity') }}{% endif %}
+  {{ section_row('week_other') }}
+</table>
+</div>
+
+<p class="small muted no-print">Word はマスを結合しない表で作ります。下書きのまま利用者のフォルダに置くと、点検が計画書として読みます。確定してから置いてください。作り直すと別の下書きになり、この下書きと手直しはそのまま残ります。</p>
+{% if not sample %}
+<form method="post" action="/users/{{ user.id }}/careplan" class="no-print flush-first busy-button"><button class="plain">AI の案をもう1つ作る</button></form>
+{% endif %}
+
+{% if p.held %}
+<section class="no-print">
+  <h2>下書きに入れなかった文</h2>
+  <p class="muted small">薬、診断、受診の判断や、特定の事業所を勧める文が {{ p.held|length }} 件あったので、AI の文は入れていません。元の書類をご自身で確かめてください。</p>
+  {% for h in p.held if h.quote %}<p class="small">元の書類: {{ h.quote }}</p>{% endfor %}
+</section>
+{% endif %}
+
+<details class="no-print"><summary>変更の履歴（{{ history|length }}件）</summary>
+  {% if not history %}<p class="muted small">まだ直していません。</p>{% endif %}
+  {% for h in history %}<p class="small"><span class="muted">{{ h.edited_at[:16].replace('T', ' ') }} {{ h.place }}</span><br>{{ h.before_text or '（空）' }} → {{ h.after_text or '（空）' }}</p>{% endfor %}
+</details>
+<script src="/static/care_plan.js"></script>
+{% endblock %}

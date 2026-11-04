@@ -18,7 +18,8 @@ from markupsafe import Markup, escape
 from urllib.parse import urlparse
 
 from keika.claude import make_client
-from keika.claude_checks import CheckRun, check_and_save, latest_run
+from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
+from keika.claude_checks import APP_RECORDS, CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
 from keika.visit_questions import get_questions, make_questions, questions_key
@@ -26,6 +27,7 @@ from keika.visit_sheet import build_sheet
 from keika.drafts import SECTIONS, draft_for_results, finish_homework, move_record_drafts, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
+from keika.guide import consent_docx
 from keika.findings import Finding, fingerprint
 from keika.claude_checks import crosses_line
 from keika.legal_texts import basis_for
@@ -510,6 +512,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "unread": len(user_refs(conn, s, user)) - len(facts),
             "cells": user_progress(conn, s, user),
             "drafts": list_drafts(conn, user_id, status=None),
+            "care_plans": list_care_plans(conn, user_id),
         })
 
     def _find(user_id: str, fp: str) -> Finding:
@@ -547,6 +550,114 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         inline = ext in BINARY_EXTS
         return FileResponse(target, content_disposition_type="inline" if inline else "attachment", filename=target.name,
                             headers={"X-Content-Type-Options": "nosniff"})
+
+    def _care_plan_or_404(plan_id: int):
+        try:
+            plan = get_care_plan(conn, plan_id)
+        except OverflowError:  # データベースの整数に入らない番号
+            plan = None
+        if plan is None:
+            raise HTTPException(404, "下書きが見つかりません")
+        return plan
+
+    def _care_plan_page(request: Request, plan, compare: str = "", saved: str = ""):
+        return templates.TemplateResponse(request, "care_plan.html", {
+            "p": plan, "user": get_user(conn, plan.user_id), "compare": compare, "saved": saved, "records_name": APP_RECORDS, "history": edit_history(conn, plan.id),
+        }, headers={"Cache-Control": "no-store"})  # 戻るボタンで古い文を開き直して、新しい手直しを上書きしない
+
+    @app.post("/users/{user_id}/careplan")
+    def post_care_plan(request: Request, user_id: str):
+        user = get_user(conn, user_id)
+        if user is None:
+            raise HTTPException(404, "利用者が見つかりません")
+        try:
+            made = make_care_plan(conn, client_factory(), s, user_id)
+        except RuntimeError:  # キーが無い時
+            made = None
+        if made is None:
+            return PlainTextResponse("ケアプランの下書きを作れませんでした。時間をおいて、もう一度押してください。", status_code=502)
+        return RedirectResponse(f"/careplans/{made}", status_code=303)
+
+    @app.get("/careplans/{plan_id}")
+    def care_plan_page(request: Request, plan_id: int, compare: str = "", saved: str = ""):
+        return _care_plan_page(request, _care_plan_or_404(plan_id), compare, saved)
+
+    @app.post("/careplans/{plan_id}/cells")
+    def save_care_plan_cell(plan_id: int, item: str = Form(...), text: str = Form(""), before: str | None = Form(None)):
+        _care_plan_or_404(plan_id)
+        try:
+            edit_cell(conn, plan_id, item, text, before)
+        except KeyError:
+            raise HTTPException(404, "そのマスが見つかりません") from None
+        except EditConflict:
+            raise HTTPException(409, "別の画面で直されています") from None
+        return {"ok": True}
+
+    @app.post("/careplans/{plan_id}/lines")
+    def add_care_plan_line(plan_id: int, key: str = Form(...)):
+        plan = _care_plan_or_404(plan_id)
+        if key not in plan.sections:
+            raise HTTPException(400, "その欄はありません")
+        add_line(conn, plan_id, key)
+        return RedirectResponse(f"/careplans/{plan_id}", status_code=303)
+
+    @app.post("/careplans/{plan_id}/rows")
+    def add_care_plan_row(plan_id: int):
+        _care_plan_or_404(plan_id)
+        add_row(conn, plan_id)
+        return RedirectResponse(f"/careplans/{plan_id}", status_code=303)
+
+    @app.post("/careplans/{plan_id}/rows/remove")
+    def remove_care_plan_row(plan_id: int, item: str = Form(...)):
+        _care_plan_or_404(plan_id)
+        try:
+            remove_row(conn, plan_id, item)
+        except KeyError:
+            raise HTTPException(404, "その行が見つかりません") from None
+        return RedirectResponse(f"/careplans/{plan_id}", status_code=303)
+
+    @app.post("/careplans/{plan_id}/export")
+    def export_care_plan(plan_id: int):
+        plan = _care_plan_or_404(plan_id)
+        try:
+            rel = save_to_output(s, plan)
+        except OSError:
+            return RedirectResponse(f"/careplans/{plan_id}?saved=failed", status_code=303)
+        return RedirectResponse(f"/careplans/{plan_id}?saved={quote(rel)}", status_code=303)
+
+    @app.post("/careplans/{plan_id}/compare")
+    def compare_care_plan(plan_id: int):
+        _care_plan_or_404(plan_id)
+        try:
+            done = check_against_assessment(conn, client_factory(), s, plan_id)
+        except RuntimeError:  # キーが無い時
+            done = None
+        suffix = {True: "", False: "?compare=none", None: "?compare=failed"}[done]
+        return RedirectResponse(f"/careplans/{plan_id}{suffix}", status_code=303)
+
+    @app.get("/careplans/{plan_id}/docx")
+    def care_plan_word(plan_id: int):
+        plan = _care_plan_or_404(plan_id)
+        user = get_user(conn, plan.user_id)
+        name = quote(f"{plan.title}_下書き_{user.name}.docx")
+        return Response(
+            care_plan_docx(plan),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{name}"},
+        )
+
+    @app.get("/guide")
+    def guide_page(request: Request):
+        return templates.TemplateResponse(request, "guide.html", {})
+
+    @app.get("/guide/consent.docx")
+    def guide_consent():
+        name = quote("AI利用の同意書_たたき台.docx")
+        return Response(
+            consent_docx(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{name}"},
+        )
 
     @app.get("/silenced")
     def silenced(request: Request):

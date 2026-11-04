@@ -67,6 +67,12 @@ CREATE TABLE IF NOT EXISTS visit_notes (
   user_id TEXT NOT NULL, item_key TEXT NOT NULL, section TEXT NOT NULL, label TEXT NOT NULL, answer TEXT NOT NULL,
   updated_at TEXT NOT NULL, used_at TEXT, PRIMARY KEY (user_id, item_key)
 );
+CREATE TABLE IF NOT EXISTS care_plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS care_plan_edits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER NOT NULL, place TEXT NOT NULL, before_text TEXT NOT NULL, after_text TEXT NOT NULL, edited_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS drafts (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, kind TEXT NOT NULL, record_id INTEGER, event_date TEXT NOT NULL,
   payload TEXT NOT NULL, original TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
@@ -77,6 +83,10 @@ BEGIN SELECT RAISE(ABORT, '薬名の確認の結果は消せません'); END;
 CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON record_versions
 BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;
 CREATE TRIGGER IF NOT EXISTS versions_no_update BEFORE UPDATE ON record_versions
+BEGIN SELECT RAISE(ABORT, '履歴は変えられません'); END;
+CREATE TRIGGER IF NOT EXISTS care_plan_edits_no_delete BEFORE DELETE ON care_plan_edits
+BEGIN SELECT RAISE(ABORT, '履歴は消せません'); END;
+CREATE TRIGGER IF NOT EXISTS care_plan_edits_no_update BEFORE UPDATE ON care_plan_edits
 BEGIN SELECT RAISE(ABORT, '履歴は変えられません'); END;
 CREATE TRIGGER IF NOT EXISTS records_no_delete BEFORE DELETE ON records
 BEGIN SELECT RAISE(ABORT, '記録は消せません'); END;

@@ -168,3 +168,39 @@ form.inline { display: inline; }
   .note-line::placeholder { color: inherit; }
   .sheet-answer:has(.note-print:not(:empty)) .note-line { display: none; }
 }
+
+.guide-list { list-style: none; padding-left: 0; }
+.guide-list li { padding-left: 1.4em; text-indent: -1.4em; margin: 0.4em 0; }
+.fill { width: 100%; border-collapse: collapse; background: #fff; }
+.fill th, .fill td { border: 1px solid #bbb; padding: 0.4em; text-align: left; vertical-align: top; }
+.fill td { height: 3em; }
+.fill td:first-child { width: 34%; }
+
+.plan-row { border: 1px solid #ddd; margin: 0.8em 0; padding: 0.6em; background: #fff; }
+.plan-row label { display: block; margin-top: 0.4em; }
+.plan-row textarea { width: 100%; }
+.week-grid { width: 100%; border-collapse: collapse; background: #fff; table-layout: fixed; }
+.week-grid th, .week-grid td { border: 1px solid #bbb; padding: 0.3em; text-align: center; vertical-align: top; overflow-wrap: anywhere; }
+
+main:has(.plan-sheet) { max-width: 1240px; }
+.sheet-wrap { overflow-x: auto; }
+.plan-sheet { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 8px; table-layout: fixed; }
+.plan-sheet th, .plan-sheet td { border: 1px solid #999; padding: 0; vertical-align: top; }
+.plan-sheet th { background: var(--paper); font-size: 13px; font-weight: 600; padding: 4px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.plan-sheet td { white-space: normal; overflow-wrap: anywhere; }
+.plan-sheet.wide { min-width: 1160px; }
+.plan-sheet .cell-box { position: relative; padding: 0; }
+.plan-sheet .cell-box + .cell-box { border-top: 1px dotted #bbb; }
+.sheet-cell { display: block; width: 100%; box-sizing: border-box; border: 0; padding: 4px; font: inherit; font-size: 13px; line-height: 1.5; resize: none; background: transparent; field-sizing: content; min-height: 2.2em; overflow: hidden; }
+.sheet-cell:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: #fff; }
+.cell-box.flagged .sheet-cell { box-shadow: inset 3px 0 0 #b3261e; }
+.cell-box.saved-failed .sheet-cell { background: #fdecea; }
+.cell-box details, .cell-box .draft-flag { padding: 0 4px; margin: 0; font-size: 12px; }
+.cell-print { display: none; white-space: pre-wrap; overflow-wrap: anywhere; padding: 3px; font-size: 12px; }
+.plan-sheet .line-add { padding: 2px 4px; }
+@media print {
+  .sheet-cell { display: none; }
+  .cell-print { display: block; }
+  .sheet-wrap { overflow: visible; }
+  .plan-sheet.wide { min-width: 0; }
+}
