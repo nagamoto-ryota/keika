@@ -799,9 +799,11 @@ def _yobo_docx(doc: Any, plan: CarePlan) -> None:
     _note(doc)
     _head_table(doc, plan, 3, [45, 45, 45, 45, 45, 45])
     _table(doc, [[label, _lines(s[key])] for key, label in plan.headings.items() if key != "week_other"], [60, 210])
-    doc.add_heading("支援計画", level=2)
+    doc.add_page_break()
+    doc.add_heading("支援計画（下書き）", level=2)
     _plan_rows(doc, plan)
-    doc.add_heading("週間の予定", level=2)
+    doc.add_page_break()
+    doc.add_heading("週間の予定（下書き）", level=2)
     _week_table(doc, plan)
     _table(doc, [["週単位以外のサービス", _lines(s["week_other"])]], [60, 210])
 

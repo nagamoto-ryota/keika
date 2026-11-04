@@ -999,3 +999,13 @@ def test_saved_text_with_old_line_ends_can_be_edited(env):
     c.commit()
     edit_cell(c, i, d["sections"]["policy"][0]["id"], "直した", "一行目\n二行目")
     assert get_care_plan(c, i).sections["policy"][0]["text"] == "直した"
+
+
+def test_prevention_word_starts_each_part_on_its_own_page_marked_as_a_draft(env):
+    s, c = env
+    (s.drive_root / "利用者" / "U02_予防花子").mkdir()
+    p = get_care_plan(c, make_care_plan(c, FakeClient(answer(WirePlan(sections=[], rows=[], week=[]))), s, "U02"))
+    d = docx.Document(io.BytesIO(to_docx(p)))
+    heads = [x.text for x in d.paragraphs if x.style.name.startswith("Heading")]
+    assert "支援計画（下書き）" in heads and "週間の予定（下書き）" in heads
+    assert sum('w:br w:type="page"' in x._p.xml for x in d.paragraphs) == 2
