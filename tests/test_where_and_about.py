@@ -39,12 +39,17 @@ def finding(**kw):
 
 
 def test_where_names_the_document_and_quote():
-    assert finding_where(finding()) == "根拠: 居宅サービス計画書_2026-08-06「交付: 本人、ほたるい。主治医は空欄。」"
+    assert finding_where(finding()) == "根拠: 居宅サービス計画書 8/6「交付: 本人、ほたるい。主治医は空欄。」"
 
 
 def test_where_names_the_record_with_its_date():
     f = finding(evidence=[Evidence(file="利用者/U04/支援経過_2026-08-01_2026-11-03.csv", quote="各事業所に計画書を交付した。", record_date="2026-08-07"), Evidence(file=DOC, quote="交付")])
     assert finding_where(f) == "根拠: 支援経過 8/7「各事業所に計画書を交付した。」 ほか1件"
+
+
+def test_month_only_name_reads_as_a_month():
+    f = finding(evidence=[Evidence(file="利用者/U04/利用票_2026-09_変更.pdf", quote="署名")])
+    assert finding_where(f) == "根拠: 利用票 9月 変更「署名」"
 
 
 def test_where_for_app_records():
@@ -77,7 +82,7 @@ def test_todo_and_user_pages_show_it_and_counts_do_not_change(env):
     http = TestClient(create_app(s))
     before = build_board(c, s).total
     for path in ("/todo", "/users/U04"):
-        assert "根拠: 居宅サービス計画書_2026-08-06" in http.get(path).text
+        assert "根拠: 居宅サービス計画書 8/6" in http.get(path).text
     assert build_board(c, s).total == before
 
 

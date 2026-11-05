@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import calendar
+import re
 import sqlite3
 from dataclasses import dataclass, field
 
@@ -32,6 +33,8 @@ def _source_label(e: Evidence) -> str:
     name = e.file.rsplit("/", 1)[-1].rsplit(".", 1)[0]
     if "支援経過" in name:
         name = "支援経過"
+    name = re.sub(r"_\d{4}-(\d{2})-(\d{2})", lambda m: f" {int(m[1])}/{int(m[2])}", name)  # 長い日付は画面に出さない
+    name = re.sub(r"_\d{4}-(\d{2})", lambda m: f" {int(m[1])}月", name).replace("_", " ")
     if e.record_date:
         month, day = e.record_date.split("-")[1:]
         return f"{name} {int(month)}/{int(day)}"
