@@ -1,7 +1,7 @@
 """先回りのメール案と共有と送信控え。
 
 案は記録に根拠がある時だけ作り、1つの記録につき1回だけ考える。宛先はその利用者に登録された相手だけ。
-送るのは人が〔送信〕を押した時だけで、処理は send_mail の1か所。このアプリからメールは出ない。控えに残し、
+送るのは人が主ボタンを押した時だけで、処理は send_mail の1か所。このアプリからメールは出ない。控えに残し、
 実際に届ける時の口は〔メールアプリで開く〕（mailto:）だけ。パスワードや認証情報は扱わない。
 """
 from __future__ import annotations
@@ -263,13 +263,26 @@ def out_view(conn: sqlite3.Connection, s: Settings, mail_id: int) -> dict | None
         blocks.append("薬の話が入っています。確かめるまで送れません。")
     consent = "本人の同意が要りそうな内容です。送る前に確かめてください。" if person and person["kind"] == "family" and _CONSENT.search(mail["body"]) else ""
     address = person["address"] if person else ""
-    mailto = f"mailto:{address}?subject={quote(mail['subject'])}&body={quote(mail['body'])}"
-    return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "med": med, "consent": consent, "address": address,
-            "mailto": mailto, "demo": s.as_of is not None, "sent_note": SENT_DEMO if s.as_of else SENT_REAL}
+    med_open = [t for t in med if row["med_ok_body"] != mail["body"]]
+    lines = [{"text": line, "check": _line_needs_check(line, med_open), "rows": max(1, -(-len(line) // 38))} for line in mail["body"].split("\n")]
+    why = f"{blocks[0]}{f'（ほか{len(blocks) - 1}件）' if len(blocks) > 1 else ''}" if blocks else ""
+    sent_mailto = _mailto(row["sent_to"] or "", row["sent_subject"] or "", row["sent_body"] or "") if row["state"] == "sent" else ""
+    return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "med": med, "med_open": bool(med_open), "consent": consent, "address": address,
+            "mailto": _mailto(address, mail["subject"], mail["body"]), "lines": lines, "why": why, "go_line": "確かめて、メールアプリで開く",
+            "sent_mailto": sent_mailto, "demo": s.as_of is not None, "sent_note": SENT_DEMO if s.as_of else SENT_REAL}
+
+
+def _mailto(address: str, subject: str, body: str) -> str:
+    return f"mailto:{address}?subject={quote(subject)}&body={quote(body)}"
+
+
+def _line_needs_check(line: str, med_open: list[str]) -> bool:
+    """本文の中で赤くする行。〇〇、まだ見ていない薬の文、判断に読める文。"""
+    return "〇〇" in line or any(t in line for t in med_open) or _crosses(line)
 
 
 def send_mail(conn: sqlite3.Connection, s: Settings, thread: str, mail_id: int) -> None:
-    """送る処理はここ1か所。人が〔送信〕を押した時だけ呼ぶ。外へは出さず、控えに残す。"""
+    """送る処理はここ1か所。人が主ボタンを押した時だけ呼ぶ。外へは出さず、控えに残す。"""
     row = out_row(conn, thread, mail_id)
     view = out_view(conn, s, mail_id) if row else None
     if view is None or row["state"] != "open":

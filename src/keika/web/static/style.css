@@ -417,3 +417,18 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .guide-lead { margin: 0 0 4px; }
 .guide-lead + .fill td { height: 2.2em; }
 .guide-foot { margin-top: 14px; }
+
+/* メール案: 本文の行をその場で直す */
+.mail-subject-row { display: flex; align-items: baseline; gap: 6px; }
+.mail-subject { flex: 1; font: inherit; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; background: transparent; }
+.mail-line { display: block; width: 100%; box-sizing: border-box; font: inherit; line-height: 1.6; border: 1px solid transparent; border-radius: 4px; padding: 1px 4px; margin: 0; background: transparent; resize: none; field-sizing: content; overflow: hidden; }
+.mail-subject:hover, .mail-line:hover { border-color: var(--line); }
+.mail-subject:focus, .mail-line:focus { border-color: var(--accent); outline: none; background: #fff; }
+.mail-line.is-blank { background: #fdeceb; border-color: #b3261e; color: #8c1d18; }
+#mail-body.mail-body { white-space: normal; }
+.mail-go { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0 6px; }
+.mail-why { color: #8c1d18; font-size: 14px; }
+.mail-side { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; font-size: 14px; }
+.mail-side form { margin: 0; }
+.mail-ai > summary { cursor: pointer; color: var(--accent); padding: 4px 0; }
+.mail-ai[open] { flex-basis: 100%; }

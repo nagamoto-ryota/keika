@@ -15,5 +15,5 @@
 11. 作る間はリポを非公開にしている。上がすべて通ったら公開に戻し、ログインしていないブラウザでリポと `LICENSE` が開けることを確かめてから提出する。公開に戻さないと提出の条件を満たさない。
 12. `python tools/desk_check.py` の「NG」が 0 件（本物の Claude を呼ぶ。約 $0.3）。答えも読む。README に「ケイカの答えの全文は機械で保証できない」と書いてある。
 13. `git diff keep-f64358a -- eval src/keika/claude_checks.py src/keika/intake.py` が空（点検、整文、測定の経路を変えていない）。
-14. このアプリからメールが出ない（`smtplib` などが無く、送信の記録は `send_mail` の1か所だけであることを `tests/test_outbox.py` で確かめている）。人が〔送信〕を押した時だけ控えに残る。ケイカの答えが自動で記録に入らない。
+14. このアプリからメールが出ない（`smtplib` などが無く、送信の記録は `send_mail` の1か所だけであることを `tests/test_outbox.py` で確かめている）。人が主ボタン〔メールアプリで開く〕を押した時だけ控えに残る。ケイカの答えが自動で記録に入らない。
 15. 試用の複製（`data/*_try.db`、`data/trial_base.db`、`data/desk_dev.db`）が提出物に入らない。`data/` は対象外のまま。

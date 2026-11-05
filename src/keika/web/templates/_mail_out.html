@@ -1,51 +1,49 @@
 {% if out.state == 'sent' %}
-<h1 class="do-line">送信控え</h1>
-<p class="mail-sent">{{ out.sent_note }}</p>
+<h1 class="do-line">控えに残しました。送るのはメールアプリからです</h1>
+<p><a class="main-link" href="{{ out.sent_mailto }}">メールアプリで開く</a></p>
+{% if just %}<script>location.href = {{ out.sent_mailto|tojson }};</script>{% endif %}
 <article class="mail-sheet">
   <p><span class="muted small">宛先</span> {{ out.sent_name }} <span class="muted small">{{ out.sent_to }}</span></p>
   <p><span class="muted small">日時</span> {{ out.sent_at[:16].replace('T', ' ') }}</p>
   <p><span class="muted small">件名</span> {{ out.sent_subject }}</p>
-  <p class="mail-body" id="mail-body">{{ out.sent_body }}</p>
+  <p class="mail-body">{{ out.sent_body }}</p>
 </article>
-<p class="small"><a href="/mail/sent">送信控えの一覧</a> ／ <a href="/">やることへ戻る</a></p>
+<p class="small"><a href="/mail/sent">メールの控え</a> ／ <a href="/">やることへ戻る</a></p>
 {% elif out.state == 'dropped' %}
 <h1 class="do-line">要らない案にしました</h1>
 <p class="small"><a href="/">やることへ戻る</a></p>
 {% else %}
-<h1 class="do-line">{{ '確かめて、送ってください' if not out.blocks else '赤い所を直してください' }}</h1>
+<h1 class="do-line">{{ out.go_line }}</h1>
 {% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
-{% if out.blocks %}<div class="mail-stop">{% for b in out.blocks %}<p>{{ b }}</p>{% endfor %}</div>{% endif %}
 {% if out.consent %}<p class="mail-notice">{{ out.consent }}</p>{% endif %}
 {% if m.changed %}<p class="small">{{ m.changed }}</p>{% endif %}
+<form id="mail-form" method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/edit" data-inplace>
 <article class="mail-sheet">
   <p><span class="muted small">宛先</span> {% if out.recipient %}{{ out.recipient.label }} <span class="muted small">{{ out.recipient.kind_label }} {{ out.address or '（アドレス未登録）' }}</span>{% else %}{{ m.to_name }}{% endif %}</p>
-  <p><span class="muted small">件名</span> {{ m.subject }}</p>
-  <p class="mail-body" id="mail-body">{{ (m.body|e)|replace('〇〇', '<mark class="is-blank">〇〇</mark>'|safe)|safe }}</p>
+  <p class="mail-subject-row"><span class="muted small">件名</span> <input class="mail-subject" name="subject" value="{{ m.subject }}" aria-label="件名" autocomplete="off"{% if sample %} readonly{% else %} data-autosave{% endif %}></p>
+  <div class="mail-body" id="mail-body">
+  {% for l in out.lines %}<textarea class="mail-line{{ ' is-blank' if l.check }}" name="line" rows="{{ l.rows }}" aria-label="本文 {{ loop.index }}行目"{% if sample %} readonly{% else %} data-autosave{% endif %}>{{ l.text }}</textarea>
+  {% endfor %}</div>
 </article>
+</form>
 <p class="small muted">{% if out.origin == 'proposal' %}根拠: {{ out.ground }}{% else %}元の記録: {{ out.ground }}{% endif %}（AI が作った案です。最後に決めるのは人です）</p>
-{% if out.med and out.med_ok_body != m.body %}
-<div class="mail-stop">
-  {% for t in out.med %}<p>「{{ t }}」</p>{% endfor %}
-  {% if not sample %}<form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/med-ok"><button class="plain">薬の文を確かめた</button></form>{% endif %}
-</div>
-{% endif %}
 {% if not sample %}
-<div class="review-actions">
-  <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/send"><button class="send-button"{% if out.blocks %} disabled{% endif %}>{{ '送信' if out.demo else '送った控えを残す' }}</button></form>
-  <details class="ng"{% if out.blocks %} open{% endif %}>
-    <summary>直す</summary>
-    <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/edit" class="mail-edit">
-      <p><label>件名<input name="subject" value="{{ m.subject }}"></label></p>
-      <p><label>本文<textarea name="body" rows="8" required>{{ m.body }}</textarea></label></p>
-      <p><button class="plain">この文にする</button></p>
-    </form>
+<div class="mail-go">
+  <button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/send" class="send-button"{% if out.blocks %} disabled{% endif %} data-leave>メールアプリで開く</button>
+  {% if out.blocks %}<span class="mail-why">{{ out.why }}</span>{% endif %}
+  {% if out.med_open %}<button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/med-ok" class="plain">薬の文はこのままでいい</button>{% endif %}
+  <span class="muted small draft-say"></span>
+</div>
+<div class="mail-side">
+  <details class="mail-ai">
+    <summary>AIに直してもらう</summary>
     <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/revise" class="mail-edit">
-      <p><label>または頼んで直す<textarea class="card-instruction" name="instruction" rows="2" required placeholder="例: 金曜までにと足して"></textarea></label></p>
+      <p><textarea class="card-instruction" name="instruction" rows="2" required aria-label="直してほしいこと" placeholder="例: 金曜までにと足して"></textarea></p>
       <p><button class="plain">直してもらう</button></p>
     </form>
   </details>
   <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/drop"><button class="plain">要らない</button></form>
 </div>
-{% if not out.blocks %}<p class="small"><a href="{{ out.mailto }}">メールアプリで開く</a> <span class="muted">実際に使う時はこちらから送ります。</span></p>{% endif %}
+<script src="/static/draft.js"></script>
 {% endif %}
 {% endif %}

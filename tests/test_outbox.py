@@ -165,7 +165,7 @@ def test_nothing_is_sent_until_the_person_presses(env):
     rows = sent_list(c)
     assert len(rows) == 1 and rows[0]["sent_to"].endswith("@example.com") and rows[0]["sent_body"]
     html = TestClient(create_app(s)).get(f"/desk/U04/mail/{i}").text
-    assert SENT_DEMO in html and "送信控え" in html and ">送信</button>" not in html
+    assert "控えに残しました" in html and 'class="send-button"' not in html
     assert home_lines(c) == []
 
 
@@ -177,13 +177,96 @@ def test_sent_list_page_shows_the_copy(env):
     assert "デイサービスこなら坂" in html and "柚木 茂さんの週2回" in html and SENT_DEMO in html
 
 
-def test_the_screen_has_only_three_buttons_and_a_mail_app_link(env):
+def page(s, i, user="U04", **kw):
+    return TestClient(create_app(s, **kw)).get(f"/desk/{user}/mail/{i}").text
+
+
+def main_buttons(html):
+    return html.count('class="send-button"')
+
+
+def test_the_screen_has_one_main_button_and_two_small_ones(env):
     s, c = env
     i = made(s, c)
-    html = TestClient(create_app(s)).get(f"/desk/U04/mail/{i}").text
-    assert ">送信</button>" in html and "<summary>直す</summary>" in html and ">要らない</button>" in html
-    assert ">いいよ</button>" not in html
-    assert 'href="mailto:sv01@example.com?subject=' in html and "メールアプリで開く" in html and GROUND in html
+    html = page(s, i)
+    assert '<h1 class="do-line">確かめて、メールアプリで開く</h1>' in html
+    assert main_buttons(html) == 1 and ">メールアプリで開く</button>" in html
+    assert "<summary>AIに直してもらう</summary>" in html and ">要らない</button>" in html
+    for word in (">送信</button>", "<summary>直す</summary>", "送った控えを残す", ">いいよ</button>", "この文にする"):
+        assert word not in html, word
+    assert GROUND in html
+
+
+def body_lines(html):
+    part = html.split('id="mail-body"')[1].split("</div>")[0]
+    return [seg.split(">", 1) for seg in part.split("<textarea")[1:]]
+
+
+def test_lines_to_check_are_red_in_the_body_and_the_button_says_why(env):
+    s, c = env
+    i = made(s, c)
+    edit_mail(c, "U04", i, "柚木 茂さんの件", "デイサービスこなら坂 岩舘様\n柚木 茂さんの件、〇〇日までに。")
+    html = page(s, i)
+    lines = body_lines(html)
+    assert len(lines) == 2
+    assert "is-blank" not in lines[0][0] and "is-blank" in lines[1][0] and lines[1][1].startswith("柚木 茂さんの件、〇〇日までに。")
+    bar = html.split('class="mail-go"')[1].split("</form>")[0]
+    assert 'class="send-button" disabled' in bar and "〇〇 が残っています" in bar
+
+
+def test_body_text_is_escaped_in_the_lines(env):
+    s, c = env
+    i = made(s, c)
+    edit_mail(c, "U04", i, "柚木 茂さんの件", "デイサービスこなら坂 岩舘様\n柚木 茂さん<b>の件")
+    html = page(s, i)
+    assert "&lt;b&gt;" in html and "<b>の件" not in html
+
+
+def test_lines_are_saved_in_place(env):
+    s, c = env
+    i = made(s, c)
+    r = TestClient(create_app(s)).post(f"/desk/U04/mail/{i}/edit", data={"subject": "件名を直した", "line": ["デイサービスこなら坂 岩舘様", "", "柚木 茂さんの件です。"]})
+    assert r.status_code == 200
+    m = get_mail(c, "U04", i)
+    assert m["subject"] == "件名を直した" and m["body"] == "デイサービスこなら坂 岩舘様\n\n柚木 茂さんの件です。"
+
+
+def test_pressing_keeps_the_latest_lines_in_the_copy(env):
+    s, c = env
+    i = made(s, c)
+    edit_mail(c, "U04", i, "柚木 茂さんの件", "デイサービスこなら坂 岩舘様\n柚木 茂さんの件、〇〇日までに。")
+    r = TestClient(create_app(s)).post(f"/desk/U04/mail/{i}/send", data={"subject": "柚木 茂さんの件", "line": ["デイサービスこなら坂 岩舘様", "柚木 茂さんの件、金曜までに。"]}, follow_redirects=False)
+    assert r.status_code == 303
+    rows = sent_list(c)
+    assert len(rows) == 1 and rows[0]["sent_body"].endswith("金曜までに。")
+
+
+def test_pressing_while_red_keeps_nothing(env):
+    s, c = env
+    i = made(s, c)
+    edit_mail(c, "U04", i, "柚木 茂さんの件", "デイサービスこなら坂 岩舘様\n柚木 茂さんの件、〇〇日までに。")
+    TestClient(create_app(s)).post(f"/desk/U04/mail/{i}/send")
+    assert sent_list(c) == []
+
+
+def test_after_pressing_one_line_and_the_mail_app(env):
+    s, c = env
+    i = made(s, c)
+    client = TestClient(create_app(s))
+    r = client.post(f"/desk/U04/mail/{i}/send", follow_redirects=False)
+    assert r.headers["location"].endswith("?just=1")
+    html = client.get(r.headers["location"]).text
+    assert "控えに残しました。送るのはメールアプリからです" in html
+    assert 'href="mailto:sv01@example.com?subject=' in html and ">メールアプリで開く</a>" in html
+    assert "location.href" in html  # 押した直後だけメールアプリを開く
+    assert "location.href" not in client.get(f"/desk/U04/mail/{i}").text
+
+
+def test_copies_are_one_step_from_the_menu(env):
+    s, c = env
+    nav = TestClient(create_app(s)).get("/").text.split("<nav>")[1].split("</nav>")[0]
+    assert '<a href="/mail/sent"' in nav and "メールの控え" in nav
+    assert '<a href="/mail/sent" aria-current="page">' in TestClient(create_app(s)).get("/mail/sent").text
 
 
 def test_drop_removes_it_from_the_home_without_a_copy(env):
@@ -234,14 +317,6 @@ def test_blank_left_in_the_body_blocks_sending(env):
     assert any("〇〇" in b for b in out_view(c, s, i)["blocks"])
 
 
-def test_blank_is_red_and_the_edit_form_is_open_while_blocked(env):
-    s, c = env
-    i = made(s, c)
-    edit_mail(c, "U04", i, "柚木 茂さんの件", "デイサービスこなら坂 岩舘様\n柚木 茂さん<b>の件、〇〇日までに。")
-    html = TestClient(create_app(s)).get(f"/desk/U04/mail/{i}").text
-    assert '<mark class="is-blank">〇〇</mark>' in html and "<details class=\"ng\" open>" in html and "&lt;b&gt;" in html and "<b>の件" not in html.split('id="mail-body"')[1].split("</p>")[0]
-
-
 def test_crossing_edit_blocks_sending(env):
     s, c = env
     i = made(s, c)
@@ -262,11 +337,16 @@ def test_medicine_in_the_body_stops_until_the_person_checks(env):
     assert out_view(c, s, i)["blocks"]  # 直したらもう一度見る
 
 
-def test_mail_app_link_is_hidden_while_blocked(env):
+def test_medicine_line_is_red_until_the_person_says_it_is_fine(env):
     s, c = env
     i = made(s, c, said=f"{GROUND}。昼の薬が無くなったと話した。朝の薬も。", body="デイサービスこなら坂 岩舘様\n柚木 茂さんは昼の薬が無くなったと話しています。")
-    html = TestClient(create_app(s)).get(f"/desk/U04/mail/{i}").text
-    assert "mailto:" not in html and "薬の文を確かめた" in html
+    html = page(s, i)
+    lines = body_lines(html)
+    assert "is-blank" in lines[1][0] and "mailto:" not in html and ">薬の文はこのままでいい</button>" in html
+    assert 'class="send-button" disabled' in html
+    med_ok(c, "U04", i)
+    html = page(s, i)
+    assert all("is-blank" not in a for a, _ in body_lines(html)) and 'class="send-button" disabled' not in html
 
 
 def test_other_threads_mail_cannot_be_opened_or_sent(env):

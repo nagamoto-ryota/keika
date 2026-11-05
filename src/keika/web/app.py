@@ -172,7 +172,7 @@ def one_view_route(fn: Callable) -> Callable:
 
 NAV_SECTIONS = (
     ("/records/new", "/records/new"), ("/records/", "/board"), ("/desk", "/desk"), ("/board", "/board"), ("/users", "/board"), ("/ledger", "/board"), ("/careplans", "/board"),
-    ("/todo", "/"), ("/review", "/"), ("/office", "/"), ("/silenced", "/"), ("/drafts", "/"),
+    ("/todo", "/"), ("/review", "/"), ("/office", "/"), ("/silenced", "/"), ("/drafts", "/"), ("/mail", "/mail/sent"),
 )
 
 
@@ -374,10 +374,10 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return mail
 
     @app.get("/desk/{thread}/mail/{mail_id}")
-    def desk_mail(request: Request, thread: str, mail_id: int):
+    def desk_mail(request: Request, thread: str, mail_id: int, just: str = ""):
         mail = _mail_or_404(thread, mail_id)
         out = out_view(conn, s, mail_id) if out_row(conn, thread, mail_id) else None
-        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "notice": mail_notices.pop(mail_id, "")})
+        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "just": just == "1", "notice": mail_notices.pop(mail_id, "")})
 
     def _out_or_404(thread: str, mail_id: int) -> None:
         if sample:
@@ -385,14 +385,22 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if out_row(conn, thread, mail_id) is None:
             raise HTTPException(404, "案が見つかりません")
 
+    def _apply_lines(thread: str, mail_id: int, subject: str | None, line: list[str] | None) -> None:
+        """画面で直した件名と行を、押した時に一緒に保存する。"""
+        if line is not None:
+            mail = get_mail(conn, thread, mail_id)
+            edit_mail(conn, thread, mail_id, mail["subject"] if subject is None else subject, "\n".join(line))
+
     @app.post("/desk/{thread}/mail/{mail_id}/send")
-    def desk_mail_send(thread: str, mail_id: int):
+    def desk_mail_send(thread: str, mail_id: int, subject: str | None = Form(None), line: list[str] | None = Form(None)):
         _out_or_404(thread, mail_id)
+        _apply_lines(thread, mail_id, subject, line)
         try:
             send_mail(conn, s, thread, mail_id)
         except Blocked as e:
             mail_notices[mail_id] = str(e)
-        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+            return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}?just=1", status_code=303)
 
     @app.post("/desk/{thread}/mail/{mail_id}/drop")
     def desk_mail_drop(thread: str, mail_id: int):
@@ -401,14 +409,18 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return RedirectResponse("/", status_code=303)
 
     @app.post("/desk/{thread}/mail/{mail_id}/edit")
-    def desk_mail_edit(thread: str, mail_id: int, subject: str = Form(""), body: str = Form("")):
+    def desk_mail_edit(thread: str, mail_id: int, subject: str = Form(""), body: str = Form(""), line: list[str] | None = Form(None)):
         _out_or_404(thread, mail_id)
-        edit_mail(conn, thread, mail_id, subject, body)
+        if line is not None:
+            _apply_lines(thread, mail_id, subject, line)
+        else:
+            edit_mail(conn, thread, mail_id, subject, body)
         return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
 
     @app.post("/desk/{thread}/mail/{mail_id}/med-ok")
-    def desk_mail_med_ok(thread: str, mail_id: int):
+    def desk_mail_med_ok(thread: str, mail_id: int, subject: str | None = Form(None), line: list[str] | None = Form(None)):
         _out_or_404(thread, mail_id)
+        _apply_lines(thread, mail_id, subject, line)
         med_ok(conn, thread, mail_id)
         return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
 

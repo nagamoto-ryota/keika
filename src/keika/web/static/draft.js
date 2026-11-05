@@ -61,6 +61,7 @@
   document.addEventListener("submit", function (e) {
     var form = e.target;
     if (!form.hasAttribute("data-inplace")) return;
+    if (e.submitter && e.submitter.hasAttribute("data-leave")) return;  // 画面を移る押し方は普通に送る
     e.preventDefault();
     send(form, e.submitter);
   });
