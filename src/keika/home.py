@@ -81,7 +81,7 @@ def pick_asks(conn: sqlite3.Connection, s: Settings, keys: list[str], *, write: 
 
 
 def deadline_lines(board: Board, s: Settings) -> list[dict]:
-    """期限の近い物だけ、秘書の一言にする。1人1行。"""
+    """期限の近い物だけ、ケイカの一言にする。1人1行。"""
     on = today(s)
     best: dict[str, dict] = {}
     for person in board.people:

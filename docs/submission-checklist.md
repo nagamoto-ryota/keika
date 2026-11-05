@@ -13,7 +13,7 @@
 9. 実データの混入を調べる: 禁止語のファイルに実在の利用者名と事業所名を入れて `tools/check_public.py` を通し、映像に使う DB は `demo/snapshot/keika.db` から作り直した物だけを使う（`review_items`、`records`、`drafts`、`intake_originals` に `mcp` 由来の行が 0）。
 10. `data/quarantine/` が提出物に入らない: `git ls-files data` が空で、`git status --ignored` で `data/` が対象外のまま。隔離したファイルは開かない。
 11. 作る間はリポを非公開にしている。上がすべて通ったら公開に戻し、ログインしていないブラウザでリポと `LICENSE` が開けることを確かめてから提出する。公開に戻さないと提出の条件を満たさない。
-12. `python tools/desk_check.py` の「NG」が 0 件（本物の Claude を呼ぶ。約 $0.3）。答えも読む。README に「秘書の答えの全文は機械で保証できない」と書いてある。
+12. `python tools/desk_check.py` の「NG」が 0 件（本物の Claude を呼ぶ。約 $0.3）。答えも読む。README に「ケイカの答えの全文は機械で保証できない」と書いてある。
 13. `git diff keep-f64358a -- eval src/keika/claude_checks.py src/keika/intake.py` が空（点検、整文、測定の経路を変えていない）。
-14. メールの送信経路が無い（`src/keika/secretary.py` に送信の処理が無いことを試験で確かめている）。秘書の答えが自動で記録に入らない。
+14. メールの送信経路が無い（`src/keika/secretary.py` に送信の処理が無いことを試験で確かめている）。ケイカの答えが自動で記録に入らない。
 15. 試用の複製（`data/*_try.db`、`data/trial_base.db`、`data/desk_dev.db`）が提出物に入らない。`data/` は対象外のまま。

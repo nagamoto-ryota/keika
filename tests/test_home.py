@@ -1,10 +1,12 @@
 """開くと終わっている入口。上限、前回開いた後、期限の一言。項目の数は変えない。"""
 import re
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+import keika.web
 from conftest import SAMPLE
 from keika.claude_checks import CheckRun, save_run
 from keika.db import connect
@@ -142,7 +144,7 @@ def test_near_deadline_gets_one_line_from_the_secretary(env):
     lines = deadline_lines(build_board(c, s), s)
     assert lines[0]["days"] == 25 and lines[0]["user_id"] == "U04"
     html = home(s)
-    assert "秘書より" in html and "計画の見直しの準備" in html and "あと25日" in html and "/desk?t=U04" in html
+    assert "ケイカより" in html and "計画の見直しの準備" in html and "あと25日" in html and "/desk?t=U04" in html
 
 
 def test_far_deadline_stays_off(env):
@@ -192,3 +194,13 @@ def test_at_most_three_answers_at_once(env):
         start_question(c, user, "質問")
     with pytest.raises(ValueError):
         start_question(c, "U04", "4人目")
+
+
+def test_no_screen_calls_it_by_the_old_name(env):
+    """呼び名は「AI相談」「ケイカに聞く」。コード内の名前と URL は変えない。"""
+    web = Path(keika.web.__file__).parent
+    old = "秘" + "書"
+    for path in [*(web / "templates").iterdir(), *(web / "static").iterdir()]:
+        if path.is_file():
+            assert old not in path.read_text(encoding="utf-8"), path.name
+    assert ">AI相談</a>" in home(env[0])

@@ -1,4 +1,4 @@
-"""秘書。利用者ごとの会話、その人の物だけを読む、引用の照合、線の検査、画面。"""
+"""AI相談。利用者ごとの会話、その人の物だけを読む、引用の照合、線の検査、画面。"""
 import json
 from datetime import date
 from types import SimpleNamespace as NS

@@ -1,4 +1,4 @@
-"""秘書の作る道具とメールの下書き。作るのは頼まれた時だけ、送る経路は無い。左に実物で開く。"""
+"""AI相談の作る道具とメールの下書き。作るのは頼まれた時だけ、送る経路は無い。左に実物で開く。"""
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace as NS

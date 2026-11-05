@@ -39,7 +39,7 @@
       <button>残す</button>
     </form>
   </details>
-  {% if v.f.user_id %}<a class="plain-link" href="/desk?t={{ v.f.user_id }}&about={{ v.fp }}">秘書に聞く</a>{% endif %}
+  {% if v.f.user_id %}<a class="plain-link" href="/desk?t={{ v.f.user_id }}&about={{ v.fp }}">ケイカに聞く</a>{% endif %}
   {% with rule_id = v.f.rule_id, basis_label = v.basis %}{% include "_basis.html" %}{% endwith %}
   {% if v.f.searched_scope %}<p class="small muted">探した範囲: {{ v.f.searched_scope|hdate }}</p>{% endif %}
 </div>

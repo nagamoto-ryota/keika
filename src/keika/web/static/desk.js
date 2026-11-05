@@ -1,4 +1,4 @@
-// 左に実物、右に秘書。答えは裏で作るので、別の人へ移っても続く。一覧の印で終わりが分かる。
+// 左に実物、右にAI相談。答えは裏で作るので、別の人へ移っても続く。一覧の印で終わりが分かる。
 (function () {
   var desk = document.getElementById("desk");
   var thread = desk.dataset.thread;
@@ -84,7 +84,7 @@
     if (madeIds === null || fresh.length) {
       document.getElementById("made-count").textContent = made.length;
       list.textContent = "";
-      if (!made.length) list.appendChild(el("li", "muted", "秘書に頼むと、作った下書きがここに開きます。"));
+      if (!made.length) list.appendChild(el("li", "muted", "ケイカに頼むと、作った下書きがここに開きます。"));
       made.forEach(function (m) {
         var li = el("li");
         var b = el("button", "linklike", m.title);

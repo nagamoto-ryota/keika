@@ -19,16 +19,16 @@
 {% endif %}
 
 {% for d in deadlines %}
-<p class="home-soon"><span class="muted small">秘書より</span> <a href="/desk?t={{ d.user_id }}">{{ d.name }}さん</a>の{{ d.title|hdate }}は {{ d.deadline|hdate }} までです（{% if d.days >= 0 %}あと{{ d.days }}日{% else %}{{ -d.days }}日過ぎています{% endif %}）。<a class="small" href="/desk?t={{ d.user_id }}{% if d.about %}&about={{ d.about }}{% endif %}">秘書に聞く</a><br><span class="small muted">{{ d.where }}</span></p>
+<p class="home-soon"><span class="muted small">ケイカより</span> <a href="/desk?t={{ d.user_id }}">{{ d.name }}さん</a>の{{ d.title|hdate }}は {{ d.deadline|hdate }} までです（{% if d.days >= 0 %}あと{{ d.days }}日{% else %}{{ -d.days }}日過ぎています{% endif %}）。<a class="small" href="/desk?t={{ d.user_id }}{% if d.about %}&about={{ d.about }}{% endif %}">ケイカに聞く</a><br><span class="small muted">{{ d.where }}</span></p>
 {% endfor %}
 
 <section class="person consult" id="kakunin">
   {% if reviews or drafts %}
   <h2>聞くこと <span class="muted small">{{ reviews|length + drafts|length }}件{% if more %}（あと {{ more }}件）{% endif %}</span></h2>
-  {% if reviews %}<div class="compare-cards">{% for it in reviews %}{% include "_review_card.html" %}{% if it.entry.get('user_id') %}<p class="small home-ask-link"><a href="/desk?t={{ it.entry.user_id }}&about=r{{ it.id }}">秘書に聞く</a></p>{% endif %}{% endfor %}</div>{% endif %}
+  {% if reviews %}<div class="compare-cards">{% for it in reviews %}{% include "_review_card.html" %}{% if it.entry.get('user_id') %}<p class="small home-ask-link"><a href="/desk?t={{ it.entry.user_id }}&about=r{{ it.id }}">ケイカに聞く</a></p>{% endif %}{% endfor %}</div>{% endif %}
   {% for d, left in drafts %}
   <a class="task task-link" href="/drafts/{{ d.id }}#kakunin"><span class="dot"></span><span class="title">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</span><span class="opens">確かめること {{ left }}件 ▸</span></a>
-  <p class="small home-ask-link"><a href="/desk?t={{ d.user_id }}&about=d{{ d.id }}">秘書に聞く</a></p>
+  <p class="small home-ask-link"><a href="/desk?t={{ d.user_id }}&about=d{{ d.id }}">ケイカに聞く</a></p>
   {% endfor %}
   {% elif more %}
   <h2>今日の分は終わりました。</h2>
@@ -43,6 +43,6 @@
   ／ <a href="/todo">すべての項目 {{ total }}件</a>
   ／ <a href="/board">一覧</a>
 </p>
-<p class="home-small small"><a href="/desk">秘書に相談する</a></p>
+<p class="home-small small"><a href="/desk">AI相談を開く</a></p>
 <script src="/static/review_card.js"></script>
 {% endblock %}

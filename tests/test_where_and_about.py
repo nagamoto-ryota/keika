@@ -1,4 +1,4 @@
-"""項目の文に根拠を添える。秘書へ項目ごと移れる。項目の数は変えない。"""
+"""項目の文に根拠を添える。AI相談へ項目ごと移れる。項目の数は変えない。"""
 from datetime import date
 from types import SimpleNamespace as NS
 
