@@ -19,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 from urllib.parse import urlparse
 
+from keika import gmail_draft
 from keika.claude import make_client
 from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
 from keika.claude_checks import APP_RECORDS, CheckRun, check_and_save, latest_run
@@ -183,8 +184,9 @@ def nav_section(path: str) -> str | None:
     return next((to for start, to in NAV_SECTIONS if path == start or path.startswith(start.rstrip("/") + "/")), None)
 
 
-def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False) -> FastAPI:
+def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False, gmail_factory: Callable[[], Any] | None = None) -> FastAPI:
     app = FastAPI(title="ケイカ")
+    gmail_factory = gmail_factory or (lambda: gmail_draft.connected(s))
     conn = ThreadConnection(s)
     connect(s).close()  # 表を先に作る
     if sample:
@@ -377,7 +379,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     def desk_mail(request: Request, thread: str, mail_id: int, just: str = ""):
         mail = _mail_or_404(thread, mail_id)
         out = out_view(conn, s, mail_id) if out_row(conn, thread, mail_id) else None
-        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "just": just == "1", "notice": mail_notices.pop(mail_id, "")})
+        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "just": just == "1", "gmail_on": out is not None and gmail_factory() is not None,
+                                                                 "gmail_open": gmail_draft.open_url(out["gmail_id"]) if out and out["gmail_id"] else "", "notice": mail_notices.pop(mail_id, "")})
 
     def _out_or_404(thread: str, mail_id: int) -> None:
         if sample:
@@ -396,9 +399,12 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         _out_or_404(thread, mail_id)
         _apply_lines(thread, mail_id, subject, line)
         try:
-            send_mail(conn, s, thread, mail_id)
+            send_mail(conn, s, thread, mail_id, gmail=gmail_factory())
         except Blocked as e:
             mail_notices[mail_id] = str(e)
+            return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+        except gmail_draft.GmailError as e:
+            mail_notices[mail_id] = f"Gmail に入れられませんでした（{e}）。もう一度押してください。"
             return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
         return RedirectResponse(f"/desk/{thread}/mail/{mail_id}?just=1", status_code=303)
 

@@ -1,7 +1,13 @@
-{% if out.state == 'sent' %}
+{% if out.state == 'sent' and gmail_open %}
+<h1 class="do-line">Gmailの下書きに入れました。送るのは Gmail からです</h1>
+<p><a class="main-link" href="{{ gmail_open }}" target="_blank" rel="noopener">Gmailで開く</a></p>
+{% endif %}
+{% if out.state == 'sent' and not gmail_open %}
 <h1 class="do-line">控えに残しました。送るのはメールアプリからです</h1>
 <p><a class="main-link" href="{{ out.sent_mailto }}">メールアプリで開く</a></p>
 {% if just %}<script>location.href = {{ out.sent_mailto|tojson }};</script>{% endif %}
+{% endif %}
+{% if out.state == 'sent' %}
 <article class="mail-sheet">
   <p><span class="muted small">宛先</span> {{ out.sent_name }} <span class="muted small">{{ out.sent_to }}</span></p>
   <p><span class="muted small">日時</span> {{ out.sent_at[:16].replace('T', ' ') }}</p>
@@ -13,7 +19,7 @@
 <h1 class="do-line">要らない案にしました</h1>
 <p class="small"><a href="/">やることへ戻る</a></p>
 {% else %}
-<h1 class="do-line">{{ out.go_line }}</h1>
+<h1 class="do-line">{{ '確かめて、Gmailに入れる' if gmail_on else '確かめて、メールアプリで開く' }}</h1>
 {% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
 {% if out.consent %}<p class="mail-notice">{{ out.consent }}</p>{% endif %}
 {% if m.changed %}<p class="small">{{ m.changed }}</p>{% endif %}
@@ -29,10 +35,10 @@
 <p class="small muted">{% if out.origin == 'proposal' %}根拠: {{ out.ground }}{% else %}元の記録: {{ out.ground }}{% endif %}（AI が作った案です。最後に決めるのは人です）</p>
 {% if not sample %}
 <div class="mail-go">
-  <button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/send" class="send-button"{% if out.blocks %} disabled{% endif %} data-leave>メールアプリで開く</button>
+  <button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/send" class="send-button"{% if out.blocks %} disabled{% endif %} data-leave>{{ 'Gmailの下書きに入れる' if gmail_on else 'メールアプリで開く' }}</button>
   {% if out.blocks %}<span class="mail-why">{{ out.why }}</span>{% endif %}
   {% if out.med_open %}<button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/med-ok" class="plain">薬の文はこのままでいい</button>{% endif %}
-  <span class="muted small draft-say"></span>
+  <span class="muted small draft-say">{% if not gmail_on %}Gmail はまだつながっていません{% endif %}</span>
 </div>
 <div class="mail-side">
   <details class="mail-ai">

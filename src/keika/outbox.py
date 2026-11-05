@@ -267,9 +267,10 @@ def out_view(conn: sqlite3.Connection, s: Settings, mail_id: int) -> dict | None
     lines = [{"text": line, "check": _line_needs_check(line, med_open), "rows": max(1, -(-len(line) // 38))} for line in mail["body"].split("\n")]
     why = f"{blocks[0]}{f'（ほか{len(blocks) - 1}件）' if len(blocks) > 1 else ''}" if blocks else ""
     sent_mailto = _mailto(row["sent_to"] or "", row["sent_subject"] or "", row["sent_body"] or "") if row["state"] == "sent" else ""
+    in_gmail = conn.execute("SELECT message_id FROM mail_gmail WHERE mail_id = ?", (mail_id,)).fetchone()
     return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "med": med, "med_open": bool(med_open), "consent": consent, "address": address,
-            "mailto": _mailto(address, mail["subject"], mail["body"]), "lines": lines, "why": why, "go_line": "確かめて、メールアプリで開く",
-            "sent_mailto": sent_mailto, "demo": s.as_of is not None, "sent_note": SENT_DEMO if s.as_of else SENT_REAL}
+            "mailto": _mailto(address, mail["subject"], mail["body"]), "lines": lines, "why": why,
+            "sent_mailto": sent_mailto, "gmail_id": in_gmail["message_id"] if in_gmail else "", "demo": s.as_of is not None, "sent_note": SENT_DEMO if s.as_of else SENT_REAL}
 
 
 def _mailto(address: str, subject: str, body: str) -> str:
@@ -281,7 +282,7 @@ def _line_needs_check(line: str, med_open: list[str]) -> bool:
     return "〇〇" in line or any(t in line for t in med_open) or _crosses(line)
 
 
-def send_mail(conn: sqlite3.Connection, s: Settings, thread: str, mail_id: int) -> None:
+def send_mail(conn: sqlite3.Connection, s: Settings, thread: str, mail_id: int, gmail: Any = None) -> None:
     """送る処理はここ1か所。人が主ボタンを押した時だけ呼ぶ。外へは出さず、控えに残す。"""
     row = out_row(conn, thread, mail_id)
     view = out_view(conn, s, mail_id) if row else None
@@ -289,6 +290,9 @@ def send_mail(conn: sqlite3.Connection, s: Settings, thread: str, mail_id: int) 
         raise Blocked("送れる案ではありません。")
     if view["blocks"]:
         raise Blocked(view["blocks"][0])
+    message_id = gmail.create_draft(view["address"], view["mail"]["subject"], view["mail"]["body"]) if gmail else ""  # 下書きに入れるだけ。送らない
+    if message_id:
+        conn.execute("INSERT OR REPLACE INTO mail_gmail (mail_id, message_id, at) VALUES (?, ?, ?)", (mail_id, message_id, now_real().isoformat()))
     conn.execute("UPDATE mail_out SET state = 'sent', sent_at = ?, sent_to = ?, sent_name = ?, sent_subject = ?, sent_body = ? WHERE mail_id = ?",
                  (now_real().isoformat(), view["address"], view["recipient"]["label"], view["mail"]["subject"], view["mail"]["body"], mail_id))
     conn.commit()

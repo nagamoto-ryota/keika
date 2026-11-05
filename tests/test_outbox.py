@@ -280,7 +280,7 @@ def test_only_one_function_records_a_send_and_nothing_leaves():
     src = Path(__file__).parent.parent / "src" / "keika"
     for path in src.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        for word in ("smtplib", "sendmail", "send_message", "gmail"):
+        for word in ("smtplib", "sendmail", "send_message", "gmail.send", "drafts/send", "users/me/messages"):
             assert word not in text, path.name
     assert (src / "outbox.py").read_text(encoding="utf-8").count("SET state = 'sent'") == 1
     assert (src / "web" / "app.py").read_text(encoding="utf-8").count("send_mail(") == 1

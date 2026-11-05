@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS mail_out (
   ground TEXT NOT NULL DEFAULT '', origin TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'open', med_ok_body TEXT,
   sent_at TEXT, sent_to TEXT, sent_name TEXT, sent_subject TEXT, sent_body TEXT, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_gmail (
+  mail_id INTEGER PRIMARY KEY, message_id TEXT NOT NULL, at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mail_scans (
   record_id INTEGER PRIMARY KEY, result TEXT NOT NULL, at TEXT NOT NULL
 );
