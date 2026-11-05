@@ -170,17 +170,17 @@ def test_opening_the_home_page_in_sample_mode_writes_nothing(env):
     assert c.execute("SELECT COUNT(*) FROM home_asks").fetchone()[0] == 0
 
 
-def test_save_word_shows_blanks_in_one_line(env):
+def test_blanks_are_shown_in_the_body_and_saving_is_open(env):
     s, c = env
     i = draft(s, c, text="デイは週2回のまま続ける。")
     html = TestClient(create_app(s)).get(f"/drafts/{i}").text
-    assert "確かめることは全部済みました" in html and "これ足して" in html and "帰りの時間" in html
+    assert "赤い所を埋めてください" in html and "残っていても保存できます" in html and 'name="end_time"' in html
 
 
-def test_draft_with_checks_does_not_ask_blanks_yet(env):
+def test_draft_with_checks_shows_blanks_too(env):
     s, c = env
     i = draft(s, c)
-    assert "帰りの時間" not in TestClient(create_app(s)).get(f"/drafts/{i}").text
+    assert "赤と黄色の所を直してください" in TestClient(create_app(s)).get(f"/drafts/{i}").text
 
 
 # --- F2 の残り ---

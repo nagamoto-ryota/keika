@@ -70,7 +70,7 @@ def test_medicine_is_not_a_card_but_stays_marked_and_listed(env):
     assert view["checks"] == [] and [m["text"] for m in view["med_list"]] == [MED.text]
     assert services(c, i)[0]["flag"]  # 未確認のまま
     html = TestClient(create_app(s)).get(f"/drafts/{i}").text
-    assert "薬の話 1件（未確認）" in html and "確かめることは全部済みました" in html and "to-check" in html
+    assert "薬・未確認" in html and "to-check" in html and ">見た</button>" in html and ">いいよ</button>" not in html
 
 
 def test_medicine_stays_marked_in_word(env):

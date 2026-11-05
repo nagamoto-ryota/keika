@@ -353,3 +353,40 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .mail-body { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px !important; }
 .task-where { display: block; font-size: 13px; color: var(--muted); }
 .home-ask-link { margin: -6px 0 10px; text-align: right; }
+
+/* 下書き: 先頭の1行と残りの数。赤は埋める所、黄色は確かめる文。 */
+.draft-bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 6px 0 8px; margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; }
+.draft-do { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.do-line { font-size: 22px; margin: 0; }
+.draft-left { font-weight: 700; color: #b3261e; white-space: nowrap; }
+.draft-next { font-size: 14px; white-space: nowrap; }
+.draft-save { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14px; }
+.draft-save .main-link, .draft-save .plain-link { font-size: 16px; }
+.draft-bar .todo-line { flex-basis: 100%; }
+.doc-sheet { padding: 14px 20px; margin-top: 8px; }
+.doc-sheet h1 { margin-bottom: 8px; }
+.head-input { width: 100%; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-bottom: 1px dotted var(--line); border-radius: 3px; padding: 1px 4px; max-width: none; }
+.head-input:hover, .head-input:focus { border-color: var(--accent); background: var(--paper); }
+.time-input { width: 6.5em; }
+.is-blank, .head-input.is-blank { color: #b3261e; font-style: italic; font-weight: 700; background: #fdeceb; border: 1px dashed #b3261e; border-radius: 3px; }
+.is-kept, .head-input.is-kept { color: var(--muted); font-style: italic; }
+.keep { background: none; border: none; color: var(--muted); font-size: 12px; padding: 0 2px; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+.sec-blank { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0; }
+.sec-blank textarea { flex: 1; font: inherit; padding: 2px 6px; }
+.sentence:target > summary { outline: 2px solid var(--accent); }
+.sentence, .head-input { scroll-margin-top: 90px; }
+.sentence.to-check > summary { background: #fff1a8; border-left: 4px solid #d9b100; padding-left: 6px; }
+.sentence.med > summary { border-left-color: #b3261e; }
+.med-tag { margin-left: 8px; padding: 0 6px; border: 1px solid #b3261e; border-radius: 3px; color: #b3261e; background: var(--paper); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.sentence-open .said-line { margin: 0 0 4px; }
+.sentence-open .said-line .said { font-weight: 600; }
+.sentence-open .review-actions { margin-top: 4px; align-items: center; }
+.sentence-open .review-actions form { margin: 0; }
+.sentence-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sentence-buttons .ok-button { padding: 6px 24px; }
+@media print {
+  .head-input, .head-input.is-blank, .head-input.is-kept, .is-blank, .is-kept { color: inherit; background: none; border: none; font-style: normal; font-weight: 400; }
+  .sentence.to-check > summary { border: none; padding-left: 4px; }
+}
+.head-input.is-blank:not(.time-input) { width: calc(100% - 5.5em); }
+.draft-say { line-height: 1.4; }

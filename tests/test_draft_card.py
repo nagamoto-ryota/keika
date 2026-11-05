@@ -64,8 +64,8 @@ def test_flagged_sentence_is_one_card_with_what_was_said(env):
     check = draft_view(c, get_draft(c, i))["checks"][0]
     assert check["text"] == "本人は昼の薬がなくなり楽だと話した。" and check["quote"] == "本人も昼のがないから楽だって言ってました"
     html = page(s, i)
-    assert "確かめること" in html and "文字起こしにはこうあります" in html and ">いいよ</button>" in html and "<summary>違う</summary>" in html
-    assert html.index("確かめること") < html.index("本人・家族の様子")
+    assert "元の発言" in html and check["quote"] in html and ">いいよ</button>" in html and "<summary>違う</summary>" in html
+    assert html.index("do-line") < html.index("本人・家族の様子")
 
 
 def test_check_label_is_not_shown_as_a_word_in_the_sentence(env):
@@ -164,10 +164,7 @@ def test_blank_fields_become_questions(env):
     asked = fields(c, i)
     assert "訪問先" in asked["place"] and "帰りの時間" in asked["end_time"] and "本人・家族の様子" in asked["s:condition"]
     assert "start_time" not in asked  # 話にあった欄は聞かない
-    assert "帰りの時間は何時でしたか" not in page(s, i)  # 確かめることが残る間は聞かない
-    ok_item(c, i, first(c, i)["id"])
-    html = page(s, i)
-    assert "これ足して" in html and "帰りの時間は何時でしたか" in html
+    assert 'name="field" value="end_time"' in page(s, i)  # 本文の中でその場で埋める
 
 
 def test_meeting_asks_in_its_own_words(env):
@@ -243,10 +240,10 @@ def test_body_reads_as_a_document_and_each_sentence_opens_to_edit(env):
     assert f'action="/drafts/{i}/items/{item["id"]}/text"' in html and "元の発言" in html
 
 
-def test_card_link_jumps_to_the_sentence(env):
+def test_sentence_can_be_reached_by_its_own_id(env):
     s, c = env
     i = draft(s, c)
-    assert f'href="#item-{first(c, i)["id"]}"' in page(s, i)
+    assert f'id="item-{first(c, i)["id"]}"' in page(s, i)
 
 
 def test_editing_a_sentence_clears_its_card(env):
@@ -297,10 +294,10 @@ def finish(c, i):
 def test_next_step_appears_only_when_nothing_is_left(env):
     s, c = env
     i = draft(s, c)
-    assert "次は Word で保存" not in page(s, i)
+    assert "Word で保存してください" not in page(s, i)
     finish(c, i)
     html = page(s, i)
-    assert "確かめることは全部済みました" in html and "次は Word で保存" in html and f"/drafts/{i}/docx" in html
+    assert "Word で保存してください" in html and f"/drafts/{i}/docx" in html
     assert 'id="kakunin"' in html  # #kakunin で来ても迷わない
     assert ">いいよ</button>" not in html
     assert get_draft(c, i).flagged == 0
@@ -310,7 +307,7 @@ def test_sample_mode_hides_the_buttons_but_shows_the_card(env):
     s, c = env
     i = draft(s, c)
     html = TestClient(create_app(s, sample=True)).get(f"/drafts/{i}").text
-    assert "文字起こしにはこうあります" in html and ">いいよ</button>" not in html and "文を直す" not in html
+    assert "元の発言" in html and ">いいよ</button>" not in html and "文を直す" not in html
 
 
 # --- やること: 細かい項目 ---

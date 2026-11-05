@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from keika.claude import MODEL, StructuredError, ask_structured, model_for
 from keika.claude_checks import _BACKDATE, crosses_line
-from keika.drafts import BLANK, Draft, _names_said_in_kana, _nearby, get_draft, list_drafts, update_draft
+from keika.drafts import BLANK, Draft, _names_said_in_kana, _nearby, _tidy, get_draft, list_drafts, update_draft
 from keika.intake import _digits, _name_parts, _normal, _without_spoken_clocks, invented_terms
 from keika.ledger import get_user
 from keika.med_names import MEDICINE_SENTENCE
@@ -96,17 +96,32 @@ def _asks(d: Draft) -> list[dict]:
 
 
 def draft_view(conn: sqlite3.Connection, draft: Draft) -> dict:
-    """上に出すカード。確かめたい文は1文と元の発言、空いた欄は1行の質問にする。"""
+    """画面が要る物。確かめたい文は1文と元の発言、空いた欄は1行の質問にする。"""
     checks, med_list = [], []
+    by_item: dict[str, dict] = {}
     for key, label in draft.headings.items():
         for item in draft.sections[key]:
             if item["flag"] and item.get("verdict") == SAID:  # 発言どおりの薬の話。聞かず、未確認として残す
                 med_list.append({"item_id": item["id"], "text": item["text"], "quote": item["quote"]})
+                by_item[item["id"]] = {"med": True, "words": [], "note": "", "changed": ""}
             elif item["flag"]:
                 words, note = _flag_parts(item["flag"])
                 checks.append({"item_id": item["id"], "label": label, "text": item["text"], "quote": item["quote"], "words": words, "note": note, "changed": item.get("changed", "")})
+                by_item[item["id"]] = {"med": False, "words": words, "note": note, "changed": item.get("changed", "")}
     blanks = [b for b in _asks(draft) if b["field"] not in draft.kept_blanks]
-    return {"checks": checks, "blanks": blanks, "med_list": med_list, "left": len(checks)}  # 空欄は毎回聞かず、保存の時に1行出す
+    view = {"checks": checks, "blanks": blanks, "med_list": med_list, "left": len(checks), "by_item": by_item, "needs": [b["field"] for b in blanks]}
+    anchors = [f"f-{b['field']}" for b in blanks] + [f"item-{row['item_id']}" for row in checks + med_list]
+    return view | {"todo": len(anchors), "first": anchors[0] if anchors else "", "do": do_line(view)}
+
+
+def do_line(view: dict) -> str:
+    """画面の先頭の1行。残りに合わせて、何をすればよいかだけを言う。"""
+    yellow = view["checks"] or view["med_list"]
+    if view["blanks"]:
+        return "赤と黄色の所を直してください" if yellow else "赤い所を埋めてください"
+    if view["checks"]:
+        return "黄色の文を確かめてください"
+    return "黄色の薬の文を見てください" if view["med_list"] else "Word で保存してください"
 
 
 def count_left(conn: sqlite3.Connection, draft: Draft) -> int:
@@ -177,10 +192,13 @@ def _find(data: dict, item_id: str) -> tuple[str, dict]:
     raise ValueError("その文は見つかりません")
 
 
-def ok_item(conn: sqlite3.Connection, draft_id: int, item_id: str) -> None:
-    """人が確かめた。文は変えない。何の印だったかは残す。"""
+def ok_item(conn: sqlite3.Connection, draft_id: int, item_id: str, text: str = "") -> None:
+    """人が確かめた。何の印だったかは残す。直してから押した時は、書いた文を捨てない。"""
     data = _load(conn, draft_id)
     _, item = _find(data, item_id)
+    if _tidy(text) and _tidy(text) != _tidy(item["text"]):
+        edit_item(conn, draft_id, item_id, text)
+        return
     if item["flag"]:
         item["checked_flag"] = item["flag"]
         item["flag"] = ""
@@ -251,7 +269,7 @@ def add_item(conn: sqlite3.Connection, draft_id: int, key: str, text: str) -> No
     update_draft(conn, draft_id, place=draft.place, start_time=draft.start_time, end_time=draft.end_time, attendees=draft.attendees, sections={key: rows})
 
 
-def _time_of(answer: str) -> str:
+def time_of(answer: str) -> str:
     """「15時半」を 15:30 に。時刻と読めない答えは書かれたまま入れる。"""
     said = _normal(answer).strip().replace("：", ":")
     m = _TIME.fullmatch(said)
@@ -273,9 +291,9 @@ def fill_blank(conn: sqlite3.Connection, draft_id: int, field: str, answer: str)
     if field == "place":
         place = written
     elif field == "start_time":
-        start = _time_of(written)
+        start = time_of(written)
     elif field == "end_time":
-        end = _time_of(written)
+        end = time_of(written)
     elif field.startswith("a:") and field[2:].isdigit() and int(field[2:]) < len(people):
         people[int(field[2:])]["name"] = written
     elif field.startswith("s:") and field[2:] in draft.sections:

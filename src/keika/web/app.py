@@ -26,7 +26,7 @@ from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
 from keika.visit_questions import get_questions, make_questions, questions_key
 from keika.visit_sheet import build_sheet
-from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, next_draft, ok_item, revise_item, settle_draft, unsettled_drafts
+from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, next_draft, ok_item, revise_item, settle_draft, time_of, unsettled_drafts
 from keika.drafts import SECTIONS, draft_for_results, finish_homework, move_record_drafts, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
@@ -441,11 +441,11 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(403, "見本モードでは直せません")
 
     @app.post("/drafts/{draft_id}/items/{item_id}/ok")
-    def post_item_ok(draft_id: int, item_id: str):
+    def post_item_ok(draft_id: int, item_id: str, text: str = Form("")):
         _no_sample()
         _draft_or_404(draft_id)
         try:
-            ok_item(conn, draft_id, item_id)
+            ok_item(conn, draft_id, item_id, text)
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
         return RedirectResponse(f"/drafts/{draft_id}#kakunin", status_code=303)
@@ -460,7 +460,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             draft_notices[draft_id] = f"直せませんでした（{e}）"
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
-        return RedirectResponse(f"/drafts/{draft_id}#kakunin", status_code=303)
+        return RedirectResponse(f"/drafts/{draft_id}#item-{item_id}", status_code=303)
 
     @app.post("/drafts/{draft_id}/items/{item_id}/text")
     def post_item_text(draft_id: int, item_id: str, text: str = Form("")):
@@ -508,8 +508,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             if f"s_{key}" in form:
                 texts, ids = form.getlist(f"s_{key}"), form.getlist(f"s_{key}_id")
                 sections[key] = [{"id": ids[i] if i < len(ids) else "", "text": text} for i, text in enumerate(texts)]
-        update_draft(conn, draft_id, place=str(form.get("place", "")).strip(), start_time=str(form.get("start_time", "")).strip(),
-                     end_time=str(form.get("end_time", "")).strip(), attendees=attendees, sections=sections)
+        update_draft(conn, draft_id, place=str(form.get("place", "")).strip(), start_time=time_of(str(form.get("start_time", ""))),
+                     end_time=time_of(str(form.get("end_time", ""))), attendees=attendees, sections=sections)
         return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
 
     @app.get("/drafts/{draft_id}/docx")
