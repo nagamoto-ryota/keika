@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS mail_gmail_thread (
 CREATE TABLE IF NOT EXISTS mail_sent_seen (
   mail_id INTEGER PRIMARY KEY, result TEXT NOT NULL, review_id INTEGER, at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_replies (
+  message_id TEXT PRIMARY KEY, mail_id INTEGER NOT NULL, review_id INTEGER, at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mail_scans (
   record_id INTEGER PRIMARY KEY, result TEXT NOT NULL, at TEXT NOT NULL
 );

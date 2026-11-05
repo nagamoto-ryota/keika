@@ -1,7 +1,7 @@
 {% if out.state == 'sent' and gmail_open %}
 <h1 class="do-line">Gmailの下書きに入れました。送るのは Gmail からです</h1>
 <p><a class="main-link" href="{{ gmail_open }}" target="_blank" rel="noopener">Gmailで開く</a></p>
-<p class="small muted">Gmail から送ると、入口に支援経過の案が出ます。</p>
+<p class="small muted">Gmail から送ると、入口に支援経過の案が出ます。返事が届いた時も出ます。</p>
 {% endif %}
 {% if out.state == 'sent' and not gmail_open %}
 <h1 class="do-line">控えに残しました。送るのはメールアプリからです</h1>
@@ -53,7 +53,7 @@
   <button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/send" class="send-button"{% if out.blocks %} disabled{% endif %} data-leave>{{ 'Gmailの下書きに入れる' if gmail_on else 'メールアプリで開く' }}</button>
   {% if out.blocks %}<span class="mail-why">{{ out.why }}</span>{% endif %}
   {% if out.med_open %}<button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/med-ok" class="plain">薬の文はこのままでいい</button>{% endif %}
-  <span class="muted small draft-say">{% if not gmail_on %}Gmail はまだつながっていません。Gmail につなぐと、送ったメールが支援経過の案になります{% endif %}</span>
+  <span class="muted small draft-say">{% if not gmail_on %}Gmail はまだつながっていません。Gmail につなぐと、送ったメールと受け取った返事が支援経過の案になります{% endif %}</span>
 </div>
 <div class="mail-side">
   <details class="mail-ai">

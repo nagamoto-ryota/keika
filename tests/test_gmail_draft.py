@@ -36,7 +36,7 @@ def app(s, gm):
 def test_scope_is_compose_and_there_is_no_send():
     assert SCOPE == "https://www.googleapis.com/auth/gmail.compose"
     src = Path(gmail_draft.__file__).read_text(encoding="utf-8")
-    assert "/send" not in src and "users/me/messages" not in src and "smtplib" not in src
+    assert "/send" not in src and "messages/send" not in src and "/modify" not in src and "/trash" not in src and "smtplib" not in src
 
 
 def test_create_draft_posts_a_mime_message_to_drafts():

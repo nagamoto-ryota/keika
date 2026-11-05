@@ -25,6 +25,7 @@ SCOPE = "https://www.googleapis.com/auth/gmail.compose"
 READ = "https://www.googleapis.com/auth/gmail.readonly"  # 送ったかと返事を読むため。読むだけで、変えられない範囲
 SCOPES = [SCOPE, READ]
 THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads/"
+MESSAGE_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/"  # 読むだけ（format=full の取得）
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts"
@@ -113,20 +114,44 @@ class Gmail:
             raise GmailError("下書きの番号が返りませんでした。")
         return message["id"], message.get("threadId", "")
 
-    def sent_state(self, thread_id: str) -> tuple[str, int | None]:
-        """ケイカが作ったスレッドが送信済みかを見る。読むのは番号と目印と日時だけ（本文は頼まない）。
-        返すのは ("sent", 送った時刻のミリ秒) / ("draft", None) / ("gone", None)。"""
+    def thread_messages(self, thread_id: str) -> list[dict]:
+        """ケイカが作ったスレッドの各メールの番号と目印と日時だけ（本文は頼まない）。無ければ GmailError(code=404)。"""
         url = THREADS_URL + urllib.parse.quote(thread_id, safe="") + "?" + urllib.parse.urlencode({"format": "minimal", "fields": "messages(id,labelIds,internalDate)"})
+        got = self.get(url, headers={"Authorization": f"Bearer {self._access_token()}"})
+        return [{"id": m.get("id", ""), "labels": m.get("labelIds") or [], "date": int(m.get("internalDate") or 0) or None} for m in got.get("messages") or []]
+
+    def sent_state(self, thread_id: str) -> tuple[str, int | None]:
+        """送信済みかを見る。("sent", 送った時刻のミリ秒) / ("draft", None) / ("gone", None)。"""
         try:
-            got = self.get(url, headers={"Authorization": f"Bearer {self._access_token()}"})
+            msgs = self.thread_messages(thread_id)
         except GmailError as e:
             if e.code == 404:
                 return "gone", None
             raise
-        sent = [m for m in got.get("messages") or [] if "SENT" in (m.get("labelIds") or [])]
+        sent = [m for m in msgs if "SENT" in m["labels"]]
         if sent:
-            return "sent", int(sent[0].get("internalDate") or 0) or None
-        return ("draft", None) if got.get("messages") else ("gone", None)
+            return "sent", sent[0]["date"]
+        return ("draft", None) if msgs else ("gone", None)
+
+    def read_message(self, message_id: str) -> dict:
+        """ケイカのスレッドに届いた返事を1通読む。添付は名前だけ（中身は取らない）。"""
+        url = MESSAGE_URL + urllib.parse.quote(message_id, safe="") + "?" + urllib.parse.urlencode({"format": "full"})
+        got = self.get(url, headers={"Authorization": f"Bearer {self._access_token()}"})
+        payload = got.get("payload") or {}
+        heads = {h.get("name", "").lower(): h.get("value", "") for h in payload.get("headers") or []}
+        texts, names = [], []
+
+        def walk(part: dict) -> None:
+            if part.get("filename"):
+                names.append(part["filename"])
+            elif part.get("mimeType") == "text/plain" and (part.get("body") or {}).get("data"):
+                texts.append(base64.urlsafe_b64decode(part["body"]["data"] + "=" * (-len(part["body"]["data"]) % 4)).decode("utf-8", "replace"))
+            for child in part.get("parts") or []:
+                walk(child)
+
+        walk(payload)
+        return {"from": heads.get("from", ""), "subject": heads.get("subject", ""), "date": int(got.get("internalDate") or 0) or None,
+                "text": "\n".join(texts).strip(), "attachments": names}
 
 
 def client_path(s: Settings) -> Path:

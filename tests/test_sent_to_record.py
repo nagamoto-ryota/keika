@@ -25,6 +25,9 @@ class FakeGmail:
         self.state[f"t{n}"] = ("draft", None)
         return f"m{n}", f"t{n}"
 
+    def thread_messages(self, thread_id):
+        return []
+
     def sent_state(self, thread_id):
         self.asked.append(thread_id)
         return self.state.get(thread_id, ("gone", None))
@@ -148,7 +151,7 @@ def test_screen_says_what_gmail_adds(env):
     s, c = env
     i = made(s, c)
     html = TestClient(create_app(s)).get(f"/desk/U04/mail/{i}").text
-    assert "Gmail につなぐと、送ったメールが支援経過の案になります" in html
+    assert "Gmail につなぐと、送ったメールと受け取った返事が支援経過の案になります" in html
 
 
 # --- Gmail の聞き方 ---
