@@ -17,10 +17,10 @@
     return e;
   }
 
-  function showTab(name) {
+  function showTab(name, stay) {
     document.querySelectorAll(".desk-tabs [data-tab]").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === name); });
     document.querySelectorAll(".desk-pane").forEach(function (p) { p.hidden = p.id !== "pane-" + name; });
-    desk.dataset.view = "real";
+    if (!stay) desk.dataset.view = "real";
   }
 
   function clearMarks() {
@@ -29,19 +29,19 @@
     });
   }
 
-  function openSource(file, quote, date) {
+  function openSource(file, quote, date, stay) {
     var url = "/desk/" + thread + "/source?file=" + encodeURIComponent(file) + "&quote=" + encodeURIComponent(quote || "") + "&record_date=" + encodeURIComponent(date || "");
     fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
       if (!d) return;
       clearMarks();
       if (d.kind === "record") {
-        showTab("records");
+        showTab("records", stay);
         var rec = document.getElementById("rec-" + d.id);
         rec.querySelector(".desk-body").innerHTML = d.html;  // サーバーでエスケープ済み
         (rec.querySelector("mark") || rec).scrollIntoView({ block: "center" });
         return;
       }
-      showTab("docs");
+      showTab("docs", stay);
       var body = document.getElementById("doc-body");
       var title = document.getElementById("doc-title");
       var open = document.getElementById("doc-open");
@@ -86,20 +86,29 @@
       if (m.status === "working") {
         row.appendChild(el("p", "muted", "記録を読んでいます… 別の人へ移っても続きます。"));
       } else {
-        row.appendChild(el("p", "desk-text", m.text));
+        row.appendChild(el("p", "desk-text", m.head));
+        if (m.more) {
+          var more = el("details", "desk-more");
+          more.appendChild(el("summary", "small", "詳しく"));
+          more.appendChild(el("p", "desk-text", m.more));
+          row.appendChild(more);
+        }
       }
       if (m.role === "assistant" && m.status === "done") {
         if (m.cites.length) {
+          var fold = el("details", "desk-more");
+          fold.appendChild(el("summary", "small", "根拠 " + m.cites.length + "件"));
           var list = el("p", "desk-cites");
           m.cites.forEach(function (c) {
             var b = el("button", "linklike small", citeLabel(c));
             b.type = "button";
             b.title = c.file;
-            b.addEventListener("click", function () { openSource(c.file, c.quote, c.record_date); });
+            b.addEventListener("click", function () { openSource(c.file, c.quote, c.record_date, false); });
             list.appendChild(b);
             if (c.unverified) list.appendChild(el("span", "small muted", "（スキャンのため未照合）"));
           });
-          row.appendChild(list);
+          fold.appendChild(list);
+          row.appendChild(fold);
         } else if (thread !== "all") {
           row.appendChild(el("p", "small muted", "この答えに根拠の引用はありません。"));
         }
@@ -110,13 +119,12 @@
     log.scrollTop = lastRow ? lastRow.offsetTop - log.offsetTop : 0;  // 答えの先頭から読めるように
     var working = messages.some(function (m) { return m.status === "working"; });
     send.disabled = working || box.disabled;
-    if (hadWorking && !working && !firstLoad) {  // 今できた答えの根拠を左に開く
+    if ((hadWorking || firstLoad) && !working && messages.length) {  // 一番関係する根拠を左に光らせておく
       var last = messages[messages.length - 1];
       if (last.cites && last.cites.length) {  // 文字で確かめられた根拠を先に開く
         var c = last.cites.filter(function (x) { return !x.unverified; })[0] || last.cites[0];
-        openSource(c.file, c.quote, c.record_date);
+        openSource(c.file, c.quote, c.record_date, window.matchMedia("(max-width: 900px)").matches);
       }
-      if (window.matchMedia("(max-width: 900px)").matches) desk.dataset.view = "talk";
     }
     firstLoad = false;
   }

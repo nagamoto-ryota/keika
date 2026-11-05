@@ -11,7 +11,7 @@ from keika.claude import PRICES
 from keika.db import connect
 from keika.ledger import seed_from_json
 from keika.records import RecordIn, add_record
-from keika.secretary import ALL, answer_question, desk_model, mark_loose, others_in_text, start_question, thread_messages, threads_state
+from keika.secretary import ALL, answer_question, desk_model, mark_loose, others_in_text, split_answer, start_question, thread_messages, threads_state
 from keika.settings import Settings
 from keika.web.app import create_app
 from test_reading import FakeClient
@@ -160,6 +160,12 @@ def test_recommending_a_provider_is_rewritten(env):
     assert m["text"] == "候補を並べ、選ぶのは本人です。"
 
 
+def test_saying_it_does_not_recommend_is_not_a_recommendation(env):
+    s, c = env
+    client, m = ask(s, c, "U04", "どこがいい？", said("特定の事業所はお勧めしません。"))
+    assert len(client.calls) == 1 and m["text"] == "特定の事業所はお勧めしません。"
+
+
 def test_system_prompt_states_the_lines(env):
     s, c = env
     client, _ = ask(s, c, "U04", "こんにちは", said("はい。"))
@@ -217,6 +223,43 @@ def test_text_written_before_a_tool_call_is_kept(env):
     first = NS(content=[NS(type="text", text="週2回です。"), NS(type="tool_use", id="t1", name="cite", input={"file": "利用者/U04_柚木茂/メモ.txt", "quote": "デイは週2回で続ける"})], stop_reason="tool_use", usage=USAGE)
     _, m = ask(s, c, "U04", "デイは？", first, said("手すりも続けます。"))
     assert m["text"] == "週2回です。\n手すりも続けます。" and len(m["cites"]) == 1
+
+
+def test_answer_splits_at_the_mark():
+    assert split_answer("結論です。\n次の一手です。\n【詳しく】\n・事実") == ("結論です。\n次の一手です。", "・事実")
+
+
+def test_short_answer_stays_whole():
+    assert split_answer("短い答えです。") == ("短い答えです。", "")
+
+
+def test_long_answer_without_mark_folds_after_the_first_paragraph():
+    head, more = split_answer("結論です。\n\n" + "細かい話です。" * 60)
+    assert head == "結論です。" and more.startswith("細かい話")
+
+
+def test_long_answer_with_no_paragraph_is_left_whole():
+    text = "細かい話です。" * 60
+    assert split_answer(text) == (text, "")
+
+
+def test_message_carries_both_parts_and_the_full_text(env):
+    s, c = env
+    _, m = ask(s, c, "U04", "質問", said("結論です。\n【詳しく】\n・事実"))
+    assert m["head"] == "結論です。" and m["more"] == "・事実" and "・事実" in m["text"]
+
+
+def test_line_check_also_covers_the_folded_part(env):
+    s, c = env
+    client, m = ask(s, c, "U04", "薬は？", said("主治医に確かめましょう。\n【詳しく】\n・その薬は中止すべきです。"), said("主治医に確かめましょう。\n【詳しく】\n・記録を見ました。"))
+    assert len(client.calls) == 2 and "中止" not in m["text"]
+
+
+def test_prompt_asks_for_the_short_form_and_keeps_depth_on_request(env):
+    s, c = env
+    client, _ = ask(s, c, "U04", "こんにちは", said("はい。"))
+    head = client.calls[0]["system"][0]["text"]
+    assert "結論を2〜3行" in head and "【詳しく】" in head and "もっと詳しく" in head
 
 
 def test_rewrite_preface_is_removed(env):

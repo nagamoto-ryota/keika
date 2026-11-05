@@ -6,6 +6,7 @@ import os
 import re
 import socket
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, get_args
 from urllib.parse import quote
@@ -45,6 +46,7 @@ from keika.reading import stored_facts
 from keika.records import KindRead, RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
+from keika.files import one_view
 from keika.home import MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
 from keika.secretary import ALL, answer_question, open_source, others_in_text, start_question, thread_messages, threads_state
 from keika.tasks import build_board, person_lines
@@ -157,6 +159,28 @@ def _next_user_id(conn) -> str:
     return f"U{max(numbers, default=0) + 1:02d}"
 
 
+def one_view_route(fn: Callable) -> Callable:
+    """画面を返す処理の間だけ、ファイルの一覧を使い回す。"""
+    @wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        with one_view():
+            return fn(*args, **kwargs)
+    return wrapper
+
+
+NAV_SECTIONS = (
+    ("/records/new", "/records/new"), ("/records/", "/board"), ("/desk", "/desk"), ("/board", "/board"), ("/users", "/board"), ("/ledger", "/board"), ("/careplans", "/board"),
+    ("/todo", "/"), ("/review", "/"), ("/office", "/"), ("/silenced", "/"), ("/drafts", "/"),
+)
+
+
+def nav_section(path: str) -> str | None:
+    """上のメニューのどれを今いる画面として見せるか。"""
+    if path == "/":
+        return "/"
+    return next((to for start, to in NAV_SECTIONS if path == start or path.startswith(start.rstrip("/") + "/")), None)
+
+
 def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False) -> FastAPI:
     app = FastAPI(title="ケイカ")
     conn = ThreadConnection(s)
@@ -169,6 +193,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             return await call_next(request)
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
+    templates.env.globals["nav_section"] = nav_section
     templates.env.globals["sample"] = sample
     templates.env.globals["legal"] = basis_for
     templates.env.globals["med_message"] = med_message
@@ -214,6 +239,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return rows
 
     @app.get("/")
+    @one_view_route
     def home_page(request: Request, cm: str | None = None):
         """開くと終わっている入口。記録できた事と、聞く事だけを出す。"""
         board = build_board(conn, s, cm=cm)
@@ -233,6 +259,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         })
 
     @app.get("/todo")
+    @one_view_route
     def dashboard(request: Request, cm: str | None = None):
         month = today(s).isoformat()[:7]
         board = build_board(conn, s, cm=None if cm == OFFICE_TAB else cm)
@@ -271,6 +298,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return thread
 
     @app.get("/desk")
+    @one_view_route
     def desk_page(request: Request, t: str = ALL):
         thread = _desk_thread(t)
         user = get_user(conn, thread) if thread != ALL else None
@@ -584,6 +612,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return RedirectResponse(f"/users/{record.user_id}", status_code=303)
 
     @app.get("/office")
+    @one_view_route
     def office_page(request: Request):
         rows = office_rows(conn, s)
         for row in rows:
@@ -665,6 +694,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return templates.TemplateResponse(request, "plan.html", {"user": get_user(conn, user_id), "f": hit, "plan": get_plan(conn, hit), "failed": False})
 
     @app.get("/board")
+    @one_view_route
     def board_page(request: Request, cm: str | None = None):
         month = today(s).isoformat()[:7]
         rows = [_dashboard_row(conn, s, u, month) for u in list_users(conn, cm=cm)]
@@ -673,6 +703,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return templates.TemplateResponse(request, "board.html", {"rows": rows, "staff": staff, "cm": cm, "summary": summary, "steps": STEPS, "med_waiting_users": {m.record.user_id for m in open_checks(conn, s)}})
 
     @app.get("/users/{user_id}")
+    @one_view_route
     def user_page(request: Request, user_id: str):
         user = get_user(conn, user_id)
         if user is None:

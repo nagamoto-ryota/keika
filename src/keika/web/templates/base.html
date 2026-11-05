@@ -11,14 +11,25 @@
   {% if as_of %}<div class="demo">デモ基準日 {{ as_of }}（架空データで動いています）</div>{% endif %}
   <header class="top">
     <a class="logo" href="/">ケイカ</a>
+    {% set here = nav_section(request.url.path) %}
     <nav>
-      <a href="/records/new" class="primary">記録する</a>
-      <a href="/">やること</a>
-      <a href="/desk">秘書</a>
-      <a href="/board">一覧</a>
+      <a href="/records/new" class="nav-record"{% if here == '/records/new' %} aria-current="page"{% endif %}>記録する</a>
+      <a href="/"{% if here == '/' %} aria-current="page"{% endif %}>やること</a>
+      <a href="/desk"{% if here == '/desk' %} aria-current="page"{% endif %}>秘書</a>
+      <a href="/board"{% if here == '/board' %} aria-current="page"{% endif %}>一覧</a>
     </nav>
   </header>
   <main>{% block main %}{% endblock %}</main>
   <footer>記録の下書きと指摘は AI（Claude）が作ります。指摘はすべて「確認してください」という形のお知らせです。法的助言や監査の代わりではありません。最終判断は事業所と保険者にあります。 <a class="no-print" href="/guide">導入の前に</a></footer>
+  <script>
+  // 押した直後に反応を見せる
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[href]");
+    if (!a || a.target || e.ctrlKey || e.metaKey || a.getAttribute("href").charAt(0) !== "/") return;
+    document.body.classList.add("going");
+    setTimeout(function () { document.body.classList.remove("going"); }, 4000);  // 保存のリンクは画面が変わらない
+  });
+  window.addEventListener("pageshow", function () { document.body.classList.remove("going"); });
+  </script>
 </body>
 </html>

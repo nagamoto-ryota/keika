@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import io
 from dataclasses import dataclass
@@ -15,6 +18,7 @@ from docx.table import Table
 from keika.settings import OutsideRootError, Settings, safe_path
 
 SCOPES = {"利用者": "user", "事業所": "office", "入口": "inbox"}
+_VIEW_SCANS: ContextVar[dict[str, list["DocRef"]] | None] = ContextVar("view_scans", default=None)
 _HASHES: dict[tuple[str, int, int], str] = {}  # 変わっていないファイルは計算し直さない
 TEXT_EXTS = {"txt", "csv", "srt", "vtt", "md"}
 OFFICE_EXTS = {"docx", "xlsx"}
@@ -45,7 +49,28 @@ class Payload:
     reason: str | None = None
 
 
+@contextmanager
+def one_view() -> Iterator[None]:
+    """画面の1回の表示の間だけ、ファイルの一覧を使い回す。既定は無効で、測定や裏の処理には効かない。
+    ContextVar なので、別のスレッドや次の表示には持ち越さない。"""
+    token = _VIEW_SCANS.set({})
+    try:
+        yield
+    finally:
+        _VIEW_SCANS.reset(token)
+
+
 def scan(s: Settings) -> list[DocRef]:
+    memo = _VIEW_SCANS.get()
+    if memo is None:
+        return _walk(s)
+    key = str(s.drive_root)
+    if key not in memo:
+        memo[key] = _walk(s)
+    return list(memo[key])
+
+
+def _walk(s: Settings) -> list[DocRef]:
     refs = []
     root = s.drive_root.resolve()
     for folder, scope in SCOPES.items():
