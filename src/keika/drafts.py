@@ -9,7 +9,7 @@ import io
 import json
 import re
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Literal
 
@@ -94,6 +94,7 @@ class Draft:
     source: str
     status: str
     created_at: str
+    kept_blanks: list[str] = field(default_factory=list)  # 今は分からないと言われ、もう聞かない欄
 
     @property
     def title(self) -> str:
@@ -297,7 +298,7 @@ def _from_row(row: sqlite3.Row) -> Draft:
     return Draft(
         id=row["id"], user_id=row["user_id"], kind=row["kind"], record_id=row["record_id"], event_date=row["event_date"],
         place=data["place"], start_time=data["start_time"], end_time=data["end_time"], attendees=data["attendees"],
-        sections=data["sections"], held=data["held"], original=row["original"], source=row["source"], status=row["status"], created_at=row["created_at"],
+        sections=data["sections"], held=data["held"], original=row["original"], source=row["source"], status=row["status"], created_at=row["created_at"], kept_blanks=data.get("kept_blanks", []),
     )
 
 

@@ -123,11 +123,11 @@ def test_stale_form_keeps_each_items_quote_and_flag(env):
     assert x["flag"] and x["quote"] == "" and y["quote"] == "デイは週2回のまま続ける"
 
 
-def test_form_shows_item_ids(env):
+def test_each_sentence_form_carries_its_item_id(env):
     s, c = env
     i = make(s, c, wire([WireItem(text="デイは週2回のまま続ける。", quote="デイは週2回のまま続ける")]))
     page = TestClient(create_app(s)).get(f"/drafts/{i}").text
-    assert 'name="s_conclusion_id"' in page
+    assert f'/drafts/{i}/items/{get_draft(c, i).sections["conclusion"][0]["id"]}/text' in page
 
 
 # --- 下書き: 出席者、場所、時刻、医療 ---

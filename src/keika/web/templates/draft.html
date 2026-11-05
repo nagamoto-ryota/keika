@@ -1,72 +1,142 @@
 {% extends "base.html" %}
 {% block title %}{{ d.title }}の下書き - ケイカ{% endblock %}
 {% block main %}
-<p class="muted no-print"><a href="/users/{{ d.user_id }}">{{ user.name }}</a> ／ {{ d.source }} から作りました</p>
-<h1>{{ d.title }}<span class="muted small">（下書き）</span></h1>
-<p class="draft-note">AI が文字起こしから作った下書きです。内容を確かめて直してください。文字起こしに出てこなかった欄は「〇〇」のままです。</p>
-{% if d.status == 'checked' %}<p class="muted">確かめ終わっています。</p>{% endif %}
-{% if d.flagged %}<p class="todo-line no-print">文字起こしと合うか確かめたい文が {{ d.flagged }} 件あります。赤い線の文を見比べてください。</p>{% endif %}
+<p class="muted no-print"><a href="/users/{{ d.user_id }}">{{ user.name }}</a> ／ {{ d.source }} から AI が作った下書きです。最後に決めるのは人です。</p>
 
-<form method="post" action="/drafts/{{ d.id }}" class="write draft">
+<section id="kakunin" class="no-print">
+{% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
+{% if view.left %}
+  <h1 class="big">確かめること <span class="count">{{ view.left }}</span></h1>
+  {% for c in view.checks %}
+  <article class="card unknown draft-check">
+    <p class="proposal">「{{ c.text }}」</p>
+    {% if c.quote %}<p>文字起こしにはこうあります:<br><span class="said">「{{ c.quote }}」</span></p>
+    {% else %}<p>文字起こしに、この文の元になる発言が見つかりません。</p>{% endif %}
+    {% if c.words %}<p class="small">{% for w in c.words %}「{{ w }}」{% endfor %}はこの発言にありません。</p>{% endif %}
+    {% if c.note %}<p class="small">{{ c.note }}</p>{% endif %}
+    {% if c.changed %}<p class="small">{{ c.changed }}</p>{% endif %}
+    <p class="small muted">{{ c.label }}の文です。<a href="#item-{{ c.item_id }}">本文のこの文へ</a></p>
+    {% if not sample %}
+    <div class="review-actions">
+      <form method="post" action="/drafts/{{ d.id }}/items/{{ c.item_id }}/ok"><button>いいよ</button></form>
+      <details class="ng">
+        <summary>違う</summary>
+        <form method="post" action="/drafts/{{ d.id }}/items/{{ c.item_id }}/revise" class="draft-revise">
+          <p><label>どう直しますか<textarea class="card-instruction" name="instruction" rows="2" required placeholder="例: 楽だと話したのは本人ではなく長女です"></textarea></label></p>
+          <p class="small muted">話して入れる時は OS の音声入力が使えます（Windows は Win + H）。</p>
+          <p><button class="plain">直してもらう</button></p>
+        </form>
+      </details>
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+  {% if view.blanks %}
+  <h2>これ足して <span class="muted small">{{ view.blanks|length }}件</span></h2>
+  <p class="small muted">話に出てこなかった所です。答えはそのまま書類に入ります。</p>
+  {% for b in view.blanks %}
+  <form method="post" action="/drafts/{{ d.id }}/blank" class="blank-ask">
+    <input type="hidden" name="field" value="{{ b.field }}">
+    <label>{{ b.question }}<input name="answer" autocomplete="off"{% if sample %} disabled{% endif %}></label>
+    {% if not sample %}<span class="blank-buttons"><button class="plain">入れる</button> <button class="plain" name="action" value="keep" formnovalidate>今は分からない</button></span>{% endif %}
+  </form>
+  {% endfor %}
+  {% endif %}
+{% else %}
+  <div class="next-step">
+    <p class="proposal">確かめることは全部済みました。</p>
+    {% if d.status == 'checked' %}
+    <p>確かめ終わっています。Word で保存して、利用者のフォルダに置いてください。</p>
+    {% else %}
+    <p>次は Word で保存して、利用者のフォルダに置いてください。点検がこの書類を読みます。</p>
+    {% endif %}
+    <p><a class="main-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a></p>
+  </div>
+{% endif %}
+</section>
+
+<article class="doc-sheet">
+  <h1>{{ d.title }}<span class="muted small no-print">（下書き）</span></h1>
   <table class="draft-head">
     <tr><th>利用者</th><td>{{ user.name }}</td><th>作成者</th><td>{{ author or '〇〇' }}</td></tr>
     <tr><th>{{ '開催日' if d.kind == 'meeting' else '訪問日' }}</th><td>{{ d.event_date|hdate }}</td>
-        <th>{{ '開催場所' if d.kind == 'meeting' else '訪問先' }}</th><td><input name="place" value="{{ d.place }}"></td></tr>
-    <tr><th>時間</th><td colspan="3"><input name="start_time" value="{{ d.start_time }}" size="6"> 〜 <input name="end_time" value="{{ d.end_time }}" size="6"></td></tr>
+        <th>{{ '開催場所' if d.kind == 'meeting' else '訪問先' }}</th><td>{{ d.place or '〇〇' }}</td></tr>
+    <tr><th>時間</th><td colspan="3">{{ d.start_time or '〇〇' }} 〜 {{ d.end_time or '〇〇' }}</td></tr>
   </table>
 
   <h2>{{ '出席者' if d.kind == 'meeting' else '同席した人' }}</h2>
+  {% if d.attendees %}
   <table class="draft-people">
     <tr><th>所属</th><th>職種</th><th>氏名</th></tr>
-    {% for a in d.attendees %}
-    <tr><td><input name="attendee_org" value="{{ a.org }}"></td><td><input name="attendee_role" value="{{ a.role }}"></td><td><input name="attendee_name" value="{{ a.name }}"></td></tr>
-    {% endfor %}
-    <tr class="no-print"><td><input name="attendee_org"></td><td><input name="attendee_role"></td><td><input name="attendee_name"></td></tr>
+    {% for a in d.attendees %}<tr><td>{{ a.org }}</td><td>{{ a.role }}</td><td>{{ a.name }}</td></tr>{% endfor %}
   </table>
+  {% else %}<p class="muted">話に出てきませんでした。</p>{% endif %}
+
+  {% if not sample %}
+  <details class="head-edit no-print">
+    <summary>場所、時間、出席者を直す</summary>
+    <form method="post" action="/drafts/{{ d.id }}" class="write draft">
+      <p><label>{{ '開催場所' if d.kind == 'meeting' else '訪問先' }} <input name="place" value="{{ d.place }}"></label></p>
+      <p><label>時間 <input name="start_time" value="{{ d.start_time }}" size="6"></label> 〜 <input name="end_time" value="{{ d.end_time }}" size="6" aria-label="終わりの時間"></p>
+      <div class="table-scroll">
+      <table class="draft-people">
+        <tr><th>所属</th><th>職種</th><th>氏名</th></tr>
+        {% for a in d.attendees %}
+        <tr><td><input name="attendee_org" value="{{ a.org }}"></td><td><input name="attendee_role" value="{{ a.role }}"></td><td><input name="attendee_name" value="{{ a.name }}"></td></tr>
+        {% endfor %}
+        <tr><td><input name="attendee_org"></td><td><input name="attendee_role"></td><td><input name="attendee_name"></td></tr>
+      </table>
+      </div>
+      <p><button>保存する</button></p>
+    </form>
+  </details>
+  {% endif %}
 
   {% for key, label in d.headings.items() %}
-  <h2>{{ label }}</h2>
+  <h2 id="sec-{{ key }}">{{ label }}</h2>
   {% for item in d.sections[key] %}
-  <div class="draft-item{{ ' flagged' if item.flag }}">
-    <input type="hidden" name="s_{{ key }}_id" value="{{ item.id }}">
-    <textarea name="s_{{ key }}" rows="2" data-label="{{ label }}">{{ item.text }}</textarea>
-    {% if item.flag %}<p class="small draft-flag no-print">{{ item.flag }}</p>{% endif %}
-    {% if item.quote %}<details class="no-print"><summary class="small muted">元の発言</summary><p class="small">{{ item.quote }}</p></details>{% endif %}
-  </div>
+  <details id="item-{{ item.id }}" class="sentence{{ ' to-check' if item.flag }}">
+    <summary>{{ item.text }}</summary>
+    <div class="sentence-open no-print">
+      {% if not sample %}
+      <form method="post" action="/drafts/{{ d.id }}/items/{{ item.id }}/text">
+        <textarea name="text" rows="2" aria-label="文を直す">{{ item.text }}</textarea>
+        <p><button class="plain">文を直す</button> <span class="small muted">空にして押すと消えます。</span></p>
+      </form>
+      {% endif %}
+      <p class="small">元の発言: {{ item.quote or '文字起こしに見つかりません' }}</p>
+    </div>
+  </details>
   {% endfor %}
-  <input type="hidden" name="s_{{ key }}_id" value="">
-  <textarea name="s_{{ key }}" rows="1" class="no-print" data-label="{{ label }}" placeholder="書き足す"></textarea>
+  {% if not sample %}
+  <details class="add-sentence no-print">
+    <summary>書き足す</summary>
+    <form method="post" action="/drafts/{{ d.id }}/sections/{{ key }}/add">
+      <textarea name="text" rows="2" required aria-label="{{ label }}に書き足す"></textarea>
+      <p><button class="plain">足す</button></p>
+    </form>
+  </details>
+  {% endif %}
   {% endfor %}
+</article>
 
-  <div class="write-actions no-print">
-    {% if not sample %}<button>保存する</button>{% endif %}
-    <a class="plain-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a>
-    <button type="button" onclick="window.print()" class="plain">印刷する</button>
-    <button type="button" class="plain" id="copy-draft">文章をコピーする</button>
-  </div>
-</form>
+<div class="write-actions no-print">
+  {% if view.left %}<span class="muted">確かめることが あと {{ view.left }} 件あります。残っていても保存できます（印が付きます）。</span>{% endif %}
+  <a class="plain-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a>
+  <button type="button" onclick="window.print()" class="plain">印刷する</button>
+  <button type="button" class="plain" id="copy-draft" data-text="{{ plain }}">文章をコピーする</button>
+  {% if d.status == 'open' and not sample %}
+  <form method="post" action="/drafts/{{ d.id }}/checked"><button class="plain">確かめ終わった（一覧から外す）</button></form>
+  {% endif %}
+</div>
 <script>
 document.getElementById("copy-draft").addEventListener("click", function () {
-  // 保存前に直した文も写す。印の付いた文には目印を付ける
-  var form = document.querySelector("form.draft");
-  var lines = [{{ d.title|tojson }}, "利用者: " + {{ user.name|tojson }}, "日: " + {{ d.event_date|tojson }}, "場所: " + form.place.value, "時間: " + form.start_time.value + "〜" + form.end_time.value, "出席者:"];
-  var orgs = form.querySelectorAll("[name=attendee_org]"), roles = form.querySelectorAll("[name=attendee_role]"), names = form.querySelectorAll("[name=attendee_name]");
-  names.forEach(function (n, i) { if (n.value.trim()) lines.push("  " + orgs[i].value + " " + roles[i].value + " " + n.value); });
-  var last = null;
-  form.querySelectorAll("textarea[data-label]").forEach(function (t) {
-    if (t.dataset.label !== last) { lines.push("", "【" + t.dataset.label + "】"); last = t.dataset.label; }
-    var flagged = t.parentElement.classList.contains("flagged");
-    if (t.value.trim()) lines.push((flagged ? "【確かめる】" : "") + t.value.trim());
-  });
-  navigator.clipboard.writeText(lines.join("\n"));
+  navigator.clipboard.writeText(this.dataset.text);
   this.textContent = "コピーしました";
 });
 </script>
 
-<p class="small muted no-print">Word は最後に保存した内容で作ります。確かめて直した後、利用者のフォルダに置くと、点検がこの書類を読みます。</p>
-{% if d.status == 'open' and not sample %}
-<form method="post" action="/drafts/{{ d.id }}/checked" class="no-print"><button class="plain">確かめ終わった（一覧から外す）</button></form>
-{% endif %}
+<p class="small muted no-print">Word は保存した内容で作ります。確かめて直した後、利用者のフォルダに置くと、点検がこの書類を読みます。</p>
 
 {% if d.held %}
 <section class="no-print">

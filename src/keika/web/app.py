@@ -24,6 +24,7 @@ from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
 from keika.visit_questions import get_questions, make_questions, questions_key
 from keika.visit_sheet import build_sheet
+from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, ok_item, revise_item
 from keika.drafts import SECTIONS, draft_for_results, finish_homework, move_record_drafts, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
@@ -44,7 +45,7 @@ from keika.reading import stored_facts
 from keika.records import KindRead, RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
-from keika.tasks import build_board
+from keika.tasks import build_board, person_lines
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
 from keika.views import evidence_view, hdate
 
@@ -192,6 +193,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     review_notices: dict[int, str] = {}
+    draft_notices: dict[int, str] = {}
 
     def _reviews_for(cm: str | None) -> list[dict]:
         """担当の絞り込み中は、その人の分と、誰の話か決まっていない分を出す。"""
@@ -224,7 +226,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "board": board, "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn),
             "reviews": _reviews_for(cm), "office": _office_for(cm),
             "med_checks": [] if cm == OFFICE_TAB else open_checks(conn, s, cm=cm),
-            "drafts": _drafts_for(cm), "user_names": {u.id: u.name for u in list_users(conn)},
+            "drafts": [(d, count_left(conn, d)) for d in _drafts_for(cm)], "user_names": {u.id: u.name for u in list_users(conn)},
+            "person_lines": person_lines(board),
         })
 
     def _drafts_for(cm: str | None) -> list:
@@ -256,7 +259,67 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         staff = {p.id: p.name for p in list_people(conn, "staff")}
         return templates.TemplateResponse(request, "draft.html", {
             "d": draft, "user": user, "author": staff.get(user.cm, ""), "plain": plain_text(draft, user.name),
+            "view": draft_view(conn, draft), "notice": draft_notices.pop(draft_id, ""),
         })
+
+    def _no_sample() -> None:
+        if sample:
+            raise HTTPException(403, "見本モードでは直せません")
+
+    @app.post("/drafts/{draft_id}/items/{item_id}/ok")
+    def post_item_ok(draft_id: int, item_id: str):
+        _no_sample()
+        _draft_or_404(draft_id)
+        try:
+            ok_item(conn, draft_id, item_id)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse(f"/drafts/{draft_id}#kakunin", status_code=303)
+
+    @app.post("/drafts/{draft_id}/items/{item_id}/revise")
+    def post_item_revise(draft_id: int, item_id: str, instruction: str = Form("")):
+        _no_sample()
+        _draft_or_404(draft_id)
+        try:
+            draft_notices[draft_id] = revise_item(conn, client_factory(), s, draft_id, item_id, instruction)
+        except RuntimeError as e:  # キーが無い時
+            draft_notices[draft_id] = f"直せませんでした（{e}）"
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse(f"/drafts/{draft_id}#kakunin", status_code=303)
+
+    @app.post("/drafts/{draft_id}/items/{item_id}/text")
+    def post_item_text(draft_id: int, item_id: str, text: str = Form("")):
+        _no_sample()
+        _draft_or_404(draft_id)
+        try:
+            edit_item(conn, draft_id, item_id, text)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse(f"/drafts/{draft_id}#item-{item_id}", status_code=303)
+
+    @app.post("/drafts/{draft_id}/sections/{key}/add")
+    def post_item_add(draft_id: int, key: str, text: str = Form("")):
+        _no_sample()
+        _draft_or_404(draft_id)
+        try:
+            add_item(conn, draft_id, key, text)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse(f"/drafts/{draft_id}#sec-{key}", status_code=303)
+
+    @app.post("/drafts/{draft_id}/blank")
+    def post_blank(draft_id: int, field: str = Form(...), answer: str = Form(""), action: str = Form("")):
+        _no_sample()
+        _draft_or_404(draft_id)
+        try:
+            if action == "keep":
+                keep_blank(conn, draft_id, field)
+            else:
+                fill_blank(conn, draft_id, field, answer)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from None
+        return RedirectResponse(f"/drafts/{draft_id}#kakunin", status_code=303)
 
     @app.post("/drafts/{draft_id}")
     async def save_draft(request: Request, draft_id: int):
@@ -289,12 +352,12 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.post("/drafts/{draft_id}/items/{item_id}/done")
     def done_homework(draft_id: int, item_id: str):
-        _draft_or_404(draft_id)
+        draft = _draft_or_404(draft_id)
         try:
             finish_homework(conn, draft_id, item_id)
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse(f"/#p-{draft.user_id}", status_code=303)  # 畳んだ一覧でも、その人の所へ戻る
 
     def _sheet_view(sheet, failed: bool) -> dict:
         q = get_questions(conn, sheet.user.id)

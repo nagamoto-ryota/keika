@@ -124,8 +124,6 @@ button { font: inherit; padding: 2px 14px; border: 1px solid var(--accent); back
 .draft h2 { font-size: 1rem; margin: 18px 0 6px; }
 form.draft table input { width: 100%; box-sizing: border-box; }
 form.draft table input[size] { width: auto; }
-.draft-item { margin-bottom: 8px; }
-.draft-item.flagged textarea { border-left: 4px solid var(--finding); }
 .draft-flag { color: var(--finding); margin: 2px 0; }
 .draft-original { white-space: pre-wrap; background: var(--paper); padding: 12px; max-height: 420px; overflow: auto; }
 @media print {
@@ -231,3 +229,45 @@ mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: 
 .ng[open] { flex-basis: 100%; }
 .card-instruction { display: block; width: 100%; box-sizing: border-box; font: inherit; margin-top: 4px; }
 .minor > summary { cursor: pointer; margin: 16px 0 8px; color: var(--muted); }
+.row { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; padding: 0; }
+.row > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 14px; cursor: pointer; }
+.row-name { font-weight: 600; }
+.row-lead { color: var(--muted); font-size: 14px; flex: 1 1 12em; min-width: 0; }
+.row-body { padding: 8px 12px 4px; border-top: 1px solid var(--line); }
+.row[open] > summary .row-lead { display: none; }
+.opens { color: var(--accent); font-size: 13px; white-space: nowrap; }
+.task summary { flex-wrap: wrap; }
+.task-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; color: inherit; text-decoration: none; }
+.task-group > .task-body { padding: 8px; }
+.draft-row { margin: 6px 0; }
+.said { font-weight: 600; }
+.draft-check .review-actions form { margin: 0; }
+.draft-revise { margin-top: 6px; }
+.blank-ask { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+.blank-ask label { display: block; font-weight: 600; }
+.blank-ask input[name=answer] { display: block; width: 100%; max-width: none; box-sizing: border-box; margin-top: 4px; font: inherit; }
+.blank-buttons { display: block; margin-top: 6px; }
+.next-step { background: var(--accent-soft); border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+.main-link { display: inline-block; padding: 8px 24px; background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; }
+.doc-sheet { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 20px 24px; margin: 16px 0; overflow-wrap: anywhere; }
+.doc-sheet h1 { font-size: 20px; margin: 0 0 12px; }
+.doc-sheet h2 { font-size: 15px; margin: 18px 0 4px; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+.doc-sheet table { width: 100%; border-collapse: collapse; }
+.doc-sheet th, .doc-sheet td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; font-size: 14px; overflow-wrap: anywhere; }
+.doc-sheet th { background: var(--bg); font-weight: 600; white-space: nowrap; }
+.sentence > summary { list-style: none; cursor: pointer; padding: 2px 4px; border-radius: 3px; line-height: 1.8; }
+.sentence > summary::-webkit-details-marker { display: none; }
+.sentence > summary:hover { background: var(--bg); }
+.sentence.to-check > summary { background: var(--nudge-soft); }
+.sentence:target > summary { outline: 2px solid var(--accent); }
+.sentence-open { background: var(--bg); border-radius: 4px; padding: 8px 10px; margin: 4px 0 10px; }
+.sentence-open textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.sentence-open form p { margin: 4px 0; }
+.add-sentence > summary, .head-edit > summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 6px; }
+.add-sentence textarea { width: 100%; box-sizing: border-box; font: inherit; margin-top: 4px; }
+.table-scroll { overflow-x: auto; }
+.head-edit input { max-width: 100%; box-sizing: border-box; }
+@media print {
+  .doc-sheet { border: none; padding: 0; margin: 0; }
+  .sentence.to-check > summary { background: none; }
+}

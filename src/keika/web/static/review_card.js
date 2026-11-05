@@ -77,10 +77,11 @@
   // 畳んだ中へのリンク（#kusuri など）で来たら開く
   if (location.hash) {
     var target = document.querySelector(location.hash);
-    var fold = target && target.closest("details");
-    if (fold) {
+    var fold = target;
+    while (fold && (fold = fold.closest("details"))) {  // 畳みが重なっていても全部開く
       fold.open = true;
-      target.scrollIntoView();
+      fold = fold.parentElement;
     }
+    if (target) target.scrollIntoView();
   }
 })();

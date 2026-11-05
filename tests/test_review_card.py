@@ -114,9 +114,9 @@ def test_consult_heading_comes_first_and_the_rest_is_folded(env):
     assert '<details class="minor">' in html
 
 
-def test_fold_stays_open_when_nothing_to_consult(env):
+def test_fold_stays_closed_when_nothing_to_consult(env):
     s, c = env
-    assert '<details class="minor" open>' in page(s)
+    assert '<details class="minor">' in page(s)
 
 
 # 3. これ足して

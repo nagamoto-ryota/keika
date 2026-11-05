@@ -19,6 +19,7 @@ from keika.settings import Settings, today
 
 VISIT_NOTICE_DAYS = 10  # 月末までこの日数を切ったら人ごとに出す
 DEADLINE_RULES = ("R44", "R45")
+UPDATE_RULES = ("R44", "R45", "R09")
 STEP_RULE = {
     "assessment": "R09", "meeting": "R01", "minutes": "R33", "consent": "R10", "delivery": "R07",
     "service_plans": "R12", "medical": "R08", "visit": "R06", "usage": "R13",
@@ -33,6 +34,15 @@ class Task:
     note: str = ""
     view: dict | None = None  # 画面に出す形（画面の側で入れる）
     homework: list[Homework] = field(default_factory=list)  # 会議や訪問で残った宿題。人ごとに1行にまとめる
+
+    @property
+    def opens(self) -> str:
+        """押すと何が開くか。空なら開く物が無く、利用者のページへ直接行く。"""
+        if self.homework:
+            return "宿題の一覧"
+        if self.item:
+            return "根拠と書き足す文の案" if self.item.finding.suggestion else "根拠と次の手順"
+        return ""
 
 
 @dataclass
@@ -82,6 +92,37 @@ def _person(conn: sqlite3.Connection, s: Settings, user: User, days_left: int, b
         person.tasks.append(Task(f"宿題・持ち越し {len(homework)}件", homework=homework))
     person.tasks.sort(key=lambda t: (t.deadline is None, t.deadline or ""))
     return person
+
+
+def _is_update(task: Task) -> bool:
+    """更新の期限に向けた準備。同じ趣旨が別の点検から重なって出る。"""
+    if not task.item:
+        return False
+    rule = task.item.finding.rule_id
+    return rule in UPDATE_RULES or (rule == "R11" and "更新" in task.title)
+
+
+def person_line(tasks: list[Task]) -> dict:
+    """1人を1行に畳む形。表示の上でまとめるだけで、項目は減らさない。"""
+    dated = [t for t in tasks if t.deadline]
+    lead = min(dated, key=lambda t: t.deadline) if dated else (tasks[0] if tasks else None)
+    updates = [t for t in tasks if _is_update(t)]
+    rows: list[dict] = []
+    grouped = len(updates) >= 2
+    for task in tasks:
+        if grouped and _is_update(task):
+            if task is updates[0]:
+                deadlines = [t.deadline for t in updates if t.deadline]
+                rows.append({"group": "更新の準備", "tasks": updates, "deadline": min(deadlines) if deadlines else None})
+        else:
+            rows.append({"task": task})
+    return {"count": len(tasks), "lead": lead.title if lead else "", "deadline": lead.deadline if lead else None, "rows": rows}
+
+
+def person_lines(board: Board) -> list[dict]:
+    """期限の近い人から。期限が無ければ件数の多い順（一覧の並びのまま）。"""
+    lines = [person_line(p.tasks) | {"user": p.user} for p in board.people if p.tasks]
+    return sorted(lines, key=lambda x: (x["deadline"] is None, x["deadline"] or ""))
 
 
 def build_board(conn: sqlite3.Connection, s: Settings, cm: str | None = None) -> Board:
