@@ -320,12 +320,12 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.get("/desk")
     @one_view_route
-    def desk_page(request: Request, t: str = ALL, about: str = ""):
+    def desk_page(request: Request, t: str = ALL, about: str = "", doc: str = ""):
         thread = _desk_thread(t)
         user = get_user(conn, thread) if thread != ALL else None
         records = list(reversed(list_records(conn, thread))) if user else []
         docs = [r.rel_path for r in user_refs(conn, s, user)] if user else []
-        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs, "question": _desk_question(thread, about) if user else ""})
+        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs, "open_file": doc if doc in docs else "", "question": _desk_question(thread, about) if user else ""})
 
     def _desk_question(thread: str, about: str) -> str:
         """項目から来た時に、入力欄へ入れておく文。送るのは人。"""
@@ -790,6 +790,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "cells": user_progress(conn, s, user),
             "drafts": list_drafts(conn, user_id, status=None),
             "care_plans": list_care_plans(conn, user_id),
+            "assessment": max([r.rel_path for r, f in facts if f.doc_type == "アセスメント"] + [r.rel_path for r in user_refs(conn, s, user) if "アセスメント" in r.rel_path.rsplit("/", 1)[-1]], default=""),
         })
 
     def _find(user_id: str, fp: str) -> Finding:

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}AI相談 - ケイカ{% endblock %}
 {% block main %}
-<div class="desk" id="desk" data-thread="{{ thread }}" data-view="talk">
+<div class="desk" id="desk" data-thread="{{ thread }}" data-view="talk"{% if open_file %} data-open-file="{{ open_file }}"{% endif %}>
   <div class="desk-views">
     <button type="button" data-show="people">人</button>
     {% if user %}<button type="button" data-show="real">実物</button>{% endif %}

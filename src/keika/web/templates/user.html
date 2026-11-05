@@ -4,24 +4,27 @@
 {% block main %}
 <h1>{{ user.name }} <small>{{ user.data.get('care_level', '') }}</small></h1>
 
-<p class="no-print"><a href="/users/{{ user.id }}/visit">訪問前の1枚を開く</a></p>
 <div class="steps">
   {% for c in cells %}<span class="chk {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status in ('todo', 'check') %}！{% elif c.status == 'unknown' %}?{% else %}—{% endif %} {{ c.label }}</span>{% endfor %}
 </div>
 
-{% if drafts or care_plans %}
-<section>
-  <h2>書類の下書き <small class="muted">{{ drafts|length + care_plans|length }}件</small></h2>
-  {% for d in drafts %}<p><a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}</p>{% endfor %}
-  {% for p in care_plans %}<p><a href="/careplans/{{ p.id }}">{{ p.title }}（{{ p.created_at[:10]|hdate }} に作成{% if p.edits %}、手直し {{ p.edits }} 件{% endif %}）</a></p>{% endfor %}
+<section id="forms" class="form-shelf no-print">
+  <h2>帳票</h2>
+  <div class="shelf-row"><span class="shelf-name">ケアプラン</span><span class="shelf-items">
+    {% for p in care_plans %}<a href="/careplans/{{ p.id }}">{{ p.title }}（{{ p.created_at[:10]|hdate }}{% if p.edits %}、手直し {{ p.edits }} 件{% endif %}）</a>{% endfor %}
+    {% if not sample %}<form method="post" action="/users/{{ user.id }}/careplan" class="shelf-make" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='作っています（2分ほど）';"><button class="plain">{{ '新しく作る' if care_plans else '下書きを作る' }}</button> <span class="small muted">AI の案です。確定は人が行います</span></form>{% endif %}
+  </span></div>
+  <div class="shelf-row"><span class="shelf-name">会議録</span><span class="shelf-items">
+    {% for d in drafts if d.kind == 'meeting' %}<a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}{% else %}<span class="muted small">会議の記録が入ると作れます</span>{% endfor %}
+  </span></div>
+  <div class="shelf-row"><span class="shelf-name">モニタリング</span><span class="shelf-items">
+    {% for d in drafts if d.kind != 'meeting' %}<a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}{% else %}<span class="muted small">訪問の記録が入ると作れます</span>{% endfor %}
+  </span></div>
+  <div class="shelf-row"><span class="shelf-name">訪問前の1枚</span><span class="shelf-items"><a href="/users/{{ user.id }}/visit">開く</a></span></div>
+  {% if assessment %}
+  <div class="shelf-row"><span class="shelf-name">アセスメント</span><span class="shelf-items"><a href="/desk?t={{ user.id }}&amp;doc={{ assessment|urlencode }}">書類を見る</a></span></div>
+  {% endif %}
 </section>
-{% endif %}
-{% if not sample %}
-<form method="post" action="/users/{{ user.id }}/careplan" class="no-print" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='作っています（2分ほど）';">
-  <button class="plain">ケアプランの下書きを作る</button>
-  <span class="small muted">AI が書類と記録から案を作ります。前の下書きと手直しはそのまま残ります。確定は人が行います</span>
-</form>
-{% endif %}
 
 <section>
   <h2>やること <small class="muted">{{ findings|length }}件</small></h2>
