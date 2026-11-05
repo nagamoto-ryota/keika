@@ -409,3 +409,11 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .shelf-name { flex: 0 0 7.5em; font-weight: 600; font-size: 15px; }
 .shelf-items { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; font-size: 15px; }
 .shelf-make { display: inline; margin: 0; }
+
+/* 導入の前に */
+.guide-step { font-size: 18px; margin: 14px 0 4px; }
+.guide-short { margin: 0; padding-left: 1.2em; }
+.guide-short li { margin: 2px 0; line-height: 1.55; }
+.guide-lead { margin: 0 0 4px; }
+.guide-lead + .fill td { height: 2.2em; }
+.guide-foot { margin-top: 14px; }

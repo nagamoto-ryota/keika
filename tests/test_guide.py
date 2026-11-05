@@ -24,7 +24,7 @@ def test_footer_links_the_guide(client):
 
 def test_guide_covers_what_the_office_does_before_entering_data(client):
     page = client.get("/guide").text
-    for word in ("同意", "家族", "追記", "学習", "保存期間", "処理する国", "取扱規程", "委託先", "職員のルール", "事故", "廃棄", "退職", "BitLocker", "画面ロック", "バックアップ", "平文", "印刷する"):
+    for word in ("同意", "家族", "追記", "学習", "処理する国", "規程", "委託先", "事故", "廃棄", "退職", "BitLocker", "画面ロック"):
         assert word in page, word
 
 
@@ -90,3 +90,16 @@ def test_guide_sentence_stays_whole_when_printed(client):
 def test_guide_makes_no_promises_it_cannot_keep(client):
     page = client.get("/guide").text
     assert "外部へ送らない" not in page and "スマホ" not in page
+
+
+def test_guide_is_three_items_with_nothing_folded(client):
+    page = client.get("/guide").text.split("<footer")[0]
+    assert "この3つが揃えば始められます" in page and "事故があった時に説明できる状態にしておく" in page
+    assert page.count('class="guide-step"') == 3 and "<details" not in page
+    assert page.index("1. 利用者の同意") < page.index("2. AI の契約") < page.index("3. 事業所の決まりと端末")
+
+
+def test_guide_does_not_promise_safety(client):
+    page = client.get("/guide").text.split("<footer")[0]
+    for word in ("安全です", "問題なし", "問題ありません", "適法"):
+        assert word not in page, word
