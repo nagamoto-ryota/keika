@@ -85,18 +85,18 @@ def test_no_visit_record_says_how_monitoring_comes(env):
     assert "訪問の記録が入ると作れます" in shelf(s)
 
 
-def test_assessment_not_shown_when_there_is_none(env):
+def test_assessment_row_offers_a_draft_when_there_is_no_real_one(env):
     s, c = env
-    assert "アセスメント" not in shelf(s)
+    part = shelf(s).split("アセスメント")[1]
+    assert 'action="/users/U04/assessment"' in part and "今の書類を見る" not in part
 
 
-def test_assessment_opens_the_real_one_and_cannot_be_read_as_making(env):
+def test_assessment_opens_the_real_one_with_its_own_link(env):
     s, c = env
     assessment(s, c)
-    part = shelf(s)
-    row = next(line for line in part.splitlines() if "アセスメント" in line)
-    assert f"/desk?t=U04&amp;doc={quote(ASSESS)}" in row
-    assert "作" not in re.sub(r"<[^>]+>", "", row)
+    part = shelf(s).split("アセスメント")[1]
+    link = re.search(r'<a href="([^"]+)">([^<]+)</a>', part)
+    assert link[1] == f"/desk?t=U04&amp;doc={quote(ASSESS)}" and link[2] == "今の書類を見る"
 
 
 def test_desk_opens_the_named_document_only_if_it_is_this_persons(env):

@@ -102,6 +102,8 @@ TOOLS = [
      "input_schema": {"type": "object", "properties": {"number": {"type": "string", "description": "list_findings の番号（N1 など）"}}, "required": ["number"]}},
     {"name": "make_care_plan", "description": "この利用者のケアプランの下書きを作る。数分かかり費用もかかる。人に作ってと頼まれた時だけ使う。",
      "input_schema": {"type": "object", "properties": {}}},
+    {"name": "make_assessment", "description": "この利用者のアセスメント（課題分析標準項目）の下書きを作る。数分かかり費用もかかる。人に作ってと頼まれた時だけ使う。",
+     "input_schema": {"type": "object", "properties": {}}},
     {"name": "list_drafts", "description": "この利用者の書類の下書き（会議の要点、モニタリング）の一覧を見る。",
      "input_schema": {"type": "object", "properties": {}}},
     {"name": "show_draft", "description": "この利用者の書類の下書きを左に開く。",
@@ -305,6 +307,12 @@ def _make_tool(conn: sqlite3.Connection, client: Any, s: Settings, thread: str, 
         if plan_id is None:
             raise ValueError("作れませんでした。")
         _add_made(conn, thread, "careplan", "ケアプランの下書き", f"/careplans/{plan_id}")
+        return "左に開きました。"
+    if block.name == "make_assessment":
+        plan_id = make_care_plan(conn, client, s, thread, kind="assessment")
+        if plan_id is None:
+            raise ValueError("作れませんでした。")
+        _add_made(conn, thread, "careplan", "アセスメントの下書き", f"/careplans/{plan_id}")
         return "左に開きました。"
     if block.name == "list_drafts":
         rows = [{"番号": d.id, "書類": d.title, "日": d.event_date} for d in list_drafts(conn, thread, status=None)]

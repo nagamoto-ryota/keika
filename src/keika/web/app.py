@@ -911,7 +911,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "unread": len(user_refs(conn, s, user)) - len(facts),
             "cells": user_progress(conn, s, user),
             "drafts": list_drafts(conn, user_id, status=None),
-            "care_plans": list_care_plans(conn, user_id),
+            "care_plans": [p for p in list_care_plans(conn, user_id) if p.kind != "assessment"],
+            "assessments": [p for p in list_care_plans(conn, user_id) if p.kind == "assessment"],
             "assessment": max([r.rel_path for r, f in facts if f.doc_type == "アセスメント"] + [r.rel_path for r in user_refs(conn, s, user) if "アセスメント" in r.rel_path.rsplit("/", 1)[-1]], default=""),
         })
 
@@ -967,15 +968,24 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.post("/users/{user_id}/careplan")
     def post_care_plan(request: Request, user_id: str):
+        return _make_plan(user_id, None, "ケアプラン")
+
+    @app.post("/users/{user_id}/assessment")
+    def post_assessment(request: Request, user_id: str):
+        return _make_plan(user_id, "assessment", "アセスメント")
+
+    def _make_plan(user_id: str, kind: str | None, name: str):
+        if sample:
+            raise HTTPException(403, "見本モードでは作れません")
         user = get_user(conn, user_id)
         if user is None:
             raise HTTPException(404, "利用者が見つかりません")
         try:
-            made = make_care_plan(conn, client_factory(), s, user_id)
+            made = make_care_plan(conn, client_factory(), s, user_id, kind=kind)
         except RuntimeError:  # キーが無い時
             made = None
         if made is None:
-            return PlainTextResponse("ケアプランの下書きを作れませんでした。時間をおいて、もう一度押してください。", status_code=502)
+            return PlainTextResponse(f"{name}の下書きを作れませんでした。時間をおいて、もう一度押してください。", status_code=502)
         return RedirectResponse(f"/careplans/{made}", status_code=303)
 
     @app.get("/careplans/{plan_id}")

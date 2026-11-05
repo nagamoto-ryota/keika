@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ p.title }}の下書き - {{ user.name }} - ケイカ{% endblock %}
-{% macro cell(c, label) %}<div class="cell-box{{ ' flagged' if c.flag }}">
+{% macro cell(c, label) %}<div class="cell-box{{ ' blank-cell' if c.text == '〇〇' }}{{ ' flagged' if c.flag }}">
   <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>
 {{ c.text }}</textarea>
   <div class="cell-print">{{ c.text }}</div>
@@ -21,7 +21,7 @@
   <button type="button" class="plain" id="print-plan">印刷する</button>
   {% if not sample %}
   <form method="post" action="/careplans/{{ p.id }}/export" class="flush-first inline"><button class="plain">事業所のフォルダの出力先に置く</button></form>
-  <form method="post" action="/careplans/{{ p.id }}/compare" class="flush-first inline busy-button"><button class="plain">アセスメントと読み比べる</button></form>
+  {% if p.kind != 'assessment' %}<form method="post" action="/careplans/{{ p.id }}/compare" class="flush-first inline busy-button"><button class="plain">アセスメントと読み比べる</button></form>{% endif %}
   {% endif %}
 </div>
 {% if saved == 'failed' %}<p class="notice no-print">出力先に置けませんでした。フォルダを確かめてください。</p>{% elif saved %}<p class="notice no-print">Word を置きました: {{ saved }}（読み取りの対象の外なので、点検はこの下書きを読みません。今ある書類は変えていません）</p>{% endif %}
@@ -43,6 +43,18 @@
 {% endif %}
 
 <div id="plan-sheet" data-url="{{ '' if sample else '/careplans/' ~ p.id ~ '/cells' }}">
+{% if p.kind == 'assessment' %}
+<table class="plan-sheet">
+  {% for pair in p.head.items()|batch(3) %}<tr>{% for label, c in pair %}<th>{{ label }}</th><td>{{ cell(c, label) }}</td>{% endfor %}</tr>{% endfor %}
+</table>
+{% for group, keys in p.groups %}
+<h2>{{ group }}</h2>
+<table class="plan-sheet">
+  <colgroup><col style="width: 26%"><col></colgroup>
+  {% for key in keys %}<tr><th>{{ key[1:] }} {{ p.headings[key] }}</th><td>{{ lines(key, p.headings[key]) }}</td></tr>{% endfor %}
+</table>
+{% endfor %}
+{% else %}
 {% if p.kind == 'kyotaku' %}
 <h2>第１表　居宅サービス計画書（１）</h2>
 {% else %}
@@ -90,11 +102,12 @@
   {% if p.kind == 'kyotaku' %}{{ section_row('activity') }}{% endif %}
   {{ section_row('week_other') }}
 </table>
+{% endif %}
 </div>
 
 <p class="small muted no-print">Word はマスを結合しない表で作ります。下書きのまま利用者のフォルダに置くと、点検が計画書として読みます。確定してから置いてください。作り直すと別の下書きになり、この下書きと手直しはそのまま残ります。</p>
 {% if not sample %}
-<form method="post" action="/users/{{ user.id }}/careplan" class="no-print flush-first busy-button"><button class="plain">AI の案をもう1つ作る</button></form>
+<form method="post" action="/users/{{ user.id }}/{{ 'assessment' if p.kind == 'assessment' else 'careplan' }}" class="no-print flush-first busy-button"><button class="plain">AI の案をもう1つ作る</button></form>
 {% endif %}
 
 {% if p.held %}

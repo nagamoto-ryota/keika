@@ -441,3 +441,6 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 
 .send-button:disabled { opacity: .45; cursor: not-allowed; }
 .mail-attach.is-blank .attach-row { color: var(--ink, #222); font-style: normal; font-weight: 400; }
+
+/* 下書きの表: 読み取れなかったマス */
+.cell-box.blank-cell .sheet-cell { background: #fdeceb; color: #b3261e; }
