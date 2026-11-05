@@ -45,6 +45,7 @@ from keika.reading import stored_facts
 from keika.records import KindRead, RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
+from keika.secretary import ALL, answer_question, open_source, others_in_text, start_question, thread_messages, threads_state
 from keika.tasks import build_board, person_lines
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
 from keika.views import evidence_view, hdate
@@ -243,6 +244,61 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             return rows
         mine = {u.id for u in list_users(conn) if u.cm == cm}
         return [d for d in rows if d.user_id in mine]
+
+    def _desk_thread(thread: str) -> str:
+        if thread != ALL and get_user(conn, thread) is None:
+            raise HTTPException(404, "その枠はありません")
+        return thread
+
+    @app.get("/desk")
+    def desk_page(request: Request, t: str = ALL):
+        thread = _desk_thread(t)
+        user = get_user(conn, thread) if thread != ALL else None
+        records = list(reversed(list_records(conn, thread))) if user else []
+        docs = [r.rel_path for r in user_refs(conn, s, user)] if user else []
+        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs})
+
+    @app.get("/desk/{thread}/messages")
+    def desk_messages(thread: str):
+        _desk_thread(thread)
+        return {"messages": thread_messages(conn, thread, seen=True), "threads": threads_state(conn)}
+
+    def _desk_answer(thread: str, working_id: int) -> None:
+        own = _connect(s)
+        try:
+            try:
+                client = client_factory()
+            except RuntimeError:  # キーが無い時
+                client = None
+            answer_question(own, client, s, thread, working_id)
+        finally:
+            own.close()
+
+    @app.post("/desk/{thread}/ask")
+    def desk_ask(thread: str, background: BackgroundTasks, question: str = Form(""), stay: str = Form("")):
+        if sample:
+            raise HTTPException(403, "見本モードでは聞けません")
+        _desk_thread(thread)
+        if not question.strip():
+            raise HTTPException(400, "聞きたい事を書いてください")
+        if not stay:
+            people = others_in_text(conn, thread, question)
+            if people:  # 別の人の話が混ざらないよう、AI を呼ぶ前に聞く
+                return {"status": "move", "people": [{"id": u.id, "name": u.name} for u in people]}
+        try:
+            working_id = start_question(conn, thread, question)
+        except ValueError as e:
+            raise HTTPException(409, str(e)) from None
+        background.add_task(_desk_answer, thread, working_id)
+        return {"status": "working"}
+
+    @app.get("/desk/{thread}/source")
+    def desk_source(thread: str, file: str = "", quote: str = "", record_date: str = ""):
+        _desk_thread(thread)
+        found = open_source(conn, s, thread, file, quote, record_date)
+        if found is None:
+            raise HTTPException(404, "開ける物がありません")
+        return found
 
     def _draft_in_background(client, results, source: str) -> None:
         own = _connect(s)

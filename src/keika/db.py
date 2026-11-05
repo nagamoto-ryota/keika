@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS med_checks (
     id INTEGER PRIMARY KEY, record_id INTEGER NOT NULL, heard TEXT NOT NULL, status TEXT NOT NULL,
     chosen TEXT, editor TEXT, created_at TEXT NOT NULL, decided_at TEXT
 );
+CREATE TABLE IF NOT EXISTS desk_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, thread TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL,
+  cites TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'done', notice TEXT NOT NULL DEFAULT '',
+  seen INTEGER NOT NULL DEFAULT 1, cost REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS finding_plans (
   fingerprint TEXT PRIMARY KEY, user_id TEXT, payload TEXT NOT NULL, created_at TEXT NOT NULL
 );

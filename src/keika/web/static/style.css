@@ -273,3 +273,58 @@ mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: 
   .doc-sheet { border: none; padding: 0; margin: 0; }
   .sentence.to-check > summary { background: none; }
 }
+main:has(.desk) { max-width: none; padding: 0; }
+body:has(.desk) { height: 100vh; display: flex; flex-direction: column; }
+body:has(.desk) main { flex: 1; min-height: 0; width: 100%; }
+body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 16px; font-size: 12px; line-height: 1.4; }
+.desk { display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(320px, 420px); height: 100%; min-height: 0; }
+.desk-frame { width: 100%; height: 70vh; border: 1px solid var(--line); background: var(--paper); }
+.desk-views { display: none; }
+.desk-people { overflow-y: auto; background: var(--paper); border-right: 1px solid var(--line); padding: 8px 0; }
+.desk-people a { display: flex; justify-content: space-between; gap: 6px; padding: 8px 12px; text-decoration: none; color: var(--ink); font-size: 15px; }
+.desk-people a.on { background: var(--accent-soft); font-weight: 600; }
+.desk-mark { font-size: 12px; color: var(--accent); white-space: nowrap; }
+.desk-mark.new { color: var(--finding); }
+.desk-real { overflow: hidden; display: flex; flex-direction: column; min-width: 0; padding: 10px 16px 0; }
+.desk-tabs { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.desk-tabs button { font: inherit; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 2px 14px; cursor: pointer; color: var(--ink); }
+.desk-tabs button.on { background: var(--accent-soft); border-color: var(--accent); }
+.desk-tabs a { margin-left: auto; }
+.desk-pane { overflow-y: auto; flex: 1; min-height: 0; padding-bottom: 16px; }
+.desk-pane[hidden] { display: none; }
+.desk-record { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
+.desk-record p { margin: 0; }
+.desk-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.7; }
+.desk-docs { list-style: none; padding: 0; margin: 0 0 12px; font-size: 15px; }
+.desk-doc { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper); border: 1px solid var(--line); padding: 12px; font: 15px/1.7 inherit; font-family: inherit; }
+.desk mark { background: #ffe58a; padding: 0 2px; border-radius: 2px; }
+.linklike { background: none; border: none; padding: 0 4px 0 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; text-align: left; }
+.linklike.small { font-size: 14px; }
+.desk-talk { display: flex; flex-direction: column; min-height: 0; background: var(--paper); border-left: 1px solid var(--line); padding: 10px 14px; }
+.desk-who { margin: 0 0 6px; font-weight: 600; }
+.desk-who .small { font-weight: 400; display: block; }
+.desk-log { flex: 1; overflow-y: auto; min-height: 0; }
+.desk-msg { margin-bottom: 10px; padding: 8px 10px; border-radius: 8px; }
+.desk-msg p { margin: 0; }
+.desk-msg.user { background: var(--bg); margin-left: 24px; }
+.desk-msg.failed { color: var(--finding); }
+.desk-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.7; }
+.desk-cites { margin-top: 4px !important; }
+.desk-move { background: var(--nudge-soft); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.desk-move p { margin: 0 0 6px; }
+.desk-move button { margin: 0 6px 4px 0; }
+.desk-ask { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
+.desk-ask textarea { flex: 1; min-width: 0; font: inherit; }
+.desk-talk > .small { margin: 4px 0 0; }
+@media (max-width: 900px) {
+  body:has(.desk) { height: auto; display: block; }
+  .desk { display: block; height: auto; }
+  .desk-views { display: flex; gap: 6px; padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+  .desk-views button { flex: 1; font: inherit; background: var(--paper); color: var(--accent); border: 1px solid var(--accent); }
+  .desk[data-view=people] [data-show=people], .desk[data-view=real] [data-show=real], .desk[data-view=talk] [data-show=talk] { background: var(--accent); color: #fff; }
+  .desk-people, .desk-real, .desk-talk { display: none; border: none; }
+  .desk[data-view=people] .desk-people { display: block; }
+  .desk[data-view=real] .desk-real { display: block; }
+  .desk[data-view=talk] .desk-talk { display: flex; height: calc(100vh - 160px); }
+  .desk-pane { overflow: visible; }
+}
