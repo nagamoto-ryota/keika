@@ -23,7 +23,7 @@ class FakeGmail:
         if self.fail:
             raise GmailError(self.fail)
         self.drafts.append((to, subject, body))
-        return f"m{len(self.drafts)}"
+        return f"m{len(self.drafts)}", f"t{len(self.drafts)}"
 
 
 def app(s, gm):
@@ -33,7 +33,7 @@ def app(s, gm):
 # --- 道具そのもの ---
 
 
-def test_scope_is_compose_only_and_there_is_no_send():
+def test_scope_is_compose_and_there_is_no_send():
     assert SCOPE == "https://www.googleapis.com/auth/gmail.compose"
     src = Path(gmail_draft.__file__).read_text(encoding="utf-8")
     assert "/send" not in src and "users/me/messages" not in src and "smtplib" not in src
@@ -47,7 +47,7 @@ def test_create_draft_posts_a_mime_message_to_drafts():
         return {"access_token": "AT"} if "token" in url else {"id": "d1", "message": {"id": "m9"}}
 
     gm = Gmail("cid", "secret", "refresh", post=post)
-    assert gm.create_draft("sv01@example.com", "柚木 茂さんの件", "岩舘様\n本文です。") == "m9"
+    assert gm.create_draft("sv01@example.com", "柚木 茂さんの件", "岩舘様\n本文です。") == ("m9", "")
     assert calls[0][0] == gmail_draft.TOKEN_URL and calls[0][1]["grant_type"] == "refresh_token" and calls[0][1]["refresh_token"] == "refresh"
     url, _, body, headers = calls[1]
     assert url == "https://gmail.googleapis.com/gmail/v1/users/me/drafts" and headers["Authorization"] == "Bearer AT"
@@ -195,7 +195,7 @@ def test_connect_saves_only_a_refresh_token_in_the_data_folder(tmp_path):
 
     assert gmail_draft.connect(s, open_browser=_browser(), post=post) == "Gmail とつながりました。"
     assert sent[0]["code"] == "c1" and sent[0]["code_verifier"] and sent[0]["grant_type"] == "authorization_code"
-    assert json.loads((tmp_path / "data" / "gmail_token.json").read_text(encoding="utf-8")) == {"refresh_token": "RT"}
+    assert json.loads((tmp_path / "data" / "gmail_token.json").read_text(encoding="utf-8")) == {"refresh_token": "RT", "scopes": gmail_draft.SCOPES}
 
 
 def test_connect_ignores_a_reply_with_the_wrong_state(tmp_path):

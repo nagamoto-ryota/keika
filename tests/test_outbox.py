@@ -262,11 +262,14 @@ def test_after_pressing_one_line_and_the_mail_app(env):
     assert "location.href" not in client.get(f"/desk/U04/mail/{i}").text
 
 
-def test_copies_are_one_step_from_the_menu(env):
+def test_copies_page_is_not_offered_anywhere(env):
     s, c = env
-    nav = TestClient(create_app(s)).get("/").text.split("<nav>")[1].split("</nav>")[0]
-    assert '<a href="/mail/sent"' in nav and "メールの控え" in nav
-    assert '<a href="/mail/sent" aria-current="page">' in TestClient(create_app(s)).get("/mail/sent").text
+    i = made(s, c)
+    client = TestClient(create_app(s))
+    after = client.post(f"/desk/U04/mail/{i}/send").text
+    for html in (client.get("/").text, after):
+        assert 'href="/mail/sent"' not in html and "メールの控え" not in html
+    assert client.get("/mail/sent").status_code == 200  # 道は残すが、案内しない
 
 
 def test_drop_removes_it_from_the_home_without_a_copy(env):

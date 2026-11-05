@@ -1,6 +1,6 @@
 """Gmail の下書きに入れるだけの道具。送る機能は作らない。
 
-範囲は gmail.compose だけ。認証はこのパソコンでの OAuth 同意で、クライアントの情報と token は
+範囲は gmail.compose（下書きを作る）と gmail.metadata（ケイカが作ったメールが送信済みかを見る。本文は読めない）だけ。認証はこのパソコンでの OAuth 同意で、クライアントの情報と token は
 DB と同じフォルダ（git に入らない data/）に置く。本文を URL に載せない。
 """
 from __future__ import annotations
@@ -22,6 +22,9 @@ from typing import Any, Callable
 from keika.settings import Settings
 
 SCOPE = "https://www.googleapis.com/auth/gmail.compose"
+METADATA = "https://www.googleapis.com/auth/gmail.metadata"  # 送ったかを見るためだけ。本文は読めない範囲
+SCOPES = [SCOPE, METADATA]
+THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads/"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts"
@@ -30,7 +33,29 @@ UPLOAD_OVER = 5 * 1024 * 1024  # これより大きい時は upload の経路で
 
 
 class GmailError(Exception):
-    pass
+    def __init__(self, message: str = "", code: int | None = None):
+        super().__init__(message)
+        self.code = code
+
+
+def _fail(e: urllib.error.HTTPError) -> GmailError:
+    try:
+        reason = json.loads(e.read().decode("utf-8")).get("error", "")
+    except ValueError:
+        reason = ""
+    reason = reason.get("message", "") if isinstance(reason, dict) else reason
+    return GmailError(f"{e.code} {reason}".strip(), code=e.code)
+
+
+def _get(url: str, headers: dict | None = None) -> dict:
+    req = urllib.request.Request(url, method="GET", headers=headers or {})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise _fail(e) from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise GmailError(f"接続できません（{type(e).__name__}）") from None
 
 
 def _post(url: str, form: dict | None = None, json_body: dict | None = None, headers: dict | None = None, raw: bytes | None = None) -> dict:
@@ -46,12 +71,7 @@ def _post(url: str, form: dict | None = None, json_body: dict | None = None, hea
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        try:
-            reason = json.loads(e.read().decode("utf-8")).get("error", "")
-        except ValueError:
-            reason = ""
-        reason = reason.get("message", "") if isinstance(reason, dict) else reason
-        raise GmailError(f"{e.code} {reason}".strip()) from None
+        raise _fail(e) from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise GmailError(f"接続できません（{type(e).__name__}）") from None
 
@@ -62,6 +82,7 @@ class Gmail:
     client_secret: str
     refresh_token: str
     post: Callable[..., dict] = field(default=_post, repr=False)
+    get: Callable[..., dict] = field(default=_get, repr=False)
 
     def _access_token(self) -> str:
         got = self.post(TOKEN_URL, form={"client_id": self.client_id, "client_secret": self.client_secret,
@@ -71,8 +92,8 @@ class Gmail:
             raise GmailError("つながりが切れています。もう一度つないでください。")
         return token
 
-    def create_draft(self, to: str, subject: str, body: str, attachments: list[tuple[str, str, bytes]] | tuple = ()) -> str:
-        """下書きを1通作り、そのメッセージの番号を返す。送らない。添付は (名前, 種類, 中身) の並び。"""
+    def create_draft(self, to: str, subject: str, body: str, attachments: list[tuple[str, str, bytes]] | tuple = ()) -> tuple[str, str]:
+        """下書きを1通作り、(メッセージの番号, スレッドの番号) を返す。送らない。添付は (名前, 種類, 中身) の並び。"""
         msg = EmailMessage()
         if to:
             msg["To"] = to
@@ -87,10 +108,25 @@ class Gmail:
             got = self.post(UPLOAD_URL, headers={**auth, "Content-Type": "message/rfc822"}, raw=whole)
         else:
             got = self.post(DRAFTS_URL, json_body={"message": {"raw": base64.urlsafe_b64encode(whole).decode("ascii")}}, headers=auth)
-        message_id = (got.get("message") or {}).get("id")
-        if not message_id:
+        message = got.get("message") or {}
+        if not message.get("id"):
             raise GmailError("下書きの番号が返りませんでした。")
-        return message_id
+        return message["id"], message.get("threadId", "")
+
+    def sent_state(self, thread_id: str) -> tuple[str, int | None]:
+        """ケイカが作ったスレッドが送信済みかを見る。読むのは番号と目印と日時だけ（本文は頼まない）。
+        返すのは ("sent", 送った時刻のミリ秒) / ("draft", None) / ("gone", None)。"""
+        url = THREADS_URL + urllib.parse.quote(thread_id, safe="") + "?" + urllib.parse.urlencode({"format": "minimal", "fields": "messages(id,labelIds,internalDate)"})
+        try:
+            got = self.get(url, headers={"Authorization": f"Bearer {self._access_token()}"})
+        except GmailError as e:
+            if e.code == 404:
+                return "gone", None
+            raise
+        sent = [m for m in got.get("messages") or [] if "SENT" in (m.get("labelIds") or [])]
+        if sent:
+            return "sent", int(sent[0].get("internalDate") or 0) or None
+        return ("draft", None) if got.get("messages") else ("gone", None)
 
 
 def client_path(s: Settings) -> Path:
@@ -113,7 +149,16 @@ def _client(s: Settings) -> tuple[str, str] | None:
 
 
 def save_token(s: Settings, refresh_token: str) -> None:
-    token_path(s).write_text(json.dumps({"refresh_token": refresh_token}), encoding="utf-8")
+    token_path(s).write_text(json.dumps({"refresh_token": refresh_token, "scopes": SCOPES}), encoding="utf-8")
+
+
+def needs_reconnect(s: Settings) -> bool:
+    """送ったかを見る権限が無い古い token の時。つなぎ直すまで、送ったかは見ない。"""
+    try:
+        data = json.loads(token_path(s).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return METADATA not in (data.get("scopes") or [])
 
 
 def connected(s: Settings) -> Gmail | None:
@@ -134,7 +179,7 @@ def open_url(message_id: str) -> str:
 
 def auth_url(client_id: str, redirect_uri: str, challenge: str, state: str) -> str:
     return AUTH_URL + "?" + urllib.parse.urlencode({
-        "client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": SCOPE,
+        "client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": " ".join(SCOPES),
         "code_challenge": challenge, "code_challenge_method": "S256", "access_type": "offline", "prompt": "consent", "state": state,
     })
 

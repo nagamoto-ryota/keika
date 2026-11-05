@@ -6,6 +6,7 @@ import os
 import re
 import socket
 import threading
+import time
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
@@ -19,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 from urllib.parse import urlparse
 
-from keika import attach, gmail_draft
+from keika import attach, gmail_draft, sent_record
 from keika.claude import make_client
 from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
 from keika.claude_checks import APP_RECORDS, CheckRun, check_and_save, latest_run
@@ -177,6 +178,9 @@ NAV_SECTIONS = (
 )
 
 
+SENT_CHECK_GAP = 60  # 送ったかを見るのは、入口を開いた時に1分に1回まで
+
+
 def nav_section(path: str) -> str | None:
     """上のメニューのどれを今いる画面として見せるか。"""
     if path == "/":
@@ -252,6 +256,9 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             background.add_task(_settle_in_background)
         if not sample and mail_candidates(conn):
             background.add_task(_propose_in_background)
+        if not sample and sent_record.pending(conn, 1) and time.monotonic() - sent_checked[0] > SENT_CHECK_GAP:
+            sent_checked[0] = time.monotonic()
+            background.add_task(_sent_in_background)
         board = build_board(conn, s, cm=cm)
         reviews, office = _reviews_for(cm), _office_for(cm)
         med_checks = open_checks(conn, s, cm=cm)
@@ -319,6 +326,17 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             settling.release()
 
     proposing = threading.Lock()
+    sent_checked = [-SENT_CHECK_GAP]
+
+    def _sent_in_background() -> None:
+        """入口を開いた時に、Gmail で送られたかを見る。つないでいない・つなぎ直しが要る時は何もしない。"""
+        if gmail_draft.needs_reconnect(s):
+            return
+        own = _connect(s)
+        try:
+            sent_record.check(own, s, gmail_factory())
+        finally:
+            own.close()
 
     def _propose_in_background() -> None:
         """入口の準備。連絡の語がある新しい記録だけを、1回開くごとに少しずつ考える。"""

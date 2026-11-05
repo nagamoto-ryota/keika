@@ -18,7 +18,6 @@
       <a href="/"{% if here == '/' %} aria-current="page"{% endif %}>やること</a>
       <a href="/desk"{% if here == '/desk' %} aria-current="page"{% endif %}>AI相談</a>
       <a href="/board"{% if here == '/board' %} aria-current="page"{% endif %}>一覧</a>
-      <a href="/mail/sent"{% if here == '/mail/sent' %} aria-current="page"{% endif %}>メールの控え</a>
     </nav>
   </header>
   <main>{% block main %}{% endblock %}</main>

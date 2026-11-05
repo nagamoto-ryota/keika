@@ -83,6 +83,12 @@ CREATE TABLE IF NOT EXISTS mail_attach_set (
 CREATE TABLE IF NOT EXISTS mail_sent_attach (
   mail_id INTEGER NOT NULL, name TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_gmail_thread (
+  mail_id INTEGER PRIMARY KEY, thread_id TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mail_sent_seen (
+  mail_id INTEGER PRIMARY KEY, result TEXT NOT NULL, review_id INTEGER, at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mail_scans (
   record_id INTEGER PRIMARY KEY, result TEXT NOT NULL, at TEXT NOT NULL
 );

@@ -23,7 +23,7 @@ class FakeGmail:
 
     def create_draft(self, to, subject, body, attachments=()):
         self.drafts.append((to, subject, body, list(attachments)))
-        return f"m{len(self.drafts)}"
+        return f"m{len(self.drafts)}", f"t{len(self.drafts)}"
 
 
 def put(s, rel, data=b"%PDF-1.4 x"):

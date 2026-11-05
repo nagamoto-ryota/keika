@@ -147,7 +147,7 @@ def _scan(conn: sqlite3.Connection, record_id: int, result: str) -> None:
 
 def candidates(conn: sqlite3.Connection, limit: int = PER_OPEN) -> list[Record]:
     """まだ考えていない、話から入った記録のうち、連絡に関わる語があるもの。無ければ AI を呼ばない。"""
-    rows = conn.execute("SELECT id, body FROM records WHERE source NOT LIKE 'csv%' AND id NOT IN (SELECT record_id FROM mail_scans) ORDER BY id DESC").fetchall()
+    rows = conn.execute("SELECT id, body FROM records WHERE source NOT LIKE 'csv%' AND source != 'intake:mail' AND id NOT IN (SELECT record_id FROM mail_scans) ORDER BY id DESC").fetchall()  # 送ったメールの記録から、またメールを考えない
     return [get_record(conn, r["id"]) for r in rows if CONTACT.search(r["body"])][:limit]
 
 
@@ -308,9 +308,11 @@ def send_mail(conn: sqlite3.Connection, s: Settings, thread: str, mail_id: int, 
     if view["blocks"]:
         raise Blocked(view["blocks"][0])
     files = attach.files_for(conn, s, row["user_id"], view["attach_chosen"]) if gmail else []
-    message_id = gmail.create_draft(view["address"], view["mail"]["subject"], view["mail"]["body"], attachments=files) if gmail else ""  # 下書きに入れるだけ。送らない
+    message_id, thread_id = gmail.create_draft(view["address"], view["mail"]["subject"], view["mail"]["body"], attachments=files) if gmail else ("", "")  # 下書きに入れるだけ。送らない
     if message_id:
         conn.execute("INSERT OR REPLACE INTO mail_gmail (mail_id, message_id, at) VALUES (?, ?, ?)", (mail_id, message_id, now_real().isoformat()))
+        if thread_id:  # 送ったかを後で見るための番号
+            conn.execute("INSERT OR REPLACE INTO mail_gmail_thread (mail_id, thread_id) VALUES (?, ?)", (mail_id, thread_id))
         attach.keep_names(conn, mail_id, [f[0] for f in files])
     conn.execute("UPDATE mail_out SET state = 'sent', sent_at = ?, sent_to = ?, sent_name = ?, sent_subject = ?, sent_body = ? WHERE mail_id = ?",
                  (now_real().isoformat(), view["address"], view["recipient"]["label"], view["mail"]["subject"], view["mail"]["body"], mail_id))

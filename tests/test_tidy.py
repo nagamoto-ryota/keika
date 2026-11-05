@@ -87,11 +87,11 @@ def test_check_cell_becomes_a_task(env):
     assert "ほたるいの照会の中身がありません" in TestClient(create_app(s)).get("/todo").text
 
 
-def test_nav_has_five_entries(env):
+def test_nav_has_four_entries(env):
     s, c = env
     body = TestClient(create_app(s)).get("/todo").text
     nav = body[body.index("<nav>"):body.index("</nav>")]
-    assert nav.count("<a ") == 5 and "記録する" in nav and "やること" in nav and "一覧" in nav and "メールの控え" in nav
+    assert nav.count("<a ") == 4 and "記録する" in nav and "やること" in nav and "一覧" in nav
 
 
 def test_list_pages_share_tabs(env):
