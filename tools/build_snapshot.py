@@ -33,6 +33,7 @@ def main() -> int:
     from keika.files import scan
     from keika.ledger import list_users, seed_from_json
     from keika.next_steps import make_plan
+    from keika.outbox import prepare_demo
     from keika.reading import read_docs
     from keika.records import import_csv
     from keika.settings import Settings
@@ -71,11 +72,13 @@ def main() -> int:
         plan = make_plan(conn, client, s, target) if target else None
         for user_id in ("U04", "U07"):  # 訪問前の1枚に、聞くことも入れておく
             make_questions(conn, client, s, user_id)
+        mails = prepare_demo(conn, client, s)  # 入口のメールの案。残りの記録は考え済みにする
+        print("メールの案:", mails)
         bad = conn.execute("SELECT (SELECT COUNT(*) FROM records WHERE source = 'intake:mcp') + (SELECT COUNT(*) FROM review_items WHERE source = 'mcp')").fetchone()[0]
         print("下書き:", [(d.title, d.flagged) for d in list_drafts(conn)], "手順の案:", bool(plan), "点検の失敗:", failed, "mcp の行:", bad, "確認カード:", review_cards(conn), f"約 ${METER.cost_usd:.2f}")
         if not review_cards(conn):
             print("確認カードがありません。録画に進まず報告してください。")
-        if failed or bad or not plan or not review_cards(conn):
+        if failed or bad or not plan or not mails or not review_cards(conn):
             print("作り直しをやめました。今の見本はそのままです。")
             return 1
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")

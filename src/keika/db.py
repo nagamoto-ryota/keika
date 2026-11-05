@@ -66,6 +66,14 @@ CREATE TABLE IF NOT EXISTS desk_mails (
   id INTEGER PRIMARY KEY AUTOINCREMENT, thread TEXT NOT NULL, to_name TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'draft', instructions TEXT NOT NULL DEFAULT '[]', changed TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_out (
+  mail_id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, record_id INTEGER NOT NULL, recipient_id TEXT NOT NULL, purpose TEXT NOT NULL,
+  ground TEXT NOT NULL DEFAULT '', origin TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'open', med_ok_body TEXT,
+  sent_at TEXT, sent_to TEXT, sent_name TEXT, sent_subject TEXT, sent_body TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mail_scans (
+  record_id INTEGER PRIMARY KEY, result TEXT NOT NULL, at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS desk_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT, thread TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL,
   cites TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'done', notice TEXT NOT NULL DEFAULT '',

@@ -72,6 +72,7 @@
         {% if r.unchecked %}<form method="post" action="/records/{{ r.id }}/checked"><button class="plain">読んだ</button></form>{% endif %}
         <a href="/records/{{ r.id }}/edit">直す</a>
         <a href="/records/{{ r.id }}/history">履歴</a>
+        <a href="/records/{{ r.id }}/share">共有</a>
         <span class="muted">記入: {{ r.first_written_at[:16].replace('T', ' ') if r.first_written_at else '不明（取り込み）' }}</span>
       </div>
     </article>

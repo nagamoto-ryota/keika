@@ -390,3 +390,14 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 }
 .head-input.is-blank:not(.time-input) { width: calc(100% - 5.5em); }
 .draft-say { line-height: 1.4; }
+
+/* メールの案と送信控え */
+.mail-stop { background: #fdeceb; border: 1px solid #b3261e; border-radius: 6px; padding: 8px 12px; margin: 8px 0; color: #8c1d18; }
+.mail-stop p { margin: 2px 0; }
+.mail-notice { background: var(--nudge-soft); border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
+.mail-sent { background: var(--accent-soft); border-radius: 6px; padding: 8px 12px; margin: 8px 0; font-weight: 600; }
+.mail-edit input, .mail-edit textarea { width: 100%; font: inherit; box-sizing: border-box; }
+.send-button { padding: 6px 32px; }
+.home-mails { margin: 8px 0 16px; }
+.share-form select { font: inherit; max-width: 100%; }
+.home-mail-ground { margin: -4px 0 8px 18px; }

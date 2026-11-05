@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}記録を共有する - ケイカ{% endblock %}
+{% block main %}
+<h1 class="do-line">共有する相手を選んでください</h1>
+{% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
+<article class="mail-sheet">
+  <p><span class="muted small">{{ user.name }}さん {{ r.event_date|hdate }} {{ r.kind_read or r.kind_written }}</span></p>
+  <p class="mail-body">{{ r.body }}</p>
+</article>
+{% if not sample %}
+<form method="post" action="/records/{{ r.id }}/share" class="share-form">
+  <p><label>相手 <select name="recipient">
+    {% for p in people %}<option value="{{ p.id }}"{% if loop.first %} selected{% endif %}>{{ p.kind_label }}: {{ p.label }}</option>{% endfor %}
+  </select></label></p>
+  <p><button>文を作る</button> <span class="small muted">送るのは次の画面で確かめてからです。</span></p>
+</form>
+{% endif %}
+<p class="small"><a href="/users/{{ r.user_id }}">戻る</a></p>
+{% endblock %}

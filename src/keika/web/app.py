@@ -49,6 +49,7 @@ from keika.responses import Item, respond, silenced_counts, silenced_list, sort_
 from keika.rules import basis_text, get_rule
 from keika.files import one_view
 from keika.home import MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
+from keika.outbox import Blocked, candidates as mail_candidates, drop_mail, edit_mail, home_lines, make_share, med_ok, out_row, out_view, propose, recipients, send_mail, sent_list
 from keika.secretary import ALL, answer_question, get_mail, made_list, mark_mail_ok, open_source, revise_mail, others_in_text, start_question, thread_messages, threads_state
 from keika.tasks import build_board, finding_where, person_lines
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
@@ -247,6 +248,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         """開くと終わっている入口。記録できた事と、聞く事だけを出す。"""
         if not sample and unsettled_drafts(conn):
             background.add_task(_settle_in_background)
+        if not sample and mail_candidates(conn):
+            background.add_task(_propose_in_background)
         board = build_board(conn, s, cm=cm)
         reviews, office = _reviews_for(cm), _office_for(cm)
         med_checks = open_checks(conn, s, cm=cm)
@@ -258,7 +261,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         since = opened_since(conn, write=not sample)
         return templates.TemplateResponse(request, "home.html", {
             "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn), "user_names": {u.id: u.name for u in list_users(conn)},
-            "new_records": new_records(conn, since, mine), "max_new": MAX_NEW_ROWS, "deadlines": deadline_lines(board, s),
+            "mail_lines": home_lines(conn, mine), "new_records": new_records(conn, since, mine), "max_new": MAX_NEW_ROWS, "deadlines": deadline_lines(board, s),
             "reviews": [it for it in reviews if f"r{it['id']}" in picked], "drafts": [row for row in waiting if f"d{row[0].id}" in picked], "more": more,
             "unchecked": unchecked_count(conn, mine), "total": board.total + len(reviews) + len(office) + len(med_checks) + len(drafts),
         })
@@ -313,6 +316,23 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             own.close()
             settling.release()
 
+    proposing = threading.Lock()
+
+    def _propose_in_background() -> None:
+        """入口の準備。連絡の語がある新しい記録だけを、1回開くごとに少しずつ考える。"""
+        if not proposing.acquire(blocking=False):
+            return
+        own = _connect(s)
+        try:
+            client = client_factory()
+            for record in mail_candidates(own):
+                propose(own, client, s, record.id)
+        except RuntimeError:  # キーが無い時は案を作らない
+            pass
+        finally:
+            own.close()
+            proposing.release()
+
     def _desk_thread(thread: str) -> str:
         if thread != ALL and get_user(conn, thread) is None:
             raise HTTPException(404, "その枠はありません")
@@ -355,7 +375,66 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.get("/desk/{thread}/mail/{mail_id}")
     def desk_mail(request: Request, thread: str, mail_id: int):
-        return templates.TemplateResponse(request, "mail.html", {"m": _mail_or_404(thread, mail_id), "thread": thread, "notice": mail_notices.pop(mail_id, "")})
+        mail = _mail_or_404(thread, mail_id)
+        out = out_view(conn, s, mail_id) if out_row(conn, thread, mail_id) else None
+        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "notice": mail_notices.pop(mail_id, "")})
+
+    def _out_or_404(thread: str, mail_id: int) -> None:
+        if sample:
+            raise HTTPException(403, "見本モードでは操作できません")
+        if out_row(conn, thread, mail_id) is None:
+            raise HTTPException(404, "案が見つかりません")
+
+    @app.post("/desk/{thread}/mail/{mail_id}/send")
+    def desk_mail_send(thread: str, mail_id: int):
+        _out_or_404(thread, mail_id)
+        try:
+            send_mail(conn, s, thread, mail_id)
+        except Blocked as e:
+            mail_notices[mail_id] = str(e)
+        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+
+    @app.post("/desk/{thread}/mail/{mail_id}/drop")
+    def desk_mail_drop(thread: str, mail_id: int):
+        _out_or_404(thread, mail_id)
+        drop_mail(conn, thread, mail_id)
+        return RedirectResponse("/", status_code=303)
+
+    @app.post("/desk/{thread}/mail/{mail_id}/edit")
+    def desk_mail_edit(thread: str, mail_id: int, subject: str = Form(""), body: str = Form("")):
+        _out_or_404(thread, mail_id)
+        edit_mail(conn, thread, mail_id, subject, body)
+        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+
+    @app.post("/desk/{thread}/mail/{mail_id}/med-ok")
+    def desk_mail_med_ok(thread: str, mail_id: int):
+        _out_or_404(thread, mail_id)
+        med_ok(conn, thread, mail_id)
+        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+
+    @app.get("/mail/sent")
+    def mail_sent(request: Request):
+        return templates.TemplateResponse(request, "mail_sent.html", {"rows": sent_list(conn), "demo": s.as_of is not None})
+
+    def _share_page(request: Request, record, notice: str = ""):
+        return templates.TemplateResponse(request, "share.html", {"r": record, "user": get_user(conn, record.user_id), "people": recipients(conn, s, record.user_id), "notice": notice})
+
+    @app.get("/records/{record_id}/share")
+    def share_form(request: Request, record_id: int):
+        return _share_page(request, _record_or_404(record_id))
+
+    @app.post("/records/{record_id}/share")
+    def share_make(request: Request, record_id: int, recipient: str = Form("")):
+        if sample:
+            raise HTTPException(403, "見本モードでは操作できません")
+        record = _record_or_404(record_id)
+        try:
+            mail_id, problem = make_share(conn, client_factory(), s, record_id, recipient)
+        except RuntimeError as e:
+            return _share_page(request, record, f"作れませんでした（{e}）")
+        if mail_id is None:
+            return _share_page(request, record, problem)
+        return RedirectResponse(f"/desk/{record.user_id}/mail/{mail_id}", status_code=303)
 
     @app.post("/desk/{thread}/mail/{mail_id}/ok")
     def desk_mail_ok(thread: str, mail_id: int):

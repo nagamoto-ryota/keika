@@ -22,6 +22,15 @@
 <p class="home-soon"><span class="muted small">ケイカより</span> <a href="/desk?t={{ d.user_id }}">{{ d.name }}さん</a>の{{ d.title|hdate }}は {{ d.deadline|hdate }} までです（{% if d.days >= 0 %}あと{{ d.days }}日{% else %}{{ -d.days }}日過ぎています{% endif %}）。<a class="small" href="/desk?t={{ d.user_id }}{% if d.about %}&about={{ d.about }}{% endif %}">ケイカに聞く</a><br><span class="small muted">{{ d.where }}</span></p>
 {% endfor %}
 
+{% if mail_lines %}
+<section class="home-mails">
+  {% for m in mail_lines[:3] %}
+  <a class="task task-link" href="{{ m.url }}"><span class="dot"></span><span class="title">{{ m.user_name }}さん: {{ m.text }}</span><span class="opens">見る ▸</span></a>
+  <p class="small muted home-mail-ground">根拠: {{ m.date|hdate }} の記録「{{ m.ground }}」</p>
+  {% endfor %}
+</section>
+{% endif %}
+
 <section class="person consult" id="kakunin">
   {% if reviews or drafts %}
   <h2>聞くこと <span class="muted small">{{ reviews|length + drafts|length }}件{% if more %}（あと {{ more }}件）{% endif %}</span></h2>
@@ -42,6 +51,7 @@
   未確認の記録 {{ unchecked }}件（下書きです。最後に決めるのは人です）
   ／ <a href="/todo">すべての項目 {{ total }}件</a>
   ／ <a href="/board">一覧</a>
+  ／ <a href="/mail/sent">送信控え</a>
 </p>
 <p class="home-small small"><a href="/desk">AI相談を開く</a></p>
 <script src="/static/review_card.js"></script>
