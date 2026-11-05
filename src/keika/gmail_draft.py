@@ -1,6 +1,6 @@
 """Gmail の下書きに入れるだけの道具。送る機能は作らない。
 
-範囲は gmail.compose（下書きを作る）と gmail.metadata（ケイカが作ったメールが送信済みかを見る。本文は読めない）だけ。認証はこのパソコンでの OAuth 同意で、クライアントの情報と token は
+範囲は gmail.compose（下書きを作る）と gmail.readonly（ケイカが作ったメールが送信済みかと、その返事を読む。変更・送信・削除はできない）だけ。認証はこのパソコンでの OAuth 同意で、クライアントの情報と token は
 DB と同じフォルダ（git に入らない data/）に置く。本文を URL に載せない。
 """
 from __future__ import annotations
@@ -22,8 +22,8 @@ from typing import Any, Callable
 from keika.settings import Settings
 
 SCOPE = "https://www.googleapis.com/auth/gmail.compose"
-METADATA = "https://www.googleapis.com/auth/gmail.metadata"  # 送ったかを見るためだけ。本文は読めない範囲
-SCOPES = [SCOPE, METADATA]
+READ = "https://www.googleapis.com/auth/gmail.readonly"  # 送ったかと返事を読むため。読むだけで、変えられない範囲
+SCOPES = [SCOPE, READ]
 THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads/"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -153,12 +153,12 @@ def save_token(s: Settings, refresh_token: str) -> None:
 
 
 def needs_reconnect(s: Settings) -> bool:
-    """送ったかを見る権限が無い古い token の時。つなぎ直すまで、送ったかは見ない。"""
+    """読む権限が無い古い token の時。つなぎ直すまで、送ったかも返事も見ない。"""
     try:
         data = json.loads(token_path(s).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return METADATA not in (data.get("scopes") or [])
+    return READ not in (data.get("scopes") or [])
 
 
 def connected(s: Settings) -> Gmail | None:

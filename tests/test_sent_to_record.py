@@ -178,13 +178,13 @@ def test_sent_state_draft_and_gone():
     assert _gm([GmailError("404 Not Found", code=404)], []).sent_state("t1") == ("gone", None)
 
 
-def test_scope_adds_only_metadata():
-    assert gmail_draft.SCOPES == ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.metadata"]
+def test_scope_adds_only_readonly():
+    assert gmail_draft.SCOPES == ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]
     url = gmail_draft.auth_url("cid", "http://127.0.0.1:1/", "ch", "st")
-    assert "gmail.metadata" in url and "gmail.readonly" not in url and "gmail.modify" not in url
+    assert "gmail.readonly" in url and "gmail.modify" not in url and "mail.google.com%2F" not in url and "gmail.send" not in url
 
 
-def test_token_without_metadata_is_asked_to_connect_again(tmp_path):
+def test_token_without_read_is_asked_to_connect_again(tmp_path):
     from datetime import date
 
     from keika.settings import Settings
