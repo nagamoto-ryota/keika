@@ -74,6 +74,15 @@ CREATE TABLE IF NOT EXISTS mail_out (
 CREATE TABLE IF NOT EXISTS mail_gmail (
   mail_id INTEGER PRIMARY KEY, message_id TEXT NOT NULL, at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mail_attach (
+  mail_id INTEGER NOT NULL, key TEXT NOT NULL, PRIMARY KEY (mail_id, key)
+);
+CREATE TABLE IF NOT EXISTS mail_attach_set (
+  mail_id INTEGER PRIMARY KEY, at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mail_sent_attach (
+  mail_id INTEGER NOT NULL, name TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mail_scans (
   record_id INTEGER PRIMARY KEY, result TEXT NOT NULL, at TEXT NOT NULL
 );

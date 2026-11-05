@@ -432,3 +432,12 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .mail-side form { margin: 0; }
 .mail-ai > summary { cursor: pointer; color: var(--accent); padding: 4px 0; }
 .mail-ai[open] { flex-basis: 100%; }
+
+/* メール案: 添付 */
+.mail-attach { border: 1px solid var(--line); border-radius: 6px; margin: 12px 0 0; padding: 6px 12px 8px; }
+.mail-attach legend { font-size: 14px; color: var(--muted, #666); padding: 0 4px; }
+.mail-attach.is-blank { background: #fdeceb; border-color: #b3261e; }
+.attach-row { display: block; padding: 2px 0; }
+
+.send-button:disabled { opacity: .45; cursor: not-allowed; }
+.mail-attach.is-blank .attach-row { color: var(--ink, #222); font-style: normal; font-weight: 400; }

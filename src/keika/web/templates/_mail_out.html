@@ -12,6 +12,7 @@
   <p><span class="muted small">宛先</span> {{ out.sent_name }} <span class="muted small">{{ out.sent_to }}</span></p>
   <p><span class="muted small">日時</span> {{ out.sent_at[:16].replace('T', ' ') }}</p>
   <p><span class="muted small">件名</span> {{ out.sent_subject }}</p>
+  {% if out.sent_attached %}<p><span class="muted small">添付</span> {{ out.sent_attached|join('、') }}</p>{% endif %}
   <p class="mail-body">{{ out.sent_body }}</p>
 </article>
 <p class="small"><a href="/mail/sent">メールの控え</a> ／ <a href="/">やることへ戻る</a></p>
@@ -30,6 +31,19 @@
   <div class="mail-body" id="mail-body">
   {% for l in out.lines %}<textarea class="mail-line{{ ' is-blank' if l.check }}" name="line" rows="{{ l.rows }}" aria-label="本文 {{ loop.index }}行目"{% if sample %} readonly{% else %} data-autosave{% endif %}>{{ l.text }}</textarea>
   {% endfor %}</div>
+  {% if gmail_on %}
+  <fieldset class="mail-attach{{ ' is-blank' if out.attach_red }}">
+    <legend>添付</legend>
+    <input type="hidden" name="attach_shown" value="1">
+    {% for a in out.attach_items %}
+    <label class="attach-row"><input type="checkbox" name="attach" value="{{ a.key }}"{% if a.key in out.attach_chosen %} checked{% endif %}{% if sample %} disabled{% else %} data-autosave{% endif %}> {{ a.name }} <span class="muted small">{{ a.size_label }}</span></label>
+    {% else %}
+    <span class="muted small">この方の書類はまだありません</span>
+    {% endfor %}
+  </fieldset>
+  {% else %}
+  <p class="small muted">添付は Gmail につないだ時だけ使えます</p>
+  {% endif %}
 </article>
 </form>
 <p class="small muted">{% if out.origin == 'proposal' %}根拠: {{ out.ground }}{% else %}元の記録: {{ out.ground }}{% endif %}（AI が作った案です。最後に決めるのは人です）</p>

@@ -25,15 +25,19 @@ SCOPE = "https://www.googleapis.com/auth/gmail.compose"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts"
+UPLOAD_URL = "https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media"
+UPLOAD_OVER = 5 * 1024 * 1024  # これより大きい時は upload の経路で送る
 
 
 class GmailError(Exception):
     pass
 
 
-def _post(url: str, form: dict | None = None, json_body: dict | None = None, headers: dict | None = None) -> dict:
+def _post(url: str, form: dict | None = None, json_body: dict | None = None, headers: dict | None = None, raw: bytes | None = None) -> dict:
     """標準ライブラリだけで POST する。失敗は GmailError にする（中身に鍵を入れない）。"""
-    if json_body is not None:
+    if raw is not None:
+        data, kind = raw, (headers or {}).get("Content-Type", "application/octet-stream")
+    elif json_body is not None:
         data, kind = json.dumps(json_body).encode("utf-8"), "application/json"
     else:
         data, kind = urllib.parse.urlencode(form or {}).encode("utf-8"), "application/x-www-form-urlencoded"
@@ -67,15 +71,22 @@ class Gmail:
             raise GmailError("つながりが切れています。もう一度つないでください。")
         return token
 
-    def create_draft(self, to: str, subject: str, body: str) -> str:
-        """下書きを1通作り、そのメッセージの番号を返す。送らない。"""
+    def create_draft(self, to: str, subject: str, body: str, attachments: list[tuple[str, str, bytes]] | tuple = ()) -> str:
+        """下書きを1通作り、そのメッセージの番号を返す。送らない。添付は (名前, 種類, 中身) の並び。"""
         msg = EmailMessage()
         if to:
             msg["To"] = to
         msg["Subject"] = subject
         msg.set_content(body)
-        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
-        got = self.post(DRAFTS_URL, json_body={"message": {"raw": raw}}, headers={"Authorization": f"Bearer {self._access_token()}"})
+        for name, mime, data in attachments:
+            main, _, minor = (mime or "application/octet-stream").partition("/")
+            msg.add_attachment(data, maintype=main, subtype=minor or "octet-stream", filename=name)
+        whole = msg.as_bytes()
+        auth = {"Authorization": f"Bearer {self._access_token()}"}
+        if len(whole) > UPLOAD_OVER:
+            got = self.post(UPLOAD_URL, headers={**auth, "Content-Type": "message/rfc822"}, raw=whole)
+        else:
+            got = self.post(DRAFTS_URL, json_body={"message": {"raw": base64.urlsafe_b64encode(whole).decode("ascii")}}, headers=auth)
         message_id = (got.get("message") or {}).get("id")
         if not message_id:
             raise GmailError("下書きの番号が返りませんでした。")

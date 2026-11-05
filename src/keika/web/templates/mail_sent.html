@@ -8,6 +8,7 @@
   <p><span class="muted small">{{ r.sent_at[:16].replace('T', ' ') }}</span> {{ r.user_name }}さんの件</p>
   <p><span class="muted small">宛先</span> {{ r.sent_name }} <span class="muted small">{{ r.sent_to }}</span></p>
   <p><span class="muted small">件名</span> {{ r.sent_subject }}</p>
+  {% if r.attached %}<p><span class="muted small">添付</span> {{ r.attached|join('、') }}</p>{% endif %}
   <p class="mail-body">{{ r.sent_body }}</p>
 </article>
 {% else %}

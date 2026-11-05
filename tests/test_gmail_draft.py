@@ -19,7 +19,7 @@ class FakeGmail:
     def __init__(self, fail: str = ""):
         self.drafts, self.fail = [], fail
 
-    def create_draft(self, to, subject, body):
+    def create_draft(self, to, subject, body, attachments=()):
         if self.fail:
             raise GmailError(self.fail)
         self.drafts.append((to, subject, body))

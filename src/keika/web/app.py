@@ -19,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 from urllib.parse import urlparse
 
-from keika import gmail_draft
+from keika import attach, gmail_draft
 from keika.claude import make_client
 from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
 from keika.claude_checks import APP_RECORDS, CheckRun, check_and_save, latest_run
@@ -378,8 +378,9 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     @app.get("/desk/{thread}/mail/{mail_id}")
     def desk_mail(request: Request, thread: str, mail_id: int, just: str = ""):
         mail = _mail_or_404(thread, mail_id)
-        out = out_view(conn, s, mail_id) if out_row(conn, thread, mail_id) else None
-        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "just": just == "1", "gmail_on": out is not None and gmail_factory() is not None,
+        gmail_on = gmail_factory() is not None
+        out = out_view(conn, s, mail_id, gmail_on=gmail_on) if out_row(conn, thread, mail_id) else None
+        return templates.TemplateResponse(request, "mail.html", {"m": mail, "out": out, "thread": thread, "just": just == "1", "gmail_on": out is not None and gmail_on,
                                                                  "gmail_open": gmail_draft.open_url(out["gmail_id"]) if out and out["gmail_id"] else "", "notice": mail_notices.pop(mail_id, "")})
 
     def _out_or_404(thread: str, mail_id: int) -> None:
@@ -388,16 +389,20 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if out_row(conn, thread, mail_id) is None:
             raise HTTPException(404, "案が見つかりません")
 
-    def _apply_lines(thread: str, mail_id: int, subject: str | None, line: list[str] | None) -> None:
-        """画面で直した件名と行を、押した時に一緒に保存する。"""
+    def _apply_lines(thread: str, mail_id: int, subject: str | None, line: list[str] | None, attach_shown: str = "", picked: list[str] | None = None) -> None:
+        """画面で直した件名と行と添付の選びを、押した時に一緒に保存する。"""
         if line is not None:
             mail = get_mail(conn, thread, mail_id)
             edit_mail(conn, thread, mail_id, mail["subject"] if subject is None else subject, "\n".join(line))
+        if attach_shown:
+            known = {it["key"] for it in attach.candidates(conn, s, thread)}
+            attach.choose(conn, mail_id, [k for k in (picked or []) if k in known])
 
     @app.post("/desk/{thread}/mail/{mail_id}/send")
-    def desk_mail_send(thread: str, mail_id: int, subject: str | None = Form(None), line: list[str] | None = Form(None)):
+    def desk_mail_send(thread: str, mail_id: int, subject: str | None = Form(None), line: list[str] | None = Form(None),
+                       attach_shown: str = Form(""), picked: list[str] | None = Form(None, alias="attach")):
         _out_or_404(thread, mail_id)
-        _apply_lines(thread, mail_id, subject, line)
+        _apply_lines(thread, mail_id, subject, line, attach_shown, picked)
         try:
             send_mail(conn, s, thread, mail_id, gmail=gmail_factory())
         except Blocked as e:
@@ -415,18 +420,20 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return RedirectResponse("/", status_code=303)
 
     @app.post("/desk/{thread}/mail/{mail_id}/edit")
-    def desk_mail_edit(thread: str, mail_id: int, subject: str = Form(""), body: str = Form(""), line: list[str] | None = Form(None)):
+    def desk_mail_edit(thread: str, mail_id: int, subject: str = Form(""), body: str = Form(""), line: list[str] | None = Form(None),
+                       attach_shown: str = Form(""), picked: list[str] | None = Form(None, alias="attach")):
         _out_or_404(thread, mail_id)
-        if line is not None:
-            _apply_lines(thread, mail_id, subject, line)
+        if line is not None or attach_shown:
+            _apply_lines(thread, mail_id, subject, line, attach_shown, picked)
         else:
             edit_mail(conn, thread, mail_id, subject, body)
         return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
 
     @app.post("/desk/{thread}/mail/{mail_id}/med-ok")
-    def desk_mail_med_ok(thread: str, mail_id: int, subject: str | None = Form(None), line: list[str] | None = Form(None)):
+    def desk_mail_med_ok(thread: str, mail_id: int, subject: str | None = Form(None), line: list[str] | None = Form(None),
+                         attach_shown: str = Form(""), picked: list[str] | None = Form(None, alias="attach")):
         _out_or_404(thread, mail_id)
-        _apply_lines(thread, mail_id, subject, line)
+        _apply_lines(thread, mail_id, subject, line, attach_shown, picked)
         med_ok(conn, thread, mail_id)
         return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
 

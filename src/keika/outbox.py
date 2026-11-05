@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
+from keika import attach
 from keika.claude import StructuredError, ask_structured
 from keika.claude_checks import _quote_ok
 from keika.ledger import get_user, list_people, list_users, squash
@@ -233,7 +234,7 @@ def out_row(conn: sqlite3.Connection, thread: str, mail_id: int) -> sqlite3.Row 
     return conn.execute("SELECT * FROM mail_out WHERE mail_id = ? AND user_id = ?", (mail_id, thread)).fetchone()
 
 
-def out_view(conn: sqlite3.Connection, s: Settings, mail_id: int) -> dict | None:
+def out_view(conn: sqlite3.Connection, s: Settings, mail_id: int, gmail_on: bool = False) -> dict | None:
     """画面に要る物と、送れない理由。理由はサーバーが毎回機械で確かめる。"""
     row = conn.execute("SELECT * FROM mail_out WHERE mail_id = ?", (mail_id,)).fetchone()
     if row is None:
@@ -264,11 +265,27 @@ def out_view(conn: sqlite3.Connection, s: Settings, mail_id: int) -> dict | None
     consent = "本人の同意が要りそうな内容です。送る前に確かめてください。" if person and person["kind"] == "family" and _CONSENT.search(mail["body"]) else ""
     address = person["address"] if person else ""
     med_open = [t for t in med if row["med_ok_body"] != mail["body"]]
-    lines = [{"text": line, "check": _line_needs_check(line, med_open), "rows": max(1, -(-len(line) // 38))} for line in mail["body"].split("\n")]
+    items = attach.candidates(conn, s, row["user_id"]) if gmail_on and row["state"] == "open" else []
+    picked = attach.chosen(conn, s, mail_id, row["user_id"], mail["body"], items) if items or gmail_on else []
+    says = bool(attach.SAYS_ATTACHED.search(mail["body"]))
+    total = sum(it["size"] for it in items if it["key"] in picked)
+    attach_red = False
+    if gmail_on and row["state"] == "open":  # メールアプリでは添付できないので、Gmail の時だけ見る
+        if says and not picked:
+            blocks.append("本文に「添付」とありますが、何も付いていません。")
+        if picked and not says:
+            blocks.append("添付した書類のことが本文にありません。「〜を添付します」と書いてください。")
+            attach_red = True
+        if total > attach.MAX_BYTES:
+            blocks.append(f"添付が合計 25MB を超えています（{total / 1024 / 1024:.1f}MB）。外してください。")
+            attach_red = True
+    no_file = gmail_on and says and not picked
+    lines = [{"text": line, "check": _line_needs_check(line, med_open) or (no_file and "添付" in line), "rows": max(1, -(-len(line) // 38))} for line in mail["body"].split("\n")]
     why = f"{blocks[0]}{f'（ほか{len(blocks) - 1}件）' if len(blocks) > 1 else ''}" if blocks else ""
     sent_mailto = _mailto(row["sent_to"] or "", row["sent_subject"] or "", row["sent_body"] or "") if row["state"] == "sent" else ""
     in_gmail = conn.execute("SELECT message_id FROM mail_gmail WHERE mail_id = ?", (mail_id,)).fetchone()
-    return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "med": med, "med_open": bool(med_open), "consent": consent, "address": address,
+    return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "attach_items": items, "attach_chosen": picked, "attach_red": attach_red,
+            "sent_attached": attach.sent_names(conn, mail_id) if row["state"] == "sent" else [], "med": med, "med_open": bool(med_open), "consent": consent, "address": address,
             "mailto": _mailto(address, mail["subject"], mail["body"]), "lines": lines, "why": why,
             "sent_mailto": sent_mailto, "gmail_id": in_gmail["message_id"] if in_gmail else "", "demo": s.as_of is not None, "sent_note": SENT_DEMO if s.as_of else SENT_REAL}
 
@@ -285,14 +302,16 @@ def _line_needs_check(line: str, med_open: list[str]) -> bool:
 def send_mail(conn: sqlite3.Connection, s: Settings, thread: str, mail_id: int, gmail: Any = None) -> None:
     """送る処理はここ1か所。人が主ボタンを押した時だけ呼ぶ。外へは出さず、控えに残す。"""
     row = out_row(conn, thread, mail_id)
-    view = out_view(conn, s, mail_id) if row else None
+    view = out_view(conn, s, mail_id, gmail_on=gmail is not None) if row else None
     if view is None or row["state"] != "open":
         raise Blocked("送れる案ではありません。")
     if view["blocks"]:
         raise Blocked(view["blocks"][0])
-    message_id = gmail.create_draft(view["address"], view["mail"]["subject"], view["mail"]["body"]) if gmail else ""  # 下書きに入れるだけ。送らない
+    files = attach.files_for(conn, s, row["user_id"], view["attach_chosen"]) if gmail else []
+    message_id = gmail.create_draft(view["address"], view["mail"]["subject"], view["mail"]["body"], attachments=files) if gmail else ""  # 下書きに入れるだけ。送らない
     if message_id:
         conn.execute("INSERT OR REPLACE INTO mail_gmail (mail_id, message_id, at) VALUES (?, ?, ?)", (mail_id, message_id, now_real().isoformat()))
+        attach.keep_names(conn, mail_id, [f[0] for f in files])
     conn.execute("UPDATE mail_out SET state = 'sent', sent_at = ?, sent_to = ?, sent_name = ?, sent_subject = ?, sent_body = ? WHERE mail_id = ?",
                  (now_real().isoformat(), view["address"], view["recipient"]["label"], view["mail"]["subject"], view["mail"]["body"], mail_id))
     conn.commit()
@@ -334,4 +353,5 @@ def home_lines(conn: sqlite3.Connection, user_ids: set[str] | None = None) -> li
 
 def sent_list(conn: sqlite3.Connection) -> list[dict]:
     names = {u.id: u.name for u in list_users(conn)}
-    return [dict(r) | {"user_name": names.get(r["user_id"], r["user_id"])} for r in conn.execute("SELECT * FROM mail_out WHERE state = 'sent' ORDER BY sent_at DESC")]
+    return [dict(r) | {"user_name": names.get(r["user_id"], r["user_id"]), "attached": attach.sent_names(conn, r["mail_id"])}
+            for r in conn.execute("SELECT * FROM mail_out WHERE state = 'sent' ORDER BY sent_at DESC")]
