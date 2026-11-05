@@ -11,7 +11,7 @@ from keika.claude import PRICES
 from keika.db import connect
 from keika.ledger import seed_from_json
 from keika.records import RecordIn, add_record
-from keika.secretary import ALL, answer_question, desk_model, mark_loose, others_in_text, split_answer, start_question, thread_messages, threads_state
+from keika.secretary import ALL, LINE_REPLY, answer_question, desk_model, mark_loose, others_in_text, split_answer, start_question, thread_messages, threads_state, urgent_words
 from keika.settings import Settings
 from keika.web.app import create_app
 from test_reading import FakeClient
@@ -164,6 +164,55 @@ def test_saying_it_does_not_recommend_is_not_a_recommendation(env):
     s, c = env
     client, m = ask(s, c, "U04", "どこがいい？", said("特定の事業所はお勧めしません。"))
     assert len(client.calls) == 1 and m["text"] == "特定の事業所はお勧めしません。"
+
+
+@pytest.mark.parametrize("text", [
+    "今日か明日のうちに久留島医師へ連絡してください。",
+    "今日中に主治医に伝えましょう。",
+    "すぐに病院へ連絡する事を考えましょう。",
+    "早めに受診の相談をしましょう。",
+    "なるべく早く訪問看護に伝えてください。",
+    "急いで先生に聞いてください。",
+    "明日までに主治医に確かめましょう。",
+    "急な変化なので、事業所の手順に沿ってください。",
+])
+def test_urgent_wording_about_medical_contact_is_caught(text):
+    assert urgent_words(text)
+
+
+@pytest.mark.parametrize("text", [
+    "すぐ座りたくなる様子を主治医に伝える事として並べます。",
+    "今日中に利用票を事業所へ送りましょう。",
+    "早めに担当者会議の日程を決めましょう。",
+    "主治医に確かめる事として並べます。",
+    "急な変化で迷う時は、事業所の緊急時の手順に沿ってください。",
+    "11月30日までに認定の更新申請が要ります。",
+])
+def test_ordinary_wording_is_left_alone(text):
+    assert urgent_words(text) == []
+
+
+def test_urgent_wording_is_rewritten(env):
+    s, c = env
+    client, m = ask(s, c, "U04", "転んだ", said("今日か明日のうちに久留島医師へ連絡してください。"), said("主治医に確かめる事として並べます。"))
+    assert len(client.calls) == 2 and m["text"] == "主治医に確かめる事として並べます。"
+
+
+def test_urgent_wording_in_the_folded_part_is_also_caught(env):
+    s, c = env
+    client, _ = ask(s, c, "U04", "転んだ", said("結論です。\n【詳しく】\n・今日中に主治医へ伝える。"), said("結論です。"))
+    assert len(client.calls) == 2
+
+
+def test_fixed_reply_points_to_the_office_procedure(env):
+    assert "緊急時の手順" in LINE_REPLY and "主治医" in LINE_REPLY
+
+
+def test_prompt_says_not_to_judge_urgency(env):
+    s, c = env
+    client, _ = ask(s, c, "U04", "こんにちは", said("はい。"))
+    head = client.calls[0]["system"][0]["text"]
+    assert "急ぐ度合い" in head and "緊急時の手順" in head
 
 
 def test_system_prompt_states_the_lines(env):
