@@ -50,7 +50,7 @@ from keika.rules import basis_text, get_rule
 from keika.files import one_view
 from keika.home import MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
 from keika.secretary import ALL, answer_question, get_mail, made_list, mark_mail_ok, open_source, revise_mail, others_in_text, start_question, thread_messages, threads_state
-from keika.tasks import build_board, person_lines
+from keika.tasks import build_board, finding_where, person_lines
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
 from keika.views import evidence_view, hdate
 
@@ -195,6 +195,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["nav_section"] = nav_section
+    templates.env.globals["finding_where"] = finding_where
     templates.env.globals["sample"] = sample
     templates.env.globals["legal"] = basis_for
     templates.env.globals["med_message"] = med_message
@@ -319,12 +320,26 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.get("/desk")
     @one_view_route
-    def desk_page(request: Request, t: str = ALL):
+    def desk_page(request: Request, t: str = ALL, about: str = ""):
         thread = _desk_thread(t)
         user = get_user(conn, thread) if thread != ALL else None
         records = list(reversed(list_records(conn, thread))) if user else []
         docs = [r.rel_path for r in user_refs(conn, s, user)] if user else []
-        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs})
+        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs, "question": _desk_question(thread, about) if user else ""})
+
+    def _desk_question(thread: str, about: str) -> str:
+        """項目から来た時に、入力欄へ入れておく文。送るのは人。"""
+        if not about:
+            return ""
+        if about.startswith("d") and about[1:].isdigit():
+            draft = get_draft(conn, int(about[1:]))
+            return f"{draft.title}（{draft.event_date}）の下書きの、確かめる文を一緒に見たい。" if draft and draft.user_id == thread else ""
+        if about.startswith("r") and about[1:].isdigit():
+            hit = next((it for it in open_reviews(conn) if it["id"] == int(about[1:]) and it["entry"].get("user_id") == thread), None)
+            return f"次の話をこの人の記録にしてよいか、前の記録と照らして一緒に確かめたい。\n{hit['original'][:300]}" if hit else ""
+        found, _ = current_findings(conn, s, thread)
+        hit = next((f for f in found if fingerprint(f) == about), None)
+        return f"「{hit.todo or hit.message}」はどれのことですか。該当の書類を開いて教えてください。" if hit else ""
 
     @app.get("/desk/{thread}/messages")
     def desk_messages(thread: str):

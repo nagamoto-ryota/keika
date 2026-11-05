@@ -31,6 +31,7 @@
   {% for v in findings %}
     <article class="card {{ v.f.kind }}">
       {% if v.f.todo %}<p class="todo-line">{{ v.f.todo|hdate }}</p>{% endif %}
+      <p class="small muted">{{ finding_where(v.f) }}</p>
       {% with uid = user.id, back = '/users/' ~ user.id %}{% include "_finding.html" %}{% endwith %}
     </article>
   {% else %}

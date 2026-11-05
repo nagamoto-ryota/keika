@@ -351,3 +351,5 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .mail-sheet { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; margin: 10px 0; }
 .mail-sheet p { margin: 4px 0; }
 .mail-body { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px !important; }
+.task-where { display: block; font-size: 13px; color: var(--muted); }
+.home-ask-link { margin: -6px 0 10px; text-align: right; }

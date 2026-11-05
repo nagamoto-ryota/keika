@@ -10,7 +10,7 @@ import sqlite3
 from dataclasses import dataclass, field
 
 from keika.drafts import Homework, open_homework
-from keika.findings import Finding
+from keika.findings import Evidence, Finding
 from keika.ledger import User, list_users
 from keika.progress import Cell, user_progress
 from keika.responses import Item, sort_findings
@@ -18,12 +18,37 @@ from keika.rules import get_rule
 from keika.settings import Settings, today
 
 VISIT_NOTICE_DAYS = 10  # 月末までこの日数を切ったら人ごとに出す
+WHERE_QUOTE = 24
+UNKNOWN_WHERE = "記録と書類からは、どの書類か特定できていません。"
 DEADLINE_RULES = ("R44", "R45")
 UPDATE_RULES = ("R44", "R45", "R09")
 STEP_RULE = {
     "assessment": "R09", "meeting": "R01", "minutes": "R33", "consent": "R10", "delivery": "R07",
     "service_plans": "R12", "medical": "R08", "visit": "R06", "usage": "R13",
 }
+
+
+def _source_label(e: Evidence) -> str:
+    name = e.file.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    if "支援経過" in name:
+        name = "支援経過"
+    if e.record_date:
+        month, day = e.record_date.split("-")[1:]
+        return f"{name} {int(month)}/{int(day)}"
+    return name
+
+
+def finding_where(f: Finding) -> str:
+    """何の書類のどこの話かを1行で。機械で組み立てる。分からなければ、そう言う。"""
+    if f.evidence:
+        labels = list(dict.fromkeys(_source_label(e) for e in f.evidence))
+        quote = (f.evidence[0].quote or "").strip()
+        shown = f"「{quote[:WHERE_QUOTE]}{'…' if len(quote) > WHERE_QUOTE else ''}」" if quote else ""
+        more = f" ほか{len(labels) - 1}件" if len(labels) > 1 else ""
+        return f"根拠: {labels[0]}{shown}{more}"
+    if f.searched_scope:
+        return f"根拠の書類は見当たりません（探した範囲: {f.searched_scope}）"
+    return UNKNOWN_WHERE
 
 
 @dataclass
@@ -34,6 +59,13 @@ class Task:
     note: str = ""
     view: dict | None = None  # 画面に出す形（画面の側で入れる）
     homework: list[Homework] = field(default_factory=list)  # 会議や訪問で残った宿題。人ごとに1行にまとめる
+
+    @property
+    def where(self) -> str:
+        """人の項目の1行目の下に添える。宿題は本文が具体的なので何も足さない。"""
+        if self.homework:
+            return ""
+        return finding_where(self.item.finding) if self.item else UNKNOWN_WHERE
 
     @property
     def opens(self) -> str:

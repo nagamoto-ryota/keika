@@ -55,7 +55,7 @@
     <div class="desk-log" id="desk-log" aria-live="polite"></div>
     <div class="desk-move" id="desk-move" hidden></div>
     <form class="desk-ask" id="desk-ask">
-      <textarea name="question" rows="2" placeholder="{{ '例: 夜の転倒が続いてる。計画で足りない所を一緒に考えたい' if user else '例: 今週の段取りを一緒に考えたい' }}"{% if sample %} disabled{% endif %}></textarea>
+      <textarea name="question" rows="2" placeholder="{{ '例: 夜の転倒が続いてる。計画で足りない所を一緒に考えたい' if user else '例: 今週の段取りを一緒に考えたい' }}"{% if sample %} disabled{% endif %}{% if question %} autofocus{% endif %}>{{ question }}</textarea>
       <button{% if sample %} disabled{% endif %}>送る</button>
     </form>
     <p class="small muted">話して入れる時は OS の音声入力が使えます（Windows は Win + H）。</p>

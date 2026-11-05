@@ -99,6 +99,7 @@
   }
 
   function citeLabel(c) {
+    if (!c.quote) return c.file.split("/").pop();
     var q = c.quote.length > 24 ? c.quote.slice(0, 24) + "…" : c.quote;
     var name = c.record_date ? c.record_date.slice(5).replace("-", "/") : c.file.split("/").pop().replace(/\.[a-z]+$/, "");
     return name + "「" + q + "」";

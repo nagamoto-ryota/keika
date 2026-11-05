@@ -22,7 +22,7 @@
 {% macro task_row(t, person_id) %}
 {% if t.opens %}
 <details class="task">
-  <summary><span class="dot"></span><span class="title">{{ t.title|hdate }}</span>{% if t.deadline %}<span class="due">{{ t.deadline|hdate }}まで</span>{% endif %}<span class="opens">{{ t.opens }} ▸</span></summary>
+  <summary><span class="dot"></span><span class="title">{{ t.title|hdate }}{% if t.where %}<span class="task-where">{{ t.where }}</span>{% endif %}</span>{% if t.deadline %}<span class="due">{{ t.deadline|hdate }}まで</span>{% endif %}<span class="opens">{{ t.opens }} ▸</span></summary>
   <div class="task-body">
     {% if t.homework %}
       {% for h in t.homework %}
@@ -37,7 +37,7 @@
   </div>
 </details>
 {% else %}
-<a class="task task-link" href="/users/{{ person_id }}"><span class="dot"></span><span class="title">{{ t.title|hdate }}</span><span class="opens">利用者のページへ ▸</span></a>
+<a class="task task-link" href="/users/{{ person_id }}"><span class="dot"></span><span class="title">{{ t.title|hdate }}{% if t.where %}<span class="task-where">{{ t.where }}</span>{% endif %}</span><span class="opens">利用者のページへ ▸</span></a>
 {% endif %}
 {% endmacro %}
 

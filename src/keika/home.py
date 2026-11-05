@@ -94,7 +94,7 @@ def deadline_lines(board: Board, s: Settings) -> list[dict]:
                 continue
             left = (when - on).days
             if left <= SOON_DAYS and (person.user.id not in best or left < best[person.user.id]["days"]):
-                best[person.user.id] = {"user_id": person.user.id, "name": person.user.name, "title": task.title, "deadline": task.deadline, "days": left}
+                best[person.user.id] = {"user_id": person.user.id, "name": person.user.name, "title": task.title, "deadline": task.deadline, "days": left, "where": task.where, "about": task.item.fingerprint if task.item else ""}
     return sorted(best.values(), key=lambda x: x["days"])[:MAX_DEADLINES]
 
 
