@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}メールの下書き - ケイカ{% endblock %}
+{% block main %}
+<p class="draft-note">AI が作った下書きです。送信はしません。送るのはご自身でお願いします。</p>
+{% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
+{% if m.changed %}<p class="small">{{ m.changed }}</p>{% endif %}
+<article class="mail-sheet">
+  <p><span class="muted small">宛先</span> {{ m.to_name }}</p>
+  <p><span class="muted small">件名</span> {{ m.subject }}</p>
+  <p class="mail-body" id="mail-body">{{ m.body }}</p>
+</article>
+{% if m.status == 'ok' %}
+<p>確かめました。送るのはご自身でお願いします。</p>
+{% endif %}
+{% if not sample %}
+<div class="review-actions">
+  {% if m.status != 'ok' %}<form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/ok"><button>いいよ</button></form>{% endif %}
+  <details class="ng">
+    <summary>違う、こうして</summary>
+    <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/revise">
+      <p><label>どう直しますか<textarea class="card-instruction" name="instruction" rows="2" required placeholder="例: 金曜までにと足して"></textarea></label></p>
+      <p><button class="plain">直してもらう</button></p>
+    </form>
+  </details>
+  <button type="button" class="plain" onclick="navigator.clipboard.writeText(document.getElementById('mail-body').textContent); this.textContent='コピーしました';">文をコピーする</button>
+</div>
+{% endif %}
+{% endblock %}

@@ -49,7 +49,7 @@ from keika.responses import Item, respond, silenced_counts, silenced_list, sort_
 from keika.rules import basis_text, get_rule
 from keika.files import one_view
 from keika.home import MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
-from keika.secretary import ALL, answer_question, open_source, others_in_text, start_question, thread_messages, threads_state
+from keika.secretary import ALL, answer_question, get_mail, made_list, mark_mail_ok, open_source, revise_mail, others_in_text, start_question, thread_messages, threads_state
 from keika.tasks import build_board, person_lines
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
 from keika.views import evidence_view, hdate
@@ -222,6 +222,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     review_notices: dict[int, str] = {}
     draft_notices: dict[int, str] = {}
+    mail_notices: dict[int, str] = {}
 
     def _reviews_for(cm: str | None) -> list[dict]:
         """担当の絞り込み中は、その人の分と、誰の話か決まっていない分を出す。"""
@@ -328,7 +329,37 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     @app.get("/desk/{thread}/messages")
     def desk_messages(thread: str):
         _desk_thread(thread)
-        return {"messages": thread_messages(conn, thread, seen=True), "threads": threads_state(conn)}
+        return {"messages": thread_messages(conn, thread, seen=True), "threads": threads_state(conn), "made": made_list(conn, thread)}
+
+    def _mail_or_404(thread: str, mail_id: int) -> dict:
+        _desk_thread(thread)
+        mail = get_mail(conn, thread, mail_id)
+        if mail is None:
+            raise HTTPException(404, "そのメールはありません")
+        return mail
+
+    @app.get("/desk/{thread}/mail/{mail_id}")
+    def desk_mail(request: Request, thread: str, mail_id: int):
+        return templates.TemplateResponse(request, "mail.html", {"m": _mail_or_404(thread, mail_id), "thread": thread, "notice": mail_notices.pop(mail_id, "")})
+
+    @app.post("/desk/{thread}/mail/{mail_id}/ok")
+    def desk_mail_ok(thread: str, mail_id: int):
+        if sample:
+            raise HTTPException(403, "見本モードでは直せません")
+        _mail_or_404(thread, mail_id)
+        mark_mail_ok(conn, thread, mail_id)
+        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
+
+    @app.post("/desk/{thread}/mail/{mail_id}/revise")
+    def desk_mail_revise(thread: str, mail_id: int, instruction: str = Form("")):
+        if sample:
+            raise HTTPException(403, "見本モードでは直せません")
+        _mail_or_404(thread, mail_id)
+        try:
+            mail_notices[mail_id] = revise_mail(conn, client_factory(), s, thread, mail_id, instruction)
+        except RuntimeError as e:  # キーが無い時
+            mail_notices[mail_id] = f"直せませんでした（{e}）"
+        return RedirectResponse(f"/desk/{thread}/mail/{mail_id}", status_code=303)
 
     def _desk_answer(thread: str, working_id: int) -> None:
         own = _connect(s)

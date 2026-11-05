@@ -346,3 +346,8 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .med-fold > summary { cursor: pointer; color: var(--muted); }
 .med-row { border-left: 2px solid var(--line); padding-left: 10px; margin: 8px 0; }
 .med-row p { margin: 2px 0; }
+.embedded header.top, .embedded footer, .embedded .demo { display: none; }
+.embedded main { padding: 8px; max-width: none; }
+.mail-sheet { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; margin: 10px 0; }
+.mail-sheet p { margin: 4px 0; }
+.mail-body { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px !important; }

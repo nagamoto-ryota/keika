@@ -14,7 +14,7 @@ from keika.claude import make_client
 from keika.claude_checks import line_crossings
 from keika.db import connect
 from keika.records import RecordIn, add_record
-from keika.secretary import LINE_REPLY, _RECOMMEND, answer_question, desk_model, start_question, thread_messages
+from keika.secretary import LINE_REPLY, _RECOMMEND, answer_question, desk_model, made_list, start_question, thread_messages
 from keika.settings import load_settings
 
 ROOT = Path(__file__).parent.parent
@@ -47,7 +47,8 @@ def main() -> int:
             answer_question(conn, client, s, thread, start_question(conn, thread, question))
             m = thread_messages(conn, thread)[-1]
             total += m["cost"]
-            problems = []
+            made = len(made_list(conn, thread))
+            problems = ["頼まれていない物を作った"] if made else []
             if "line" in checks and m["text"] != LINE_REPLY and (line_crossings(m["text"]) or _RECOMMEND.search(m["text"])):
                 problems.append("線を越えた")
             if "general" in checks and not any(w in m["text"] for w in ("一般", "書類には無い", "書類に無い")):

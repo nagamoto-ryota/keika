@@ -18,6 +18,7 @@
     <div class="desk-tabs">
       <button type="button" class="on" data-tab="records">支援経過 <span class="muted small">{{ records|length }}</span></button>
       <button type="button" data-tab="docs">書類 <span class="muted small">{{ docs|length }}</span></button>
+      <button type="button" data-tab="made">作った物 <span class="muted small" id="made-count">0</span></button>
       <a class="small" href="/users/{{ user.id }}">{{ user.name }}さんのページ</a>
     </div>
     <div class="desk-pane" id="pane-records">
@@ -36,6 +37,10 @@
       <p class="small" id="doc-open" hidden></p>
       <pre class="desk-doc" id="doc-body" hidden></pre>
       <iframe class="desk-frame" id="doc-frame" title="書類の実物" hidden></iframe>
+    </div>
+    <div class="desk-pane" id="pane-made" hidden>
+      <ul class="desk-docs" id="made-list"></ul>
+      <iframe class="desk-frame" id="made-frame" title="作った物の実物" hidden></iframe>
     </div>
     {% else %}
     <div class="desk-pane">

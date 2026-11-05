@@ -68,6 +68,36 @@
     });
   }
 
+  var madeIds = null;
+  function showMade(url, stay) {
+    showTab("made", stay);
+    var frame = document.getElementById("made-frame");
+    frame.hidden = false;
+    frame.src = url;
+  }
+
+  function renderMade(made) {
+    var list = document.getElementById("made-list");
+    if (!list) return;
+    var ids = made.map(function (m) { return m.id; });
+    var fresh = madeIds !== null ? made.filter(function (m) { return madeIds.indexOf(m.id) < 0; }) : [];
+    if (madeIds === null || fresh.length) {
+      document.getElementById("made-count").textContent = made.length;
+      list.textContent = "";
+      if (!made.length) list.appendChild(el("li", "muted", "秘書に頼むと、作った下書きがここに開きます。"));
+      made.forEach(function (m) {
+        var li = el("li");
+        var b = el("button", "linklike", m.title);
+        b.type = "button";
+        b.addEventListener("click", function () { showMade(m.url, false); });
+        li.appendChild(b);
+        list.appendChild(li);
+      });
+    }
+    madeIds = ids;
+    if (fresh.length) showMade(fresh[0].url, window.matchMedia("(max-width: 900px)").matches);
+  }
+
   function citeLabel(c) {
     var q = c.quote.length > 24 ? c.quote.slice(0, 24) + "…" : c.quote;
     var name = c.record_date ? c.record_date.slice(5).replace("-", "/") : c.file.split("/").pop().replace(/\.[a-z]+$/, "");
@@ -109,9 +139,18 @@
           });
           fold.appendChild(list);
           row.appendChild(fold);
-        } else if (thread !== "all") {
+        } else if (thread !== "all" && m.text.length > 60) {
           row.appendChild(el("p", "small muted", "この答えに根拠の引用はありません。"));
         }
+      }
+      if (m.role === "assistant" && m.status === "done" && thread !== "all") {
+        var toRecord = el("button", "linklike small", "記録の入力欄へ送る");
+        toRecord.type = "button";
+        toRecord.addEventListener("click", function () {
+          try { sessionStorage.setItem("keika_prefill", (m.head + "\n" + m.more).trim()); } catch (e) { return; }
+          location.href = "/records/new";
+        });
+        row.appendChild(toRecord);
       }
       log.appendChild(row);
     });
@@ -141,6 +180,7 @@
   function poll() {
     return fetch("/desk/" + thread + "/messages").then(function (r) { return r.json(); }).then(function (d) {
       render(d.messages);
+      renderMade(d.made || []);
       marks(d.threads);
     }).catch(function () {});
   }
