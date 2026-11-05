@@ -342,3 +342,7 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .home-small { margin: 8px 0; }
 .blank-fold { margin-top: 10px; }
 .blank-fold > summary { cursor: pointer; }
+.med-fold { margin: 10px 0; }
+.med-fold > summary { cursor: pointer; color: var(--muted); }
+.med-row { border-left: 2px solid var(--line); padding-left: 10px; margin: 8px 0; }
+.med-row p { margin: 2px 0; }

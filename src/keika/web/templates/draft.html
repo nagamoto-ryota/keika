@@ -57,6 +57,20 @@
 {% endif %}
 </section>
 
+{% if view.med_list %}
+<details class="med-fold no-print">
+  <summary>薬の話 {{ view.med_list|length }}件（未確認）</summary>
+  <p class="small muted">Claude は発言どおりと見ました。薬の話なので、人が見るまで印を残します。保存は止めません。</p>
+  {% for m in view.med_list %}
+  <div class="med-row">
+    <p>「{{ m.text }}」<a class="small" href="#item-{{ m.item_id }}">本文へ</a></p>
+    {% if m.quote %}<p class="small">文字起こし: 「{{ m.quote }}」</p>{% endif %}
+    {% if not sample %}<form method="post" action="/drafts/{{ d.id }}/items/{{ m.item_id }}/ok"><button class="plain">見た</button></form>{% endif %}
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
+
 <article class="doc-sheet">
   <h1>{{ d.title }}<span class="muted small no-print">（下書き）</span></h1>
   <table class="draft-head">

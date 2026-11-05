@@ -28,6 +28,7 @@ def main() -> int:
     from keika.claude_checks import run_claude_checks, save_run
     from keika.cli import AS_OF
     from keika.db import connect
+    from keika.draft_card import settle_draft, unsettled_drafts
     from keika.drafts import intake_with_drafts, list_drafts
     from keika.files import scan
     from keika.ledger import list_users, seed_from_json
@@ -57,6 +58,8 @@ def main() -> int:
         for name in TALKS:
             path = REPO / "sample_data" / "demo_talks" / name
             intake_with_drafts(conn, client, s, path.read_text(encoding="utf-8"), name, date_hint=date_hint(name))
+        for draft_id in unsettled_drafts(conn):
+            settle_draft(conn, client, s, draft_id)
         failed = []
         for user in list_users(conn):
             run = run_claude_checks(conn, client, s, user.id)

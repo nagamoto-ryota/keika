@@ -5,6 +5,7 @@ import ipaddress
 import os
 import re
 import socket
+import threading
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
@@ -25,7 +26,7 @@ from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
 from keika.visit_questions import get_questions, make_questions, questions_key
 from keika.visit_sheet import build_sheet
-from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, next_draft, ok_item, revise_item
+from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, next_draft, ok_item, revise_item, settle_draft, unsettled_drafts
 from keika.drafts import SECTIONS, draft_for_results, finish_homework, move_record_drafts, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
@@ -240,8 +241,10 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
     @app.get("/")
     @one_view_route
-    def home_page(request: Request, cm: str | None = None):
+    def home_page(request: Request, background: BackgroundTasks, cm: str | None = None):
         """開くと終わっている入口。記録できた事と、聞く事だけを出す。"""
+        if not sample and unsettled_drafts(conn):
+            background.add_task(_settle_in_background)
         board = build_board(conn, s, cm=cm)
         reviews, office = _reviews_for(cm), _office_for(cm)
         med_checks = open_checks(conn, s, cm=cm)
@@ -291,6 +294,22 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             return rows
         mine = {u.id for u in list_users(conn) if u.cm == cm}
         return [d for d in rows if d.user_id in mine]
+
+    settling = threading.Lock()
+
+    def _settle_in_background() -> None:
+        if not settling.acquire(blocking=False):  # もう照らしている
+            return
+        own = _connect(s)
+        try:
+            client = client_factory()
+            for draft_id in unsettled_drafts(own):
+                settle_draft(own, client, s, draft_id)
+        except RuntimeError:  # キーが無い時は今までどおり人に聞く
+            pass
+        finally:
+            own.close()
+            settling.release()
 
     def _desk_thread(thread: str) -> str:
         if thread != ALL and get_user(conn, thread) is None:
