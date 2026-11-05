@@ -83,7 +83,7 @@ def draft_view(conn: sqlite3.Connection, draft: Draft) -> dict:
                 words, note = _flag_parts(item["flag"])
                 checks.append({"item_id": item["id"], "label": label, "text": item["text"], "quote": item["quote"], "words": words, "note": note, "changed": item.get("changed", "")})
     blanks = [b for b in _asks(draft) if b["field"] not in draft.kept_blanks]
-    return {"checks": checks, "blanks": blanks, "left": len(checks) + len(blanks)}
+    return {"checks": checks, "blanks": blanks, "left": len(checks)}  # 空欄は毎回聞かず、保存の時に1行出す
 
 
 def count_left(conn: sqlite3.Connection, draft: Draft) -> int:

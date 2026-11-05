@@ -35,27 +35,27 @@ def client(settings, conn):
 
 
 def test_dashboard_lists_users_of_selected_cm(client):
-    body = client.get("/", params={"cm": "CM02"}).text
+    body = client.get("/todo", params={"cm": "CM02"}).text
     assert "柚木 茂" in body and "杉森 ハル" not in body
 
 
 def test_dashboard_lists_everyone_without_cm(client):
-    body = client.get("/").text
+    body = client.get("/todo").text
     assert "柚木 茂" in body and "杉森 ハル" in body
 
 
 def test_dashboard_can_switch_person_in_charge(client):
-    body = client.get("/").text
+    body = client.get("/todo").text
     assert "真柴 洋子" in body and "井波 拓真" in body
 
 
 def test_dashboard_shows_demo_date_banner(client):
-    assert "デモ基準日 2026-11-04" in client.get("/").text
+    assert "デモ基準日 2026-11-04" in client.get("/todo").text
 
 
 def test_no_banner_without_as_of(tmp_path):
     s = Settings(drive_root=SAMPLE / "drive", db_path=tmp_path / "x.db")
-    assert "デモ基準日" not in TestClient(create_app(s)).get("/").text
+    assert "デモ基準日" not in TestClient(create_app(s)).get("/todo").text
 
 
 def test_every_page_shows_demo_banner_and_final_judgment_note(client):
@@ -133,7 +133,7 @@ def test_user_page_shows_claude_finding_with_suggestion_blank(client, conn):
 
 def test_dashboard_counts_claude_findings(client, conn):
     save_run(conn, "U04", CheckRun(findings=[_claude()]))
-    assert "週2回のままです" in client.get("/", params={"cm": "CM02"}).text
+    assert "週2回のままです" in client.get("/todo", params={"cm": "CM02"}).text
 
 
 def test_dismissed_candidate_is_hidden_and_shown_as_a_note(client, conn):

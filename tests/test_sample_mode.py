@@ -22,7 +22,7 @@ def test_snapshot_is_in_the_repo():
 
 def test_sample_mode_runs_without_api_key(tmp_path):
     s, client = sample_app(tmp_path)
-    body = client.get("/").text
+    body = client.get("/todo").text
     assert "やること" in body and "見本モード" in body and "デモ基準日" in body
 
 
@@ -54,4 +54,4 @@ def test_empty_ledger_and_plain_name_folders_can_start(tmp_path):
     for path in ("/", "/board", "/office", "/ledger", "/review", "/records/new", "/silenced"):
         assert client.get(path).status_code == 200, path
     client.post("/ledger", data={"id": "", "name": "田中 花子", "kana": "", "cm": "", "care_level": "要介護1", "cert_start": "", "cert_end": "", "type": "居宅介護支援"})
-    assert "田中 花子" in client.get("/").text
+    assert "田中 花子" in client.get("/todo").text

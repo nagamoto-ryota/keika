@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}ケイカ{% endblock %}
+{% block main %}
+{% if staff|length > 1 %}
+<div class="tabs">
+  <a href="/" class="{{ 'on' if not cm }}">全員</a>
+  {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
+</div>
+{% endif %}
+
+{% if new_records %}
+<h1 class="big-line">前回開いた後の {{ new_records|length }}件を記録しました。</h1>
+<ul class="home-new">
+  {% for r in new_records[:max_new] %}<li><a href="/desk?t={{ r.user_id }}">{{ r.user_name }}</a> <span class="muted small">{{ r.event_date|hdate }} {{ r.kind }}</span></li>{% endfor %}
+  {% if new_records|length > max_new %}<li class="muted small">ほか {{ new_records|length - max_new }}件</li>{% endif %}
+</ul>
+{% else %}
+<h1 class="big-line">前回開いた後の新しい記録はありません。</h1>
+{% endif %}
+
+{% for d in deadlines %}
+<p class="home-soon"><span class="muted small">秘書より</span> <a href="/desk?t={{ d.user_id }}">{{ d.name }}さん</a>の{{ d.title|hdate }}は {{ d.deadline|hdate }} までです（{% if d.days >= 0 %}あと{{ d.days }}日{% else %}{{ -d.days }}日過ぎています{% endif %}）。</p>
+{% endfor %}
+
+<section class="person consult" id="kakunin">
+  {% if reviews or drafts %}
+  <h2>聞くこと <span class="muted small">{{ reviews|length + drafts|length }}件{% if more %}（あと {{ more }}件）{% endif %}</span></h2>
+  {% if reviews %}<div class="compare-cards">{% for it in reviews %}{% include "_review_card.html" %}{% endfor %}</div>{% endif %}
+  {% for d, left in drafts %}
+  <a class="task task-link" href="/drafts/{{ d.id }}#kakunin"><span class="dot"></span><span class="title">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</span><span class="opens">確かめること {{ left }}件 ▸</span></a>
+  {% endfor %}
+  {% elif more %}
+  <h2>今日の分は終わりました。</h2>
+  <p>あと {{ more }}件あります。急ぐ物ではありません。<a href="/todo">見る</a></p>
+  {% else %}
+  <h2>聞くことはありません。</h2>
+  {% endif %}
+</section>
+
+<p class="home-small small muted">
+  未確認の記録 {{ unchecked }}件（下書きです。最後に決めるのは人です）
+  ／ <a href="/todo">すべての項目 {{ total }}件</a>
+  ／ <a href="/board">一覧</a>
+</p>
+<p class="home-small small"><a href="/desk">秘書に相談する</a></p>
+<script src="/static/review_card.js"></script>
+{% endblock %}

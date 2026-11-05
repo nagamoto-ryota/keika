@@ -84,12 +84,12 @@ def test_check_cell_becomes_a_task(env):
     put(s, c, "計画.txt", plan_doc())
     put(s, c, "要点.txt", DocFacts(doc_type="サービス担当者会議の要点", doc_date="2026-07-30"))
     mark(c, "todo")
-    assert "ほたるいの照会の中身がありません" in TestClient(create_app(s)).get("/").text
+    assert "ほたるいの照会の中身がありません" in TestClient(create_app(s)).get("/todo").text
 
 
 def test_nav_has_four_entries(env):
     s, c = env
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/todo").text
     nav = body[body.index("<nav>"):body.index("</nav>")]
     assert nav.count("<a ") == 4 and "記録する" in nav and "やること" in nav and "一覧" in nav
 
@@ -105,7 +105,7 @@ def test_list_pages_share_tabs(env):
 def test_office_tasks_and_reviews_appear_on_the_one_todo_page(env):
     s, c = env
     to_review(c, "長女から電話。", "typed", {"user_id": "U01", "body": "長女から電話があった。"}, [], "「長女」が誰か確かめてください")
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/todo").text
     assert "長女から電話があった。" in body  # 記録の確認がその場で処理できる
     assert 'action="/office/' in body  # 事業所のことも同じページ
 
@@ -125,8 +125,8 @@ def test_saving_a_review_returns_to_todo(env):
 def test_cm_tab_hides_office_and_office_tab_exists(env):
     s, c = env
     client = TestClient(create_app(s))
-    assert 'action="/office/' not in client.get("/?cm=CM01").text
-    assert 'action="/office/' in client.get("/?cm=office").text
+    assert 'action="/office/' not in client.get("/todo?cm=CM01").text
+    assert 'action="/office/' in client.get("/todo?cm=office").text
 
 
 def test_term_context_shows_words_around_the_number():
@@ -138,7 +138,7 @@ def test_term_context_shows_words_around_the_number():
 def test_warning_is_shown_in_plain_words(env):
     s, c = env
     to_review(c, "訪問した", "typed", {"user_id": "U01", "body": "15時から訪問した。"}, ["15"], "")
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/todo").text
     assert "入力にありません" in body and "15時から訪問した" in body
     assert "話に無いかもしれない語" not in body
     assert "15時から訪問した" in card_view(c, open_reviews(c)[0])["question"]

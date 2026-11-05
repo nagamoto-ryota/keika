@@ -142,7 +142,12 @@
     data.append("question", question);
     if (stay) data.append("stay", "1");
     return fetch("/desk/" + thread + "/ask", { method: "POST", body: data }).then(function (r) { return r.json().then(function (d) { return [r.status, d]; }); }).then(function (res) {
-      if (res[0] === 409) { poll(); return; }
+      if (res[0] === 409) {
+        moveBox.hidden = false;
+        moveBox.textContent = res[1].detail || "答えを作っている途中です。";
+        poll();
+        return;
+      }
       var d = res[1];
       if (d.status === "move") { offerMove(question, d.people); return; }
       box.value = "";

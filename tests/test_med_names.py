@@ -174,7 +174,7 @@ def test_screen_shows_the_check_on_todo_list_user_page_and_board(env):
     r = record(c)
     register_checks(c, s, r, [HEARD])
     client = TestClient(create_app(s))
-    page = client.get("/").text
+    page = client.get("/todo").text
     assert "薬の名前の確認" in page and f"「{HEARD}」と聞こえました。" in page and "「アムロジピン」に直す" in page
     assert not any(g in page for g in ("のことですね", "おそらく", "正しくは"))
     assert "薬の名前が未確認" in client.get("/board").text and "薬の名前が未確認" in client.get("/users/U04").text

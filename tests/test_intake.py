@@ -231,13 +231,13 @@ def test_review_page_lists_and_resolves(env):
 def test_home_shows_review_count(env):
     s, c = env
     run(s, c, "洋子さんから電話。", entry(user_id="", spoken_name="洋子さん"))
-    assert "記録の確認" in TestClient(create_app(s)).get("/").text
+    assert "記録の確認" in TestClient(create_app(s)).get("/todo").text
 
 
 def test_review_card_says_which_word_and_what_to_do(env):
     s, c = env
     run(s, c, "柚木さん宅を訪問。変わりなし。", entry(body="柚木様宅を訪問した。歩行は99歩だった。"))
-    page = TestClient(create_app(s)).get("/").text
+    page = TestClient(create_app(s)).get("/todo").text
     assert "「歩行は99歩だった」の 99 は入力にありません" in page
 
 
@@ -245,7 +245,7 @@ def test_review_card_shows_names_changed_to_ledger_spelling(env):
     s, c = env
     fix = WireFix(heard="ゆのきさん", fixed="柚木 茂")
     run(s, c, "ゆのきさん宅を訪問。変わりなし。", entry(spoken_name="ゆのきさん", name_fixes=[fix], ambiguous=True, body="柚木様宅を訪問した。"))
-    page = TestClient(create_app(s)).get("/").text
+    page = TestClient(create_app(s)).get("/todo").text
     assert "ゆのきさんの話は、柚木 茂さんの記録にします。" in page
 
 

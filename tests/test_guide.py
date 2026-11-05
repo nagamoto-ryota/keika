@@ -19,7 +19,7 @@ def client(tmp_path):
 
 def test_footer_links_the_guide(client):
     assert 'href="/guide"' in client.get("/guide").text.split("<footer")[1]
-    assert 'href="/guide"' in client.get("/").text.split("<footer")[1]
+    assert 'href="/guide"' in client.get("/todo").text.split("<footer")[1]
 
 
 def test_guide_covers_what_the_office_does_before_entering_data(client):

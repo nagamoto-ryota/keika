@@ -25,6 +25,7 @@ from keika.settings import OutsideRootError, Settings, now_real
 ALL = "all"
 DEFAULT_MODEL = "claude-sonnet-5-5"
 MAX_TURNS = 10
+MAX_WORKING = 3  # 同時に作る数。費用が人数分かかるので上限を置く
 TIME_LIMIT_SECONDS = 180
 STALE_SECONDS = 300
 MIN_CITE = 4  # 短い語はどの原文にも当たるので根拠にならない
@@ -109,6 +110,8 @@ def start_question(conn: sqlite3.Connection, thread: str, question: str) -> int:
     _expire(conn)
     if conn.execute("SELECT 1 FROM desk_messages WHERE thread = ? AND status = 'working'", (thread,)).fetchone():
         raise ValueError("答えを作っている途中です")
+    if conn.execute("SELECT COUNT(*) FROM desk_messages WHERE status = 'working'").fetchone()[0] >= MAX_WORKING:
+        raise ValueError(f"いま{MAX_WORKING}人分の答えを作っています。少し待ってください。")
     at = now_real().isoformat()
     conn.execute("INSERT INTO desk_messages (thread, role, text, status, seen, created_at) VALUES (?, 'user', ?, 'done', 1, ?)", (thread, question.strip(), at))
     cur = conn.execute("INSERT INTO desk_messages (thread, role, text, status, seen, created_at) VALUES (?, 'assistant', '', 'working', 0, ?)", (thread, at))

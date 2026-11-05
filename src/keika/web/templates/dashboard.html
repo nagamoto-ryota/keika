@@ -2,9 +2,9 @@
 {% block title %}やること - ケイカ{% endblock %}
 {% block main %}
 <div class="tabs">
-  <a href="/" class="{{ 'on' if not cm }}">全員</a>
-  {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
-  <a href="/?cm=office" class="{{ 'on' if cm == 'office' }}">事業所</a>
+  <a href="/todo" class="{{ 'on' if not cm }}">全員</a>
+  {% for p in staff %}<a href="/todo?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
+  <a href="/todo?cm=office" class="{{ 'on' if cm == 'office' }}">事業所</a>
 </div>
 
 <h1 class="big">今決めること <span class="count">{{ decide_count }}</span>{% if other_count %} <a class="others" href="#hoka">ほかに {{ other_count }}件</a>{% endif %}</h1>
@@ -32,7 +32,7 @@
       </div>
       {% endfor %}
     {% elif t.view %}
-      {% with v = t.view, uid = person_id, back = '/' ~ ('?cm=' ~ cm if cm else '') ~ '#p-' ~ person_id %}{% include "_finding.html" %}{% endwith %}
+      {% with v = t.view, uid = person_id, back = '/todo' ~ ('?cm=' ~ cm if cm else '') ~ '#p-' ~ person_id %}{% include "_finding.html" %}{% endwith %}
     {% endif %}
   </div>
 </details>

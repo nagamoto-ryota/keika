@@ -94,14 +94,14 @@ def item(c, original="本日訪問。古河さんが元気。", body="本日訪�
 def test_text_on_the_card_is_escaped(env):
     s, c = env
     item(c, original="<script>x</script>古河", body="<script>y</script>古賀")
-    page = TestClient(create_app(s)).get("/").text
+    page = TestClient(create_app(s)).get("/todo").text
     assert "<script>x" not in page and "<script>y" not in page
 
 
 def test_card_for_text_ai_could_not_tidy_does_not_call_it_tidied(env):
     s, c = env
     item(c, original="話の内容", body="", note="整えられませんでした（理由）")
-    page = TestClient(create_app(s)).get("/").text
+    page = TestClient(create_app(s)).get("/todo").text
     assert "記録にする文" in page and "AI が整えた文" not in page and "話の内容" in page
 
 

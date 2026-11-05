@@ -164,6 +164,8 @@ def test_blank_fields_become_questions(env):
     asked = fields(c, i)
     assert "訪問先" in asked["place"] and "帰りの時間" in asked["end_time"] and "本人・家族の様子" in asked["s:condition"]
     assert "start_time" not in asked  # 話にあった欄は聞かない
+    assert "帰りの時間は何時でしたか" not in page(s, i)  # 確かめることが残る間は聞かない
+    ok_item(c, i, first(c, i)["id"])
     html = page(s, i)
     assert "これ足して" in html and "帰りの時間は何時でしたか" in html
 
@@ -315,7 +317,7 @@ def test_sample_mode_hides_the_buttons_but_shows_the_card(env):
 
 
 def dash(s):
-    return TestClient(create_app(s)).get("/").text
+    return TestClient(create_app(s)).get("/todo").text
 
 
 def test_other_items_have_no_outer_fold(env):
@@ -349,7 +351,7 @@ def test_rows_keep_their_buttons(env):
 def test_sample_mode_hides_the_buttons_inside_the_rows(env):
     s, c = env
     homework_draft(s, c)
-    html = TestClient(create_app(s, sample=True)).get("/").text
+    html = TestClient(create_app(s, sample=True)).get("/todo").text
     assert "主治医に伝える" in html and "済んだ" not in html
 
 
@@ -422,7 +424,7 @@ def test_done_homework_returns_to_that_person(env):
     i = draft(s, c, items=[WireItem(text="デイは週2回のまま続ける。", quote="デイは週2回のまま続けます")], sections=[WireSection(key="next", items=[WireItem(text="主治医に伝える。", quote="来る島先生にも伝えます")])])
     item = first(c, i, "next")
     r = TestClient(create_app(s)).post(f"/drafts/{i}/items/{item['id']}/done", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/#p-U04"
+    assert r.status_code == 303 and r.headers["location"] == "/todo#p-U04"
 
 
 # --- 押す回数 ---

@@ -186,7 +186,7 @@ def test_dashboard_lists_open_draft_and_page_shows_quote(env):
     s, c = env
     i = make(s, c, wire())
     client = TestClient(create_app(s))
-    assert f"/drafts/{i}" in client.get("/").text
+    assert f"/drafts/{i}" in client.get("/todo").text
     page = client.get(f"/drafts/{i}").text
     assert "サービス担当者会議の要点" in page and "デイは週2回のまま続ける" in page and "下書き" in page
 
@@ -205,7 +205,7 @@ def test_check_button_removes_from_dashboard(env):
     i = make(s, c, wire())
     client = TestClient(create_app(s))
     client.post(f"/drafts/{i}/checked", follow_redirects=False)
-    assert "書類の下書きの確認" not in client.get("/").text  # 宿題は残るので、下書きへのリンクは宿題の側に残る
+    assert "書類の下書きの確認" not in client.get("/todo").text  # 宿題は残るので、下書きへのリンクは宿題の側に残る
 
 
 def test_unknown_draft_is_404(env):

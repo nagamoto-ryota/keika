@@ -132,7 +132,7 @@ def test_people_with_most_to_do_come_first(env):
 def test_home_shows_todo_lines_not_tables(env):
     s, c = env
     save_run(c, "U01", CheckRun(findings=[claude_finding()]))
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/todo").text
     assert "やること" in body and "主治医への交付を確かめる" in body
     assert "<table" not in body
 
@@ -140,14 +140,14 @@ def test_home_shows_todo_lines_not_tables(env):
 def test_home_task_opens_details_with_buttons(env):
     s, c = env
     save_run(c, "U01", CheckRun(findings=[claude_finding()]))
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/todo").text
     assert "交付の記録が見当たりません" in body and "確認した・問題なし" in body
 
 
 def test_home_has_no_dates_of_past_work(env):
     s, c = env
     put(s, c, "計画.txt", DocFacts(doc_type="居宅サービス計画書", period_start="2026-08-01", period_end="2027-07-31", consent_date="2026-07-30", consent_source=Source(quote="同意")))
-    body = TestClient(create_app(s)).get("/").text
+    body = TestClient(create_app(s)).get("/todo").text
     assert "7/30" not in body
 
 
@@ -159,7 +159,7 @@ def test_press_problem_free_on_home_returns_to_home(env):
     client = TestClient(create_app(s))
     r = client.post("/users/U01/respond", data={"fp": fingerprint(one), "kind": "off_target", "back": "/"}, follow_redirects=False)
     assert r.headers["location"] == "/"
-    assert "主治医への交付を確かめる" not in client.get("/").text
+    assert "主治医への交付を確かめる" not in client.get("/todo").text
     r = client.post("/users/U01/respond", data={"fp": fingerprint(one), "kind": "off_target", "back": "//evil.example"}, follow_redirects=False)
     assert r.headers["location"] == "/users/U01"
 

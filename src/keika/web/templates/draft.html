@@ -31,17 +31,6 @@
     {% endif %}
   </article>
   {% endfor %}
-  {% if view.blanks %}
-  <h2>これ足して <span class="muted small">{{ view.blanks|length }}件</span></h2>
-  <p class="small muted">話に出てこなかった所です。答えはそのまま書類に入ります。</p>
-  {% for b in view.blanks %}
-  <form method="post" action="/drafts/{{ d.id }}/blank" class="blank-ask">
-    <input type="hidden" name="field" value="{{ b.field }}">
-    <label>{{ b.question }}<input name="answer" autocomplete="off"{% if sample %} disabled{% endif %}></label>
-    {% if not sample %}<span class="blank-buttons"><button class="plain">入れる</button> <button class="plain" name="action" value="keep" formnovalidate>今は分からない</button></span>{% endif %}
-  </form>
-  {% endfor %}
-  {% endif %}
 {% else %}
   <div class="next-step">
     <p class="proposal">確かめることは全部済みました。</p>
@@ -52,6 +41,18 @@
     {% endif %}
     <p class="next-buttons"><a class="main-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a>
     {% if next_id %}<a class="plain-link" href="/drafts/{{ next_id }}#kakunin">次の下書きへ ▸</a>{% else %}<a class="plain-link" href="/">やることへ戻る</a>{% endif %}</p>
+    {% if view.blanks %}
+    <details class="blank-fold">
+      <summary>これ足して {{ view.blanks|length }}件 <span class="muted small">（無くても保存できます。空いた所は〇〇のままです）</span></summary>
+      {% for b in view.blanks %}
+      <form method="post" action="/drafts/{{ d.id }}/blank" class="blank-ask">
+        <input type="hidden" name="field" value="{{ b.field }}">
+        <label>{{ b.question }}<input name="answer" autocomplete="off"{% if sample %} disabled{% endif %}></label>
+        {% if not sample %}<span class="blank-buttons"><button class="plain">入れる</button> <button class="plain" name="action" value="keep" formnovalidate>今は分からない</button></span>{% endif %}
+      </form>
+      {% endfor %}
+    </details>
+    {% endif %}
   </div>
 {% endif %}
 </section>

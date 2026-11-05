@@ -45,6 +45,7 @@ from keika.reading import stored_facts
 from keika.records import KindRead, RecordIn, add_record, edit_record, get_record, history, list_records, mark_checked
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
+from keika.home import MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
 from keika.secretary import ALL, answer_question, open_source, others_in_text, start_question, thread_messages, threads_state
 from keika.tasks import build_board, person_lines
 from keika.settings import OutsideRootError, Settings, now_real, safe_path, today
@@ -213,6 +214,25 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         return rows
 
     @app.get("/")
+    def home_page(request: Request, cm: str | None = None):
+        """開くと終わっている入口。記録できた事と、聞く事だけを出す。"""
+        board = build_board(conn, s, cm=cm)
+        reviews, office = _reviews_for(cm), _office_for(cm)
+        med_checks = open_checks(conn, s, cm=cm)
+        drafts = [(d, count_left(conn, d)) for d in _drafts_for(cm)]
+        waiting = [row for row in drafts if row[1]]
+        keys = [f"r{it['id']}" for it in reviews] + [f"d{d.id}" for d, _ in waiting]
+        picked, more = pick_asks(conn, s, keys, write=not sample)
+        mine = {u.id for u in list_users(conn, cm=cm)} if cm else None
+        since = opened_since(conn, write=not sample)
+        return templates.TemplateResponse(request, "home.html", {
+            "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn), "user_names": {u.id: u.name for u in list_users(conn)},
+            "new_records": new_records(conn, since, mine), "max_new": MAX_NEW_ROWS, "deadlines": deadline_lines(board, s),
+            "reviews": [it for it in reviews if f"r{it['id']}" in picked], "drafts": [row for row in waiting if f"d{row[0].id}" in picked], "more": more,
+            "unchecked": unchecked_count(conn, mine), "total": board.total + len(reviews) + len(office) + len(med_checks) + len(drafts),
+        })
+
+    @app.get("/todo")
     def dashboard(request: Request, cm: str | None = None):
         month = today(s).isoformat()[:7]
         board = build_board(conn, s, cm=None if cm == OFFICE_TAB else cm)
@@ -418,7 +438,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             finish_homework(conn, draft_id, item_id)
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
-        return RedirectResponse(f"/#p-{draft.user_id}", status_code=303)  # 畳んだ一覧でも、その人の所へ戻る
+        return RedirectResponse(f"/todo#p-{draft.user_id}", status_code=303)  # 畳んだ一覧でも、その人の所へ戻る
 
     def _sheet_view(sheet, failed: bool) -> dict:
         q = get_questions(conn, sheet.user.id)
@@ -547,7 +567,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             decide_fix(conn, s, check_id, chosen, editor)
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
-        return RedirectResponse("/#kusuri", status_code=303)
+        return RedirectResponse("/todo#kusuri", status_code=303)
 
     @app.post("/med/{check_id}/keep")
     def med_keep(check_id: int, editor: str = Form("")):
@@ -555,7 +575,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             decide_keep(conn, check_id, editor)
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
-        return RedirectResponse("/#kusuri", status_code=303)
+        return RedirectResponse("/todo#kusuri", status_code=303)
 
     @app.post("/records/{record_id}/checked")
     def record_checked(record_id: int):

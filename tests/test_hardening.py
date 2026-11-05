@@ -500,9 +500,9 @@ def test_post_from_other_origin_is_refused(env):
 def test_unknown_host_is_refused(env):
     s, c = env
     client = TestClient(create_app(s))
-    assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
-    assert client.get("/", headers={"Host": "127.0.0.1:8000"}).status_code == 200
-    assert client.get("/", headers={"Host": "192.168.1.20:8000"}).status_code == 200
+    assert client.get("/todo", headers={"Host": "evil.example"}).status_code == 400
+    assert client.get("/todo", headers={"Host": "127.0.0.1:8000"}).status_code == 200
+    assert client.get("/todo", headers={"Host": "192.168.1.20:8000"}).status_code == 200
 
 
 # 14. CSV の再取り込みが手直しを上書きしない

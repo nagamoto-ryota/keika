@@ -160,7 +160,7 @@ def test_homework_is_on_the_todo_board(env):
 def test_todo_page_has_done_button_and_source_link(env):
     s, c = env
     i = meeting(s, c)
-    page = TestClient(create_app(s)).get("/").text
+    page = TestClient(create_app(s)).get("/todo").text
     assert "ショートステイ" in page and f"/drafts/{i}" in page and "済んだ" in page
 
 
@@ -170,14 +170,14 @@ def test_done_button_removes_it_from_todo(env):
     h = open_homework(c, "U04")[0]
     client = TestClient(create_app(s))
     assert client.post(f"/drafts/{i}/items/{h.item_id}/done", follow_redirects=False).status_code == 303
-    assert "ショートステイ" not in client.get("/").text.split("書類の下書きの確認")[0]
+    assert "ショートステイ" not in client.get("/todo").text.split("書類の下書きの確認")[0]
     assert open_homework(c, "U04") == []
 
 
 def test_sample_mode_has_no_done_button(env):
     s, c = env
     meeting(s, c)
-    page = TestClient(create_app(s, client_factory=lambda: None, sample=True)).get("/").text
+    page = TestClient(create_app(s, client_factory=lambda: None, sample=True)).get("/todo").text
     assert "ショートステイ" in page and "済んだ" not in page
 
 

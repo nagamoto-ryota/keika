@@ -44,7 +44,7 @@ def wire(**kw):
 
 
 def page(s, **kw):
-    return TestClient(create_app(s, **kw)).get("/").text
+    return TestClient(create_app(s, **kw)).get("/todo").text
 
 
 def fake(result):
@@ -282,8 +282,8 @@ def test_revise_route_shows_the_notice_once(env):
     tc = TestClient(create_app(s, client_factory=lambda: fake(wire(body="訪問した。歩行は99歩だった。"))))
     r = tc.post(f"/review/{it['id']}/revise", data={"instruction": "直して", "user_id": "U02", "body": it["entry"]["body"]}, follow_redirects=False)
     assert r.status_code == 303
-    assert "直しませんでした" in tc.get("/").text
-    assert "直しませんでした" not in tc.get("/").text
+    assert "直しませんでした" in tc.get("/todo").text
+    assert "直しませんでした" not in tc.get("/todo").text
 
 
 def test_written_text_with_ok_button_is_not_lost(env):
@@ -318,7 +318,7 @@ def test_no_api_key_keeps_the_card_and_says_so(env):
 
     tc = TestClient(create_app(s, client_factory=no_key))
     tc.post(f"/review/{it['id']}/revise", data={"instruction": "直して"}, follow_redirects=False)
-    assert "直せませんでした" in tc.get("/").text and open_reviews(c)[-1]["entry"] == it["entry"]
+    assert "直せませんでした" in tc.get("/todo").text and open_reviews(c)[-1]["entry"] == it["entry"]
 
 
 def test_saved_record_keeps_what_the_person_wrote_as_the_source(env):
@@ -408,7 +408,7 @@ def test_reason_route(env):
     it = card(c, original="古河さん。歩行器は問題なし。")
     tc = TestClient(create_app(s, client_factory=lambda: fake(WireReason(words=["歩行器"]))))
     assert "歩行器" in tc.post(f"/review/{it['id']}/reason").json()["reason"]
-    assert "歩行器" in TestClient(create_app(s, sample=True)).get("/").text  # 保存済みの理由は見本でも読める
+    assert "歩行器" in TestClient(create_app(s, sample=True)).get("/todo").text  # 保存済みの理由は見本でも読める
 
 
 def test_stop_rule_itself_is_unchanged(env):
