@@ -1,5 +1,6 @@
 """下書きの確認カードと書類の見た目、やることの「細かい項目」の畳み方。判定と項目の数は変えない。"""
 from datetime import date
+from html.parser import HTMLParser
 from types import SimpleNamespace as NS
 
 import pytest
@@ -7,9 +8,12 @@ from fastapi.testclient import TestClient
 
 from conftest import SAMPLE
 from keika.db import connect
-from keika.draft_card import WireSentence, add_item, draft_view, edit_item, fill_blank, keep_blank, ok_item, revise_item
-from keika.drafts import WireAttendee, WireDraft, WireItem, WireSection, get_draft, make_draft
-from keika.ledger import seed_from_json
+from keika.claude_checks import CheckRun, save_run
+from keika.draft_card import WireSentence, add_item, draft_view, edit_item, fill_blank, keep_blank, next_draft, ok_item, revise_item
+from keika.drafts import WireAttendee, WireDraft, WireItem, WireSection, get_draft, make_draft, mark_checked
+from keika.findings import Evidence, Finding
+from keika.ledger import get_user, seed_from_json
+from keika.office import office_rows
 from keika.records import RecordIn, add_record
 from keika.settings import Settings
 from keika.tasks import Task, build_board, person_line
@@ -314,9 +318,9 @@ def dash(s):
     return TestClient(create_app(s)).get("/").text
 
 
-def test_minor_stays_closed_even_with_no_consultation(env):
+def test_other_items_have_no_outer_fold(env):
     s, _ = env
-    assert '<details class="minor">' in dash(s)
+    assert 'class="minor"' not in dash(s)
 
 
 def test_each_person_is_one_row_that_opens(env):
@@ -329,7 +333,7 @@ def test_each_person_is_one_row_that_opens(env):
 def test_script_runs_after_the_rows_so_a_link_can_open_them(env):
     s, _ = env
     html = dash(s)
-    assert html.index('<details class="minor">') < html.index("review_card.js")
+    assert html.index("ほかの項目") < html.index("review_card.js")
 
 
 def homework_draft(s, c):
@@ -419,3 +423,171 @@ def test_done_homework_returns_to_that_person(env):
     item = first(c, i, "next")
     r = TestClient(create_app(s)).post(f"/drafts/{i}/items/{item['id']}/done", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/#p-U04"
+
+
+# --- 押す回数 ---
+
+
+class _Depth(HTMLParser):
+    """語や属性が、いくつの畳み（details）の中にあるか。畳みを1つ開くのが1回押す事にあたる。"""
+
+    def __init__(self, needle):
+        super().__init__()
+        self.needle, self.depth, self.found = needle, 0, []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "details":
+            self.depth += 1
+        if any(self.needle in (v or "") for _, v in attrs):
+            self.found.append(self.depth)
+
+    def handle_endtag(self, tag):
+        if tag == "details":
+            self.depth -= 1
+
+    def handle_data(self, data):
+        if self.needle in data:
+            self.found.append(self.depth)
+
+
+def folds_around(html, needle):
+    parser = _Depth(needle)
+    parser.feed(html)
+    assert parser.found, needle
+    return max(parser.found)
+
+
+def finding(rule, todo, message):
+    return Finding(rule_id=rule, user_id="U04", kind="finding", period="2026-10", source="claude", message=message, evidence=[Evidence(file="x.csv", quote="計画")], todo=todo)
+
+
+def test_a_draft_answer_is_one_press_from_the_todo_page(env):
+    """1通1行のリンクが畳みの外にあるので、押せばすぐ答える画面に着く。"""
+    s, c = env
+    i = draft(s, c)
+    html = dash(s)
+    assert folds_around(html, f"/drafts/{i}#kakunin") == 0
+    assert 'id="kakunin"' in page(s, i) and ">いいよ</button>" in page(s, i)
+
+
+def test_draft_rows_come_right_after_the_consultation(env):
+    s, c = env
+    draft(s, c)
+    html = dash(s)
+    assert html.index("ケイカからの相談") < html.index("書類の下書きの確認") < html.index("ほかの項目")
+
+
+def test_person_rows_are_listed_from_the_start(env):
+    s, c = env
+    save_run(c, "U04", CheckRun(findings=[finding("R07", "主治医への交付を確かめる", "交付の記録が見当たりません。")]))
+    parser = _Depth("p-U04")
+    parser.feed(dash(s))
+    assert min(parser.found) == 1  # 人の行そのもの。外側の畳みが無い
+
+
+def test_finding_and_next_step_are_within_two_presses(env):
+    s, c = env
+    save_run(c, "U04", CheckRun(findings=[finding("R07", "主治医への交付を確かめる", "交付の記録が見当たりません。")]))
+    html = dash(s)
+    assert folds_around(html, "交付の記録が見当たりません") == 2 and folds_around(html, "次の手順と下書きを作る") == 2
+
+
+def test_grouped_update_tasks_do_not_add_a_press(env):
+    s, c = env
+    save_run(c, "U04", CheckRun(findings=[finding("R09", "計画更新のアセスメントを確かめる", "更新のアセスメントが見当たりません。"), finding("R11", "更新申請の状況を確かめる", "更新申請の状況が見当たりません。")]))
+    html = dash(s)
+    assert "更新の準備" in html and folds_around(html, "更新のアセスメントが見当たりません") == 2 and folds_around(html, "更新申請の状況が見当たりません") == 2
+
+
+def test_homework_is_within_two_presses(env):
+    s, c = env
+    homework_draft(s, c)
+    assert folds_around(dash(s), "主治医に伝える") == 2
+
+
+def test_visit_row_sits_with_the_people(env):
+    s, c = env
+    save_run(c, "U04", CheckRun(findings=[Finding(rule_id="R06", user_id="U04", kind="nudge", period="2026-11", source="claude", message="今月の訪問がまだです。", evidence=[], todo="今月の訪問")]))
+    html = dash(s)
+    assert html.index("ほかの項目") < html.index("今月の訪問がまだの方")
+    assert folds_around(html, "今月の訪問がまだの方") == 1
+
+
+# --- 見出し ---
+
+
+def test_heading_counts_what_needs_deciding_and_the_rest_stay_counted(env):
+    s, c = env
+    i = draft(s, c)
+    j = homework_draft(s, c)
+    keep = [b["field"] for b in draft_view(c, get_draft(c, j))["blanks"]]
+    for field in keep:
+        keep_blank(c, j, field)
+    for ch in draft_view(c, get_draft(c, j))["checks"]:
+        ok_item(c, j, ch["item_id"])
+    board = build_board(c, s)
+    html = dash(s)
+    assert '今決めること <span class="count">1</span>' in html  # 確かめることが残る下書きだけ。j は済んだ
+    assert f"ほかに {board.total + 1 + len(office_todo(c, s))}件" in html
+    assert i != j
+
+
+def office_todo(c, s):
+    return [r for r in office_rows(c, s) if r.status in ("todo", "unknown")]
+
+
+# --- 次の下書きへ ---
+
+
+def done(c, i):
+    finish(c, i)
+
+
+def test_next_draft_button_goes_to_the_one_still_open(env):
+    s, c = env
+    a, b = draft(s, c), draft(s, c)
+    done(c, a)
+    html = page(s, a)
+    assert "次の下書きへ" in html and f'href="/drafts/{b}#kakunin"' in html and "やることへ戻る" not in html
+
+
+def test_last_draft_offers_the_way_back(env):
+    s, c = env
+    a = draft(s, c)
+    done(c, a)
+    html = page(s, a)
+    assert "次の下書きへ" not in html and "やることへ戻る" in html and "Word で保存する" in html
+
+
+def test_next_draft_skips_finished_and_set_aside_ones(env):
+    s, c = env
+    a, b, d = draft(s, c), draft(s, c), draft(s, c)
+    done(c, a)
+    done(c, b)
+    mark_checked(c, d)
+    assert next_draft(c, get_draft(c, a)) is None
+
+
+def test_next_draft_goes_forward_then_wraps(env):
+    s, c = env
+    a, b, d = draft(s, c), draft(s, c), draft(s, c)
+    done(c, b)
+    assert next_draft(c, get_draft(c, b)) == d
+    done(c, d)
+    assert next_draft(c, get_draft(c, d)) == a
+
+
+def test_next_draft_prefers_the_same_care_manager(env):
+    s, c = env
+    a = draft(s, c)
+    r = add_record(c, RecordIn(user_id="U05", event_date="2026-11-05", kind_read="居宅訪問", monitoring=True, body="話した。"))
+    other = make_draft(c, FakeClient(answer(WireDraft(place="", start_time="", end_time="", attendees=[], sections=[]))), s, r, TALK, "話.txt")
+    b = draft(s, c)
+    done(c, a)
+    same = get_user(c, "U04").cm == get_user(c, "U05").cm
+    assert next_draft(c, get_draft(c, a)) == (other if same else b)
+
+
+def test_no_all_at_once_button(env):
+    s, c = env
+    assert "全部いいよ" not in page(s, draft(s, c))

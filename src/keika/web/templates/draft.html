@@ -50,7 +50,8 @@
     {% else %}
     <p>次は Word で保存して、利用者のフォルダに置いてください。点検がこの書類を読みます。</p>
     {% endif %}
-    <p><a class="main-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a></p>
+    <p class="next-buttons"><a class="main-link" href="/drafts/{{ d.id }}/docx">Word で保存する</a>
+    {% if next_id %}<a class="plain-link" href="/drafts/{{ next_id }}#kakunin">次の下書きへ ▸</a>{% else %}<a class="plain-link" href="/">やることへ戻る</a>{% endif %}</p>
   </div>
 {% endif %}
 </section>

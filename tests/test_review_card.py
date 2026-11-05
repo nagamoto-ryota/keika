@@ -105,18 +105,17 @@ def test_set_aside_still_works_from_the_card(env):
 
 
 # 5. 相談の見出し
-def test_consult_heading_comes_first_and_the_rest_is_folded(env):
+def test_consult_heading_comes_first(env):
     s, c = env
     card(c)
     html = page(s)
     assert "ケイカからの相談" in html and "記録の確認" in html
-    assert html.index("ケイカからの相談") < html.index('<details class="minor"')
-    assert '<details class="minor">' in html
+    assert html.index("ケイカからの相談") < html.index("ほかの項目")
 
 
-def test_fold_stays_closed_when_nothing_to_consult(env):
+def test_other_items_show_when_nothing_to_consult(env):
     s, c = env
-    assert '<details class="minor">' in page(s)
+    assert 'class="minor"' not in page(s)
 
 
 # 3. これ足して

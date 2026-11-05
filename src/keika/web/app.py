@@ -24,7 +24,7 @@ from keika.db import connect as _connect
 from keika.next_steps import get_plan, make_plan
 from keika.visit_questions import get_questions, make_questions, questions_key
 from keika.visit_sheet import build_sheet
-from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, ok_item, revise_item
+from keika.draft_card import add_item, count_left, draft_view, edit_item, fill_blank, keep_blank, next_draft, ok_item, revise_item
 from keika.drafts import SECTIONS, draft_for_results, finish_homework, move_record_drafts, to_docx, get_draft, list_drafts, mark_checked as mark_draft_checked, plain_text, sync_review, update_draft
 from keika.db import ThreadConnection, connect
 from keika.files import ALL_EXTS, BINARY_EXTS
@@ -222,12 +222,17 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             records = list_records(conn, person.user.id)
             for task in person.tasks:
                 task.view = _view(s, task.item, records, year) if task.item else None
+        reviews, office = _reviews_for(cm), _office_for(cm)
+        med_checks = [] if cm == OFFICE_TAB else open_checks(conn, s, cm=cm)
+        drafts = [(d, count_left(conn, d)) for d in _drafts_for(cm)]
+        drafts.sort(key=lambda row: not row[1])  # 確かめることが残る物を先に
+        decide = len(reviews) + sum(1 for _, left in drafts if left)  # 人の判断が要る物。合計は今までと同じ
         return templates.TemplateResponse(request, "dashboard.html", {
             "board": board, "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn),
-            "reviews": _reviews_for(cm), "office": _office_for(cm),
-            "med_checks": [] if cm == OFFICE_TAB else open_checks(conn, s, cm=cm),
-            "drafts": [(d, count_left(conn, d)) for d in _drafts_for(cm)], "user_names": {u.id: u.name for u in list_users(conn)},
-            "person_lines": person_lines(board),
+            "reviews": reviews, "office": office, "med_checks": med_checks,
+            "drafts": drafts, "user_names": {u.id: u.name for u in list_users(conn)},
+            "person_lines": person_lines(board), "decide_count": decide,
+            "other_count": board.total + len(reviews) + len(office) + len(med_checks) + len(drafts) - decide,
         })
 
     def _drafts_for(cm: str | None) -> list:
@@ -259,7 +264,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         staff = {p.id: p.name for p in list_people(conn, "staff")}
         return templates.TemplateResponse(request, "draft.html", {
             "d": draft, "user": user, "author": staff.get(user.cm, ""), "plain": plain_text(draft, user.name),
-            "view": draft_view(conn, draft), "notice": draft_notices.pop(draft_id, ""),
+            "view": draft_view(conn, draft), "notice": draft_notices.pop(draft_id, ""), "next_id": next_draft(conn, draft),
         })
 
     def _no_sample() -> None:

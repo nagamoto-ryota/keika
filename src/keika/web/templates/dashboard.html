@@ -7,7 +7,7 @@
   <a href="/?cm=office" class="{{ 'on' if cm == 'office' }}">事業所</a>
 </div>
 
-<h1 class="big">やること <span class="count">{{ board.total + reviews|length + office|length + med_checks|length + drafts|length }}</span></h1>
+<h1 class="big">今決めること <span class="count">{{ decide_count }}</span>{% if other_count %} <a class="others" href="#hoka">ほかに {{ other_count }}件</a>{% endif %}</h1>
 
 <section class="person consult" id="kakunin">
   <h2>ケイカからの相談 <span class="muted small">{{ reviews|length }}件</span></h2>
@@ -41,19 +41,17 @@
 {% endif %}
 {% endmacro %}
 
-<details class="minor">
-<summary>細かい項目 <strong>{{ board.total + office|length + med_checks|length + drafts|length }}件</strong></summary>
-
 {% if drafts %}
-<details class="row" id="shitagaki">
-  <summary><span class="row-name">書類の下書きの確認</span><span class="muted small">{{ drafts|length }}件</span><span class="row-lead">{{ user_names.get(drafts[0][0].user_id, '') }}さんの{{ drafts[0][0].title }} ほか</span></summary>
-  <div class="row-body">
+<section class="person" id="shitagaki">
+  <h2>書類の下書きの確認 <span class="muted small">{{ drafts|length }}件</span></h2>
   {% for d, left in drafts %}
-  <p class="draft-row"><a href="/drafts/{{ d.id }}#kakunin">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</a> <span class="muted small">{% if left %}確かめること {{ left }} 件 ▸{% else %}確かめ済み。Word で保存へ ▸{% endif %}</span></p>
+  <a class="task task-link" href="/drafts/{{ d.id }}#kakunin"><span class="dot"></span><span class="title">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</span><span class="opens">{% if left %}確かめること {{ left }}件 ▸{% else %}確かめ済み。Word で保存へ ▸{% endif %}</span></a>
   {% endfor %}
-  </div>
-</details>
+</section>
 {% endif %}
+
+<section id="hoka">
+<h2 class="others-head">ほかの項目 <span class="muted small">{{ other_count }}件</span></h2>
 
 {% if med_checks %}
 <details class="row" id="kusuri">
@@ -75,10 +73,10 @@
   <div class="row-body">
     {% for r in line.rows %}
     {% if r.group %}
-    <details class="task task-group">
-      <summary><span class="dot"></span><span class="title">{{ r.group }} <span class="muted small">{{ r.tasks|length }}件</span></span>{% if r.deadline %}<span class="due">{{ r.deadline|hdate }}まで</span>{% endif %}<span class="opens">一覧 ▸</span></summary>
-      <div class="task-body">{% for t in r.tasks %}{{ task_row(t, line.user.id) }}{% endfor %}</div>
-    </details>
+    <div class="task-group">
+      <p class="group-head">{{ r.group }} <span class="muted small">{{ r.tasks|length }}件</span>{% if r.deadline %} <span class="due">{{ r.deadline|hdate }}まで</span>{% endif %}</p>
+      {% for t in r.tasks %}{{ task_row(t, line.user.id) }}{% endfor %}
+    </div>
     {% else %}{{ task_row(r.task, line.user.id) }}{% endif %}
     {% endfor %}
     <p class="small"><a href="/users/{{ line.user.id }}">{{ line.user.name }}さんのページを開く</a></p>
@@ -107,6 +105,6 @@
 </details>
 {% endif %}
 
-</details>
+</section>
 <script src="/static/review_card.js"></script>
 {% endblock %}

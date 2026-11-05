@@ -14,8 +14,9 @@ from pydantic import BaseModel, Field
 
 from keika.claude import StructuredError, ask_structured, model_for
 from keika.claude_checks import _BACKDATE, crosses_line
-from keika.drafts import BLANK, Draft, _names_said_in_kana, _nearby, get_draft, update_draft
+from keika.drafts import BLANK, Draft, _names_said_in_kana, _nearby, get_draft, list_drafts, update_draft
 from keika.intake import _digits, _name_parts, _normal, _without_spoken_clocks, invented_terms
+from keika.ledger import get_user
 from keika.review_card import _what_changed
 from keika.settings import Settings
 
@@ -87,6 +88,15 @@ def draft_view(conn: sqlite3.Connection, draft: Draft) -> dict:
 
 def count_left(conn: sqlite3.Connection, draft: Draft) -> int:
     return draft_view(conn, draft)["left"]
+
+
+def next_draft(conn: sqlite3.Connection, draft: Draft) -> int | None:
+    """確かめることが残る次の下書き。同じ担当の物を先に、番号の順で一回りする。無ければ None。"""
+    cm_of = lambda user_id: getattr(get_user(conn, user_id), "cm", None)  # noqa: E731
+    mine = cm_of(draft.user_id)
+    left = [d for d in list_drafts(conn) if d.id != draft.id and count_left(conn, d)]
+    left.sort(key=lambda d: (cm_of(d.user_id) != mine, d.id < draft.id, d.id))
+    return left[0].id if left else None
 
 
 def _load(conn: sqlite3.Connection, draft_id: int) -> dict:

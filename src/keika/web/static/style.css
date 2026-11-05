@@ -228,7 +228,6 @@ mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: 
 .ng > summary::-webkit-details-marker { display: none; }
 .ng[open] { flex-basis: 100%; }
 .card-instruction { display: block; width: 100%; box-sizing: border-box; font: inherit; margin-top: 4px; }
-.minor > summary { cursor: pointer; margin: 16px 0 8px; color: var(--muted); }
 .row { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; padding: 0; }
 .row > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 14px; cursor: pointer; }
 .row-name { font-weight: 600; }
@@ -238,8 +237,11 @@ mark.diff-new { background: var(--nudge-soft); color: inherit; text-decoration: 
 .opens { color: var(--accent); font-size: 13px; white-space: nowrap; }
 .task summary { flex-wrap: wrap; }
 .task-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; color: inherit; text-decoration: none; }
-.task-group > .task-body { padding: 8px; }
-.draft-row { margin: 6px 0; }
+.task-group { border-left: 2px solid var(--line); padding-left: 8px; margin-bottom: 10px; }
+.group-head { margin: 8px 0 4px; font-weight: 600; font-size: 14px; }
+.others { font-size: 15px; font-weight: 400; color: var(--muted); }
+.others-head { font-size: 17px; margin: 24px 0 8px; }
+.next-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .said { font-weight: 600; }
 .draft-check .review-actions form { margin: 0; }
 .draft-revise { margin-top: 6px; }
