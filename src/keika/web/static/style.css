@@ -401,3 +401,11 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .home-mails { margin: 8px 0 16px; }
 .share-form select { font: inherit; max-width: 100%; }
 .home-mail-ground { margin: -4px 0 8px 18px; }
+
+/* 帳票の欄 */
+.form-shelf { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px 8px; margin: 12px 0 8px; }
+.form-shelf h2 { margin: 6px 0 4px; font-size: 16px; }
+.shelf-row { display: flex; gap: 12px; padding: 4px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.shelf-name { flex: 0 0 7.5em; font-weight: 600; font-size: 15px; }
+.shelf-items { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; font-size: 15px; }
+.shelf-make { display: inline; margin: 0; }

@@ -245,6 +245,7 @@
     b.addEventListener("click", function () { desk.dataset.view = b.dataset.show; });
   });
 
+  if (desk.dataset.openFile) { desk.dataset.view = "real"; openSource(desk.dataset.openFile, "", ""); }
   poll();
   setInterval(poll, 2000);
 })();
