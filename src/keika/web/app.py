@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 
 from keika import attach, gmail_draft, sent_record
 from keika.claude import make_client
-from keika.care_plan import cell_words, mark_reason, ok_cell, refresh_marks
+from keika.care_plan import cell_words, is_red, mark_reason, ok_cell, refresh_marks, scan_only, short_reason
 from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
 from keika.claude_checks import APP_RECORDS, CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
@@ -223,6 +223,9 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates.env.globals["nav_section"] = nav_section
     templates.env.globals["progress_link"] = progress_link
     templates.env.globals["mark_reason"] = mark_reason
+    templates.env.globals["is_red"] = is_red
+    templates.env.globals["scan_only"] = scan_only
+    templates.env.globals["short_reason"] = short_reason
     templates.env.filters["marked"] = marked
     templates.env.globals["finding_where"] = finding_where
     templates.env.globals["sample"] = sample

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ p.title }}の下書き - {{ user.name }} - ケイカ{% endblock %}
-{% macro cell(c, label) %}{% set srcs = c.sources if c.sources else ([c] if c.quote else []) %}<div class="cell-box{{ ' blank-cell' if c.text == '〇〇' }}{{ ' flagged' if c.flag }}" id="cell-{{ c.id }}">
+{% macro cell(c, label) %}{% set srcs = c.sources if c.sources else ([c] if c.quote else []) %}<div class="cell-box{{ ' blank-cell' if c.text == '〇〇' }}{{ ' flagged' if is_red(c) }}{{ ' scan-cell' if scan_only(c) }}" id="cell-{{ c.id }}">
   {% if srcs or c.flag %}
   <details class="cell-more">
     <summary class="cell-text">{{ c.text|marked(c) }}</summary>
@@ -8,10 +8,10 @@
 {{ c.text }}</textarea>
     <div class="cell-why no-print">
       {% for src in srcs %}<p class="cell-src">元の書類: {% if src.file and src.file != records_name %}<a href="/doc?path={{ src.file|urlencode }}">{{ src.file.rsplit('/', 1)[-1] }}</a>{% else %}支援経過{% endif %}「{{ src.quote }}」</p>{% endfor %}
-      {% if c.flag %}<p class="draft-flag">{{ mark_reason(c) }}</p>
-      {% if not sample %}<form method="post" action="/careplans/{{ p.id }}/ok" class="flush-first cell-ok"><input type="hidden" name="item" value="{{ c.id }}"><button class="ok-button">これでいい</button></form>{% endif %}{% endif %}
     </div>
   </details>
+  {% if is_red(c) %}<div class="cell-mark no-print"><span class="mark-why">{{ short_reason(c) }}</span>{% if not sample %}<form method="post" action="/careplans/{{ p.id }}/ok" class="flush-first cell-ok"><input type="hidden" name="item" value="{{ c.id }}"><button class="ok-button">これでいい</button></form>{% endif %}</div>
+  {% elif scan_only(c) %}<p class="scan-note no-print">スキャンのため確かめられません</p>{% endif %}
   {% else %}
   <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>
 {{ c.text }}</textarea>
@@ -24,7 +24,7 @@
 <p class="muted no-print"><a href="/users/{{ user.id }}">{{ user.name }}</a> のページへ戻る</p>
 <h1>{{ p.title }}<span class="muted small">（下書き）</span></h1>
 <p class="draft-note">AI の案です。書類と記録から作りました。どのマスも、その場で打って直せます。確定は人が行います。説明、同意、交付はこの画面では扱いません。読み取れなかった欄は「〇〇」のままです。</p>
-{% if p.flagged %}<p class="todo-line no-print">元の書類と見比べたいマスが {{ p.flagged }} 件あります。左に赤い線の付いたマスを見てください。</p>{% endif %}
+{% if p.flagged %}<p class="todo-line no-print">赤い字は、元の書類や記録に同じ言葉が見つからない所です。合っていれば〔これでいい〕、違えば直してください。（あと {{ p.flagged }} 件）</p>{% endif %}
 
 <div class="write-actions no-print">
   <span class="small muted" id="plan-state" role="status">{{ '見本のため保存されません' if sample else '打った内容は自動で保存します' }}</span>

@@ -108,3 +108,73 @@ def test_blank_cells_stay_plain_and_red(env):
     assert cell(p, "a12")["text"] == BLANK
     part = html.split(f'id="cell-{blank_id}"')[0].rsplit("<div", 1)[1]
     assert "blank-cell" in part
+
+
+# --- 2回目の直し（赤の意味が伝わる形に） ---
+
+META = "障害高齢者の日常生活自立度：B2（前回アセスメントの記載。判定を確認した書類の記載なし）。"
+
+
+def test_top_line_says_what_red_means_and_what_to_press(env):
+    s, c = env
+    p = plan_with(s, c, ("a10", "夜間のトイレで入院した。", "毎回恵子さんが起きて付き添っている", APP_RECORDS))
+    html = page(s, p)
+    assert "赤い字は、元の書類や記録に同じ言葉が見つからない所です。合っていれば〔これでいい〕、違えば直してください。" in html
+
+
+def test_this_is_fine_is_shown_without_opening_and_the_reason_is_next_to_it(env):
+    s, c = env
+    p = plan_with(s, c, ("a10", "夜間のトイレで入院した。", "毎回恵子さんが起きて付き添っている", APP_RECORDS))
+    html = page(s, p)
+    box = html.split(f'id="cell-{cell(p, "a10")["id"]}"')[1].split('<div class="cell-print">')[0]
+    after = box.split("</details>")[1]
+    assert ">これでいい</button>" in after and "「入院」は元の書類に無い言葉" in after
+    assert ">これでいい</button>" not in box.split("</details>")[0]
+
+
+def test_pressing_this_is_fine_lowers_the_count_on_the_page(env):
+    s, c = env
+    p = plan_with(s, c, ("a10", "夜間のトイレで入院した。", "毎回恵子さんが起きて付き添っている", APP_RECORDS))
+    client = TestClient(create_app(s))
+    before = int(re.search(r"あと (\d+) 件", client.get(f"/careplans/{p.id}").text)[1])
+    client.post(f"/careplans/{p.id}/ok", data={"item": cell(p, "a10")["id"]})
+    html = client.get(f"/careplans/{p.id}").text
+    assert (int(re.search(r"あと (\d+) 件", html)[1]) if "あと " in html else 0) == before - 1
+
+
+def test_scan_only_cells_get_a_pale_note_not_red(env):
+    s, c = env
+    p = plan_with(s, c, ("a11", "階段は手すりを使う", "階段は手すりを使う", ASSESS))
+    d = json.loads(c.execute("SELECT payload FROM care_plans WHERE id = ?", (p.id,)).fetchone()["payload"])
+    d["sections"]["a11"][0]["flag"] = "スキャンのため現物で確かめてください"
+    c.execute("UPDATE care_plans SET payload = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), p.id))
+    c.commit()
+    q = get_care_plan(c, p.id)
+    assert q.flagged == 0
+    html = page(s, q)
+    part = html.split(f'id="cell-{cell(q, "a11")["id"]}"')[0].rsplit("<div", 1)[1]
+    assert "scan-cell" in part and "flagged" not in part
+    assert "スキャンのため確かめられません" in html.split(f'id="cell-{cell(q, "a11")["id"]}"')[1].split('<div class="cell-print">')[0]
+
+
+def test_ai_notes_about_its_own_work_are_taken_out(env):
+    s, c = env
+    from keika.care_plan import ASSESS_SYSTEM
+
+    assert "作業の説明" in ASSESS_SYSTEM
+    p = plan_with(s, c, ("a5", META, "膝が痛く、長く歩くと休む", ASSESS))
+    assert cell(p, "a5")["text"] == "障害高齢者の日常生活自立度：B2。"
+
+
+def test_old_drafts_lose_the_ai_notes_once_and_the_history_says_so(env):
+    s, c = env
+    p = plan_with(s, c, ("a11", "階段は手すりを使う", "階段は手すりを使う", ASSESS))
+    d = json.loads(c.execute("SELECT payload FROM care_plans WHERE id = ?", (p.id,)).fetchone()["payload"])
+    d["sections"]["a5"][0].update(text=META, flag=f"{COMPARE}前回、記載、判定、書類", words=["前回", "記載", "判定", "書類"])
+    d["marks_v"] = 2
+    c.execute("UPDATE care_plans SET payload = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), p.id))
+    c.commit()
+    page(s, p)
+    q = get_care_plan(c, p.id)
+    assert cell(q, "a5")["text"] == "障害高齢者の日常生活自立度：B2。" and cell(q, "a5")["flag"] == ""
+    assert any("作業の説明" in h["after_text"] for h in edit_history(c, p.id))
