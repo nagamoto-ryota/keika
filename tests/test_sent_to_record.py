@@ -198,3 +198,18 @@ def test_token_without_read_is_asked_to_connect_again(tmp_path):
     assert gmail_draft.connected(s) is not None and gmail_draft.needs_reconnect(s)
     gmail_draft.save_token(s, "r2")
     assert not gmail_draft.needs_reconnect(s)
+
+
+def test_mail_cards_come_first_in_the_asks_newest_first(env):
+    from keika.intake import to_review
+
+    s, c = env
+    entry = {"user_id": "U04", "event_date": "2026-11-06", "event_time": "", "kind_read": "電話", "monitoring": False, "partner": "", "body": "電話で話した。", "reason": "x"}
+    to_review(c, "電話で話した。", "voice.txt", entry, [], "")
+    to_review(c, "古いメール", "mail", entry | {"body": "古い方のメールの案です。"}, [], "")
+    to_review(c, "電話で話した2。", "voice2.txt", entry | {"body": "電話で話した2。"}, [], "")
+    to_review(c, "返事", "mail_reply", entry | {"body": "新しい方の返事の案です。"}, [], "")
+    html = TestClient(create_app(s)).get("/").text
+    asks = html.split("聞くこと")[1]
+    at = [asks.index(x) for x in ("新しい方の返事の案です。", "古い方のメールの案です。", "電話で話した2。")]
+    assert at == sorted(at)

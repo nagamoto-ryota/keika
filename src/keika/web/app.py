@@ -178,6 +178,7 @@ NAV_SECTIONS = (
 )
 
 
+MAIL_SOURCES = ("mail", "mail_reply")  # Gmail で送った・届いたメールから作った確認カード
 SENT_CHECK_GAP = 60  # 送ったかを見るのは、入口を開いた時に1分に1回まで
 
 
@@ -248,6 +249,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             return []
         mine = {u.id for u in list_users(conn, cm=cm)} if cm else None
         items = [it for it in open_reviews(conn) if mine is None or not it["entry"].get("user_id") or it["entry"]["user_id"] in mine]
+        mails = sorted((it for it in items if it["source"] in MAIL_SOURCES), key=lambda it: -it["id"])  # 新しく来たメールの案を先頭に（見落とさないため）
+        items = mails + [it for it in items if it["source"] not in MAIL_SOURCES]
         return [it | {"card": card_view(conn, it), "notice": review_notices.pop(it["id"], "")} for it in items]
 
     def _office_for(cm: str | None) -> list:
