@@ -285,9 +285,36 @@ def _texts(conn: sqlite3.Connection, s: Settings, user_id: str) -> dict[str, str
     return texts
 
 
+_KANJI_DIGIT = {"〇": 0, "零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+
+
+def _kanji_int(run: str) -> int:
+    """「三十」「十月」「二〇二六」のような漢数字を数にする。"""
+    if not any(ch in "十百" for ch in run):
+        return int("".join(str(_KANJI_DIGIT[ch]) for ch in run))
+    total, cur = 0, 0
+    for ch in run:
+        if ch == "十":
+            total, cur = total + (cur or 1) * 10, 0
+        elif ch == "百":
+            total, cur = total + (cur or 1) * 100, 0
+        else:
+            cur = _KANJI_DIGIT[ch]
+    return total + cur
+
+
+_DATE_UNIT = re.compile(r"(\d+)\s*[年月日時分]")
+
+
+def _is_date_part(number: str, text: str) -> bool:
+    """その数が日付や時刻（年・月・日・時・分）として書かれているか。回数や量の違いは日付扱いにしない。"""
+    return number in _DATE_UNIT.findall(_normal(text)) or bool(re.search(rf"(?<!\d){re.escape(number)}\s*[/:]|[/:]\s*{re.escape(number)}(?!\d)", _normal(text)))
+
+
 def _numbers(text: str) -> set[int]:
-    """数として比べる（2026-11-02 と 11/2 と 11月2日 を同じに見る）。"""
-    return {int(x) for x in re.findall(r"\d+", _normal(text))}
+    """数として比べる（2026-11-02、11/2、11月2日、全角、十一月二日 を同じ値に見る）。"""
+    plain = _normal(text)
+    return {int(x) for x in re.findall(r"\d+", plain)} | {_kanji_int(x) for x in re.findall(r"[〇零一二三四五六七八九十百]+", text)}  # _normal は漢数字を一部だけ数字にするので、元の文から読む
 
 
 def _pieces_known(word: str, material: str) -> bool:
@@ -390,6 +417,7 @@ class _Checker:
         # 文字の無い書類は、Claude に送って読ませた物だけ根拠にできる
         self.texts, self.allowed, self.plan_files, self.names = texts, {f for f, x in texts.items() if x is not None or f in sent}, plan_files, names
         self.material = "\n".join(t or "" for t in texts.values())
+        self.material_numbers = _numbers(self.material)  # どこかの書類か記録に同じ値があれば、書き方が違っても赤にしない
         self.counter = 0
         self.held: list[dict] = []
 
@@ -502,10 +530,10 @@ class _Checker:
     def extra(self, text: str, quote: str, file: str, kind: str | None) -> list[str]:
         """元の書類に無い数字と語。日付の書き方の違いと、元にある語のつながりは数えない。"""
         near = _same_lines(quote, self.texts.get(file) or "")[1] if kind else ""
-        known = _numbers(f"{near}\n{file}\n{self.texts.get(file) or ''}") if kind else set()
+        known = (_numbers(f"{near}\n{file}\n{self.texts.get(file) or ''}") if kind else set()) | self.material_numbers
         found = invented_terms(self.material, text, self.names) + sorted(_digits(_without_spoken_clocks(near, text)) - _digits(near))
         found = [w for w in found if not (w.isdigit() and int(w) in known)]
-        found += [n for n in _changed_numbers(text, quote) if n not in found]
+        found += [n for n in _changed_numbers(text, quote) if n not in found and not (int(n) in self.material_numbers and _is_date_part(n, text))]
         found += [w for w in _TERMS.findall(text) if w not in self.material and w not in _PLAN_WORDS and w not in found and not _pieces_known(w, self.material)]
         return list(dict.fromkeys(found))
 
@@ -746,7 +774,7 @@ def ok_cell(conn: sqlite3.Connection, plan_id: int, item_id: str) -> None:
         _store(conn, plan_id, d)
 
 
-MARKS_VERSION = 3
+MARKS_VERSION = 5
 
 
 def refresh_marks(conn: sqlite3.Connection, s: Settings, plan_id: int) -> None:

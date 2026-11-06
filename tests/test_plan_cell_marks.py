@@ -178,3 +178,45 @@ def test_old_drafts_lose_the_ai_notes_once_and_the_history_says_so(env):
     q = get_care_plan(c, p.id)
     assert cell(q, "a5")["text"] == "障害高齢者の日常生活自立度：B2。" and cell(q, "a5")["flag"] == ""
     assert any("作業の説明" in h["after_text"] for h in edit_history(c, p.id))
+
+
+# --- 数字は書き方をそろえて値で比べる（10/30・10月30日・2026-10-30、全角、漢数字） ---
+
+
+def plan_with_fall(s, c, text):
+    """日付は別の記録に漢数字で書いてあるだけ。文の元（アセスメント）には日付が無い。"""
+    add_record(c, RecordIn(user_id="U01", event_date="2026-11-03", kind_read="電話", body="十月三十日の夜に転倒したと長女から電話があった。"))
+    return plan_with(s, c, ("a2", text, "膝が痛く、長く歩くと休む", ASSESS))
+
+
+def test_slash_date_is_the_same_value(env):
+    s, c = env
+    assert cell(plan_with_fall(s, c, "10/30の夜に転倒した。"), "a2")["words"] == []
+
+
+def test_full_width_date_is_the_same_value(env):
+    s, c = env
+    assert cell(plan_with_fall(s, c, "１０月３０日の夜に転倒した。"), "a2")["words"] == []
+
+
+def test_year_month_day_is_the_same_value(env):
+    s, c = env
+    assert cell(plan_with_fall(s, c, "2026年10月30日の夜に転倒した。"), "a2")["words"] == []
+
+
+def test_a_number_with_a_different_value_is_still_red(env):
+    s, c = env
+    assert "29" in cell(plan_with_fall(s, c, "10月29日の夜に転倒した。"), "a2")["words"]
+
+
+def test_month_compared_with_another_month_in_the_quote_is_not_red_when_the_date_exists(env):
+    s, c = env
+    add_record(c, RecordIn(user_id="U01", event_date="2026-11-03", kind_read="電話", body="十月三十日の夜に転倒した。9月にも同じ時間帯に転倒している。"))
+    p = plan_with(s, c, ("a2", "9月と10月30日に転倒した。", "9月にも同じ時間帯に転倒している", APP_RECORDS))
+    assert cell(p, "a2")["words"] == []
+
+
+def test_count_changed_from_the_quote_is_still_red(env):
+    s, c = env
+    p = plan_with(s, c, ("a15", "デイは週3回。", "週2回", "利用者/U01_試験太郎/居宅サービス計画書_2026-04-01.txt"))
+    assert "3" in cell(p, "a15")["words"]
