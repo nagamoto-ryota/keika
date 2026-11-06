@@ -45,6 +45,7 @@ class FakeGmail:
 
     def send(self, thread_id):
         self.threads[thread_id] = [{"id": "m1", "labels": ["SENT"], "date": SENT_AT}]
+        self.bodies["m1"] = {"from": "hello", "to": "sv01@example.com", "subject": "柚木 茂さんの件", "date": SENT_AT, "text": "本文", "attachments": []}
 
     def reply(self, thread_id, message_id, text=REPLY, attachments=()):
         self.threads[thread_id].append({"id": message_id, "labels": ["INBOX", "UNREAD"], "date": REPLY_AT})
@@ -96,6 +97,7 @@ def test_only_replies_in_keika_threads_are_read(env):
     gm = ready(s, c)
     gm.threads["other"] = [{"id": "x1", "labels": ["INBOX"], "date": REPLY_AT}]  # ケイカと関係ないメール
     gm.reply("t1", "r1")
+    gm.read.clear()
     sent_record.check(c, s, gm, summary())
     assert gm.read == ["r1"]
 
@@ -103,6 +105,7 @@ def test_only_replies_in_keika_threads_are_read(env):
 def test_our_own_sent_mail_is_not_a_reply(env):
     s, c = env
     gm = ready(s, c)
+    gm.read.clear()
     gm.threads["t1"].append({"id": "m2", "labels": ["SENT"], "date": REPLY_AT})
     assert sent_record.check(c, s, gm, summary()) == 0 and gm.read == []
 
@@ -154,7 +157,7 @@ def test_read_message_takes_plain_text_and_attachment_names():
 
     gm = Gmail("c", "s", "r", post=lambda url, **k: {"access_token": "AT"}, get=get)
     got = gm.read_message("r1")
-    assert got == {"from": "岩舘 <sv01@example.com>", "subject": "Re: 件名", "date": REPLY_AT, "text": "本文です。", "attachments": ["計画書.pdf"]}
+    assert got == {"from": "岩舘 <sv01@example.com>", "to": "", "subject": "Re: 件名", "date": REPLY_AT, "text": "本文です。", "attachments": ["計画書.pdf"]}
     assert seen[0].startswith("https://gmail.googleapis.com/gmail/v1/users/me/messages/r1?") and "format=full" in seen[0]
 
 

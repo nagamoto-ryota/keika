@@ -147,7 +147,7 @@ def _scan(conn: sqlite3.Connection, record_id: int, result: str) -> None:
 
 def candidates(conn: sqlite3.Connection, limit: int = PER_OPEN) -> list[Record]:
     """まだ考えていない、話から入った記録のうち、連絡に関わる語があるもの。無ければ AI を呼ばない。"""
-    rows = conn.execute("SELECT id, body FROM records WHERE source NOT LIKE 'csv%' AND source NOT LIKE 'intake:mail%' AND id NOT IN (SELECT record_id FROM mail_scans) ORDER BY id DESC").fetchall()  # 送ったメールの記録から、またメールを考えない
+    rows = conn.execute("SELECT id, body FROM records WHERE source NOT LIKE 'csv%' AND source NOT IN ('intake:mail', 'intake:mail_reply') AND id NOT IN (SELECT record_id FROM mail_scans) ORDER BY id DESC").fetchall()  # 送ったメールの記録から、またメールを考えない
     return [get_record(conn, r["id"]) for r in rows if CONTACT.search(r["body"])][:limit]
 
 

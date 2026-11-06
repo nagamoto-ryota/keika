@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
+import re
+import time
 import json
 import secrets
 import urllib.error
@@ -84,13 +87,19 @@ class Gmail:
     refresh_token: str
     post: Callable[..., dict] = field(default=_post, repr=False)
     get: Callable[..., dict] = field(default=_get, repr=False)
+    _token: str = field(default="", repr=False)
+    _token_until: float = field(default=0.0, repr=False)
 
     def _access_token(self) -> str:
+        """有効な間は使い回す（呼ぶたびに取り直さない）。"""
+        if self._token and time.monotonic() < self._token_until:
+            return self._token
         got = self.post(TOKEN_URL, form={"client_id": self.client_id, "client_secret": self.client_secret,
                                          "refresh_token": self.refresh_token, "grant_type": "refresh_token"})
         token = got.get("access_token")
         if not token:
             raise GmailError("つながりが切れています。もう一度つないでください。")
+        self._token, self._token_until = token, time.monotonic() + max(0, int(got.get("expires_in") or 0) - 60)
         return token
 
     def create_draft(self, to: str, subject: str, body: str, attachments: list[tuple[str, str, bytes]] | tuple = ()) -> tuple[str, str]:
@@ -139,19 +148,37 @@ class Gmail:
         got = self.get(url, headers={"Authorization": f"Bearer {self._access_token()}"})
         payload = got.get("payload") or {}
         heads = {h.get("name", "").lower(): h.get("value", "") for h in payload.get("headers") or []}
-        texts, names = [], []
+        texts, htmls, names = [], [], []
 
         def walk(part: dict) -> None:
             if part.get("filename"):
                 names.append(part["filename"])
-            elif part.get("mimeType") == "text/plain" and (part.get("body") or {}).get("data"):
-                texts.append(base64.urlsafe_b64decode(part["body"]["data"] + "=" * (-len(part["body"]["data"]) % 4)).decode("utf-8", "replace"))
+            elif part.get("mimeType") in ("text/plain", "text/html") and (part.get("body") or {}).get("data"):
+                (texts if part["mimeType"] == "text/plain" else htmls).append(_decode(part))
             for child in part.get("parts") or []:
                 walk(child)
 
         walk(payload)
-        return {"from": heads.get("from", ""), "subject": heads.get("subject", ""), "date": int(got.get("internalDate") or 0) or None,
-                "text": "\n".join(texts).strip(), "attachments": names}
+        text = "\n".join(texts).strip() or "\n".join(_plain(h) for h in htmls).strip()  # 本文が HTML だけの返事も読む
+        return {"from": heads.get("from", ""), "to": heads.get("to", ""), "subject": heads.get("subject", ""), "date": int(got.get("internalDate") or 0) or None,
+                "text": text, "attachments": names}
+
+
+def _decode(part: dict) -> str:
+    """その部分の文字コードで読む（ISO-2022-JP や Shift_JIS の返事が化けないように）。"""
+    data = base64.urlsafe_b64decode(part["body"]["data"] + "=" * (-len(part["body"]["data"]) % 4))
+    kind = next((h.get("value", "") for h in part.get("headers") or [] if h.get("name", "").lower() == "content-type"), "")
+    found = re.search(r'charset="?([\w\-]+)"?', kind, re.I)
+    try:
+        return data.decode(found[1] if found else "utf-8", "replace")
+    except LookupError:
+        return data.decode("utf-8", "replace")
+
+
+def _plain(markup: str) -> str:
+    markup = re.sub(r"(?is)<(script|style).*?</\1>", "", markup)
+    markup = re.sub(r"(?i)<br\s*/?>|</(?:p|div|li|tr)>", "\n", markup)
+    return html.unescape(re.sub(r"<[^>]+>", "", markup)).strip()
 
 
 def client_path(s: Settings) -> Path:
@@ -173,8 +200,10 @@ def _client(s: Settings) -> tuple[str, str] | None:
     return info["client_id"], info["client_secret"]
 
 
-def save_token(s: Settings, refresh_token: str) -> None:
-    token_path(s).write_text(json.dumps({"refresh_token": refresh_token, "scopes": SCOPES}), encoding="utf-8")
+def save_token(s: Settings, refresh_token: str, granted: str | None = None) -> None:
+    """Google が実際に許した権限を覚える。同意の画面で読む権限が外された時は、つなぎ直しが要ると分かるように。"""
+    scopes = granted.split() if granted else SCOPES
+    token_path(s).write_text(json.dumps({"refresh_token": refresh_token, "scopes": scopes}), encoding="utf-8")
 
 
 def needs_reconnect(s: Settings) -> bool:
@@ -247,5 +276,5 @@ def connect(s: Settings, open_browser: Callable[[str], Any] = webbrowser.open, p
         return f"つなげませんでした（{e}）"
     if not tokens.get("refresh_token"):
         return "つなげませんでした（token が返りませんでした）"
-    save_token(s, tokens["refresh_token"])
+    save_token(s, tokens["refresh_token"], tokens.get("scope"))
     return "Gmail とつながりました。"

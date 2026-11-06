@@ -266,7 +266,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             background.add_task(_settle_in_background)
         if not sample and mail_candidates(conn):
             background.add_task(_propose_in_background)
-        if not sample and (sent_record.pending(conn, 1) or sent_record.watching(conn, 1)) and time.monotonic() - sent_checked[0] > SENT_CHECK_GAP:
+        if not sample and not sent_record.RUNNING.locked() and (sent_record.pending(conn, 1) or sent_record.watching(conn, 1)) and time.monotonic() - sent_checked[0] > SENT_CHECK_GAP:
             sent_checked[0] = time.monotonic()
             background.add_task(_sent_in_background)
         board = build_board(conn, s, cm=cm)
