@@ -21,6 +21,7 @@ from markupsafe import Markup, escape
 from urllib.parse import urlparse
 
 from keika import attach, gmail_draft, sent_record
+from keika.outbox import make_for_offer, offer_for, offer_skipped, skip_offer
 from keika.claude import make_client
 from keika.care_plan import cell_words, is_red, mark_reason, ok_cell, refresh_marks, scan_only, short_reason
 from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
@@ -222,6 +223,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["nav_section"] = nav_section
     templates.env.globals["progress_link"] = progress_link
+    templates.env.globals["offer_for"] = offer_for
+    templates.env.globals["offer_skipped"] = lambda fp: offer_skipped(conn, fp)
     templates.env.globals["mark_reason"] = mark_reason
     templates.env.globals["is_red"] = is_red
     templates.env.globals["scan_only"] = scan_only
@@ -1019,6 +1022,34 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if made is None:
             return PlainTextResponse(f"{name}の下書きを作れませんでした。時間をおいて、もう一度押してください。", status_code=502)
         return RedirectResponse(f"/careplans/{made}", status_code=303)
+
+    @app.post("/users/{user_id}/offer")
+    def make_offer(user_id: str, fp: str = Form("")):
+        """指摘カードの〔作って〕。提案に書いた相手へのメール案を作り、最初の案の画面へ進む。"""
+        if sample:
+            raise HTTPException(403, "見本モードでは作れません")
+        if get_user(conn, user_id) is None:
+            raise HTTPException(404, "利用者が見つかりません")
+        found, _ = current_findings(conn, s, user_id)
+        hit = next((f for f in found if fingerprint(f) == fp), None)
+        if hit is None:
+            raise HTTPException(404, "その指摘は見つかりません")
+        try:
+            made, problem = make_for_offer(conn, client_factory(), s, user_id, hit.rule_id, hit.message)
+        except RuntimeError as e:  # キーが無い時
+            made, problem = [], f"作れませんでした（{e}）"
+        if not made:
+            return PlainTextResponse(problem or "作れませんでした。", status_code=502)
+        if problem:
+            mail_notices[made[0]] = problem
+        return RedirectResponse(f"/desk/{user_id}/mail/{made[0]}", status_code=303)
+
+    @app.post("/users/{user_id}/offer/skip")
+    def skip_offer_page(user_id: str, fp: str = Form("")):
+        if sample:
+            raise HTTPException(403, "見本モードでは変えられません")
+        skip_offer(conn, fp)
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
 
     @app.post("/careplans/{plan_id}/ok")
     def care_plan_ok(plan_id: int, item: str = Form("")):

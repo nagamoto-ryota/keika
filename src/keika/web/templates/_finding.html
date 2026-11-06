@@ -16,25 +16,44 @@
   {% endfor %}
 </div>
 {% endif %}
-{% if v.f.suggestion %}<div class="suggest"><span class="muted small">記録に書き足す文の案です。実際にした事だけを残してください。</span><p>{{ v.f.suggestion|hdate|blanks }}</p></div>{% endif %}
-<div class="actions">
-  {% if not sample and v.f.user_id %}
-  <form method="post" action="/users/{{ uid }}/plan" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（1分ほど）';">
-    <input type="hidden" name="fp" value="{{ v.fp }}">
-    <button>次の手順と下書きを作る</button>
-  </form>
+{# 記録に書き足す文の案（v.f.suggestion）は出さない。支援経過は実際の訪問・電話・送ったメールと返事から作る。データは残す #}
+{% set offer = offer_for(v.f.rule_id) if v.f.user_id else none %}
+{% if offer and not offer_skipped(v.fp) %}
+<div class="offer">
+  <p class="offer-line">{{ offer.text }}</p>
+  {% if not sample %}
+  <div class="offer-buttons">
+    <form method="post" action="/users/{{ v.f.user_id }}/offer" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（数十秒）';">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <button class="ok-button">作って</button>
+    </form>
+    <form method="post" action="/users/{{ v.f.user_id }}/offer/skip">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <button class="plain">今はいい</button>
+    </form>
+  </div>
   {% endif %}
+</div>
+{% endif %}
+<div class="actions">
   <form method="post" action="/users/{{ uid }}/respond">
     <input type="hidden" name="fp" value="{{ v.fp }}">
     <input type="hidden" name="back" value="{{ back }}">
     <button name="kind" value="off_target" class="plain">確認した・問題なし</button>
   </form>
   <details class="more">
-    <summary>今日の日付で経緯を残す</summary>
+    <summary>その他</summary>
+    {% if not sample and v.f.user_id %}
+    <form method="post" action="/users/{{ uid }}/plan" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（1分ほど）';">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <button class="plain">次の手順と下書きを作る</button>
+    </form>
+    {% endif %}
     <form method="post" action="/users/{{ uid }}/respond">
       <input type="hidden" name="fp" value="{{ v.fp }}">
       <input type="hidden" name="back" value="{{ back }}">
       <input type="hidden" name="kind" value="history_noted">
+      <p class="small muted">今日の日付で経緯を残す</p>
       <textarea name="note" rows="3" required placeholder="後から直せない漏れは、今日の日付で経緯を残します"></textarea>
       <button>残す</button>
     </form>

@@ -92,6 +92,9 @@ CREATE TABLE IF NOT EXISTS mail_sent_seen (
 CREATE TABLE IF NOT EXISTS mail_replies (
   message_id TEXT PRIMARY KEY, mail_id INTEGER NOT NULL, review_id INTEGER, at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS offer_skips (
+  fingerprint TEXT PRIMARY KEY, at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mail_scans (
   record_id INTEGER PRIMARY KEY, result TEXT NOT NULL, at TEXT NOT NULL
 );

@@ -16,12 +16,14 @@
   {% if out.sent_attached %}<p><span class="muted small">添付</span> {{ out.sent_attached|join('、') }}</p>{% endif %}
   <p class="mail-body">{{ out.sent_body }}</p>
 </article>
+{% if out.siblings %}<p class="small mail-siblings">同じ用件の案: {% for x in out.siblings %}<a href="/desk/{{ thread }}/mail/{{ x.id }}">{{ x.label }}宛て</a>{% if x.state == 'sent' %}<span class="muted">（済み）</span>{% endif %}{% if not loop.last %} ／ {% endif %}{% endfor %}</p>{% endif %}
 <p class="small"><a href="/">やることへ戻る</a></p>
 {% elif out.state == 'dropped' %}
 <h1 class="do-line">要らない案にしました</h1>
 <p class="small"><a href="/">やることへ戻る</a></p>
 {% else %}
 <h1 class="do-line">{{ '確かめて、Gmailに入れる' if gmail_on else '確かめて、メールアプリで開く' }}</h1>
+{% if out.siblings %}<p class="small mail-siblings">同じ用件の案: {% for x in out.siblings %}<a href="/desk/{{ thread }}/mail/{{ x.id }}">{{ x.label }}宛て</a>{% if x.state == 'sent' %}<span class="muted">（済み）</span>{% endif %}{% if not loop.last %} ／ {% endif %}{% endfor %}</p>{% endif %}
 {% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
 {% if out.consent %}<p class="mail-notice">{{ out.consent }}</p>{% endif %}
 {% if m.changed %}<p class="small">{{ m.changed }}</p>{% endif %}

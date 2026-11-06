@@ -488,7 +488,7 @@ def test_finding_and_next_step_are_within_two_presses(env):
     s, c = env
     save_run(c, "U04", CheckRun(findings=[finding("R07", "主治医への交付を確かめる", "交付の記録が見当たりません。")]))
     html = dash(s)
-    assert folds_around(html, "交付の記録が見当たりません") == 2 and folds_around(html, "次の手順と下書きを作る") == 2
+    assert folds_around(html, "交付の記録が見当たりません") == 2 and folds_around(html, "次の手順と下書きを作る") == 3  # 11/6 から「その他」の中
 
 
 def test_grouped_update_tasks_do_not_add_a_press(env):

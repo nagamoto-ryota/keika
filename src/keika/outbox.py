@@ -52,6 +52,30 @@ SHARE = {
 SHARE_HEAD = "日本の介護支援専門員の記録を、相手に共有する短いメールにします。"
 
 
+# 指摘カードの「次の一手」。メールで済む指摘だけ。文は決まった形で、AI を呼ばない。
+OFFERS = {
+    "R01": ("会議の開催を調整しませんか。するなら、担当の事業所と主治医に、意見照会と日程調整のメールを作ります。", ("provider", "medical"), "意見照会と日程調整"),
+    "R11": ("会議の開催を調整しませんか。するなら、担当の事業所と主治医に、意見照会と日程調整のメールを作ります。", ("provider", "medical"), "意見照会と日程調整"),
+    "R08": ("主治医に意見を聞きませんか。するなら、主治医への意見照会のメールを作ります。", ("medical",), "意見照会"),
+    "R12": ("担当の事業所に個別サービス計画の提出をお願いしませんか。するなら、依頼のメールを作ります。", ("provider",), "個別サービス計画の提出依頼"),
+}
+OFFER_HEAD = "日本の介護支援専門員が、利用者の件で相手に送るメールの案を1通書きます。用件は下の「用件」だけです。"
+
+
+def offer_for(rule_id: str) -> dict | None:
+    hit = OFFERS.get(rule_id)
+    return {"text": hit[0], "kinds": hit[1], "purpose": hit[2]} if hit else None
+
+
+def offer_skipped(conn: sqlite3.Connection, fp: str) -> bool:
+    return conn.execute("SELECT 1 FROM offer_skips WHERE fingerprint = ?", (fp,)).fetchone() is not None
+
+
+def skip_offer(conn: sqlite3.Connection, fp: str) -> None:
+    conn.execute("INSERT OR REPLACE INTO offer_skips (fingerprint, at) VALUES (?, ?)", (fp, now_real().isoformat()))
+    conn.commit()
+
+
 class Blocked(Exception):
     """まだ送れない。"""
 
@@ -226,6 +250,40 @@ def make_share(conn: sqlite3.Connection, client: Any, s: Settings, record_id: in
     return _save(conn, record.user_id, record_id, person, "共有", f"{record.event_date} {record.kind_read or record.kind_written or '記録'}", "share", wire.subject, wire.body), ""
 
 
+def make_for_offer(conn: sqlite3.Connection, client: Any, s: Settings, user_id: str, rule_id: str, about: str) -> tuple[list[int], str]:
+    """〔作って〕を押した時。提案に書いた相手（その人の関係者だけ）に1通ずつ案を作る。送らない。
+    返すのは (メールの番号の並び, 困った時の一言)。"""
+    offer = offer_for(rule_id)
+    if offer is None:
+        return [], "この指摘には、メールの案を作れません。"
+    people = [p for p in recipients(conn, s, user_id) if p["kind"] in offer["kinds"]]
+    if not people:
+        return [], "送る相手が台帳に登録されていません。"
+    user = get_user(conn, user_id)
+    made, problems = [], []
+    for person in people:
+        same = conn.execute("SELECT mail_id FROM mail_out WHERE user_id = ? AND recipient_id = ? AND state = 'open' AND origin = 'finding' AND purpose = ?",
+                            (user_id, person["id"], offer["purpose"])).fetchone()
+        if same:
+            made.append(same["mail_id"])
+            continue
+        system = f"{OFFER_HEAD}\n{SHARE[person['kind']]}\n{_COMMON}"
+        prompt = (f"## 利用者\n{user.name}\n\n## 相手\n{person['label']}\n\n## 差出人\n{_office_line(conn, user_id)}\n\n"
+                  f"## 用件\n{offer['purpose']}\n\n## 背景（ケアマネジャーが気づいた事。相手に断定して伝えない）\n{about}")
+        try:
+            wire = ask_structured(client, system, [{"type": "text", "text": prompt}], WireMail, effort="low", max_tokens=2000, model=desk_model())
+        except StructuredError:
+            problems.append(f"{person['short']}宛ては作れませんでした。")
+            continue
+        problem = _refused(conn, s, user_id, f"{about}\n{person['label']}\n{_office_line(conn, user_id)}", wire.subject, wire.body) if wire.body.strip() else "作れませんでした。"
+        if problem:
+            problems.append(f"{person['short']}宛て: {problem}")
+            continue
+        made.append(_save(conn, user_id, 0, person, offer["purpose"], about, "finding", wire.subject, wire.body))
+    conn.commit()
+    return made, " ".join(problems)
+
+
 def _med_sentences(body: str) -> list[str]:
     return [t.strip() for t in re.split(r"[。\n]", body) if t.strip() and MEDICINE_SENTENCE.search(_NOT_DRUG.sub("", t))]
 
@@ -284,7 +342,13 @@ def out_view(conn: sqlite3.Connection, s: Settings, mail_id: int, gmail_on: bool
     why = f"{blocks[0]}{f'（ほか{len(blocks) - 1}件）' if len(blocks) > 1 else ''}" if blocks else ""
     sent_mailto = _mailto(row["sent_to"] or "", row["sent_subject"] or "", row["sent_body"] or "") if row["state"] == "sent" else ""
     in_gmail = conn.execute("SELECT message_id FROM mail_gmail WHERE mail_id = ?", (mail_id,)).fetchone()
-    return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "attach_items": items, "attach_chosen": picked, "attach_red": attach_red,
+    siblings = []
+    if row["origin"] == "finding":  # 〔作って〕で一度に作った、同じ用件の他の宛先の案
+        shorts = {p["id"]: p["short"] for p in people}
+        siblings = [{"id": r["mail_id"], "label": shorts.get(r["recipient_id"], r["recipient_id"]), "state": r["state"]}
+                    for r in conn.execute("SELECT mail_id, recipient_id, state FROM mail_out WHERE user_id = ? AND origin = 'finding' AND purpose = ? AND ground = ? AND mail_id != ? AND state != 'dropped' ORDER BY mail_id",
+                                          (row["user_id"], row["purpose"], row["ground"], mail_id))]
+    return {**dict(row), "mail": mail, "recipient": person, "blocks": blocks, "siblings": siblings, "attach_items": items, "attach_chosen": picked, "attach_red": attach_red,
             "sent_attached": attach.sent_names(conn, mail_id) if row["state"] == "sent" else [], "med": med, "med_open": bool(med_open), "consent": consent, "address": address,
             "mailto": _mailto(address, mail["subject"], mail["body"]), "lines": lines, "why": why,
             "sent_mailto": sent_mailto, "gmail_id": in_gmail["message_id"] if in_gmail else "", "demo": s.as_of is not None, "sent_note": SENT_DEMO if s.as_of else SENT_REAL}

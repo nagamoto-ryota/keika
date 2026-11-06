@@ -472,3 +472,9 @@ mark.cmp { background: #fdeceb; color: #b3261e; font-weight: 700; padding: 0 1px
 .cell-mark .ok-button { padding: 2px 14px; font-size: 14px; }
 .cell-box.scan-cell .cell-more > summary { background: #f3f3f0; }
 .scan-note { margin: 0; padding: 0 6px 4px; font-size: 13px; color: #777; }
+
+/* 指摘カードの次の一手 */
+.offer { background: var(--accent-soft, #eef5f1); border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
+.offer-line { margin: 0 0 6px; font-weight: 600; }
+.offer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.offer-buttons form { margin: 0; }

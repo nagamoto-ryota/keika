@@ -128,7 +128,7 @@ def _claude(**kw):
 def test_user_page_shows_claude_finding_with_suggestion_blank(client, conn):
     save_run(conn, "U04", CheckRun(findings=[_claude()]))
     body = client.get("/users/U04").text
-    assert "週2回のままです" in body and "月・水・木" in body and "記録に書き足す文の案" in body and 'class="blank"' in body
+    assert "週2回のままです" in body and "月・水・木" in body and "記録に書き足す文の案" not in body  # 経過の文の案は出さない（11/6 方針）
 
 
 def test_dashboard_counts_claude_findings(client, conn):
@@ -201,9 +201,9 @@ def test_respond_unknown_finding_gives_404(client):
     assert client.post("/users/U04/respond", data={"fp": "nope", "kind": "done"}).status_code == 404
 
 
-def test_blank_marks_keep_the_blank_characters(client, conn):
-    save_run(conn, "U04", CheckRun(findings=[_claude()]))
-    assert '<mark class="blank">〇〇</mark>月' in client.get("/users/U04").text
+def test_draft_record_sentence_with_blanks_is_not_shown(client, conn):
+    save_run(conn, "U04", CheckRun(findings=[_claude()]))  # 経過の文の案（〇〇入り）は出さない（11/6 方針。データは残す）
+    assert "〇〇月〇〇日に経緯を確認した" not in client.get("/users/U04").text
 
 
 def test_user_page_shows_closed_findings_with_the_record(client, conn):
