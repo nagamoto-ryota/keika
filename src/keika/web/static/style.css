@@ -451,3 +451,16 @@ body:has(.desk) footer { max-width: none; width: 100%; margin: 0; padding: 2px 1
 .chk .step-why { display: none; }
 .chk:target { outline: 2px solid #b3261e; border-radius: 4px; }
 .chk:target .step-why { display: inline; }
+
+/* 下書きの表: 文は大きく、元の書類は押した時だけ */
+.plan-sheet th { font-size: 15px; }
+.sheet-cell { font-size: 16px; line-height: 1.6; }
+.cell-more > summary { list-style: none; cursor: pointer; padding: 4px 6px; font-size: 16px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cell-more > summary::-webkit-details-marker { display: none; }
+.cell-more[open] > summary { display: none; }
+.cell-why { padding: 2px 6px 6px; font-size: 14px; }
+.cell-why .cell-src { margin: 2px 0; color: var(--muted, #555); }
+.cell-why .draft-flag { margin: 2px 0; font-size: 14px; }
+.cell-ok { margin: 4px 0 0; }
+mark.cmp { background: #fdeceb; color: #b3261e; font-weight: 700; padding: 0 1px; border-radius: 2px; }
+.cell-box.flagged .cell-more > summary { box-shadow: inset 3px 0 0 #b3261e; }

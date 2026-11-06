@@ -48,9 +48,11 @@
         throw new Error("save");
       } else {
         saved.set(item, text);
-        box.parentElement.classList.remove("flagged");
-        var flag = box.parentElement.querySelector(".draft-flag");
-        if (flag) flag.remove();
+        var cellBox = box.closest(".cell-box");
+        cellBox.classList.remove("flagged");
+        cellBox.querySelectorAll(".draft-flag, .cell-ok").forEach(function (x) { x.remove(); });
+        var shown = cellBox.querySelector(".cell-text");
+        if (shown) shown.textContent = text;  // 直した文には赤い語を残さない
         if (box.value === text) {
           dirty.delete(item);
           mark(box, false);

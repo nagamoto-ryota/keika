@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 
 from keika import attach, gmail_draft, sent_record
 from keika.claude import make_client
+from keika.care_plan import cell_words, mark_reason, ok_cell, refresh_marks
 from keika.care_plan import EditConflict, add_line, add_row, check_against_assessment, edit_cell, edit_history, get_care_plan, list_care_plans, make_care_plan, remove_row, save_to_output, to_docx as care_plan_docx
 from keika.claude_checks import APP_RECORDS, CheckRun, check_and_save, latest_run
 from keika.db import connect as _connect
@@ -182,6 +183,14 @@ MAIL_SOURCES = ("mail", "mail_reply")  # Gmail で送った・届いたメール
 SENT_CHECK_GAP = 60  # 送ったかを見るのは、入口を開いた時に1分に1回まで
 
 
+def marked(text: str, cell: dict) -> Markup:
+    """見比べたい語だけを赤くした文。文はエスケープしてから印を付ける。"""
+    out = str(escape(text))
+    for w in sorted({w for w in cell_words(cell) if w}, key=len, reverse=True):
+        out = out.replace(str(escape(w)), f'<mark class="cmp">{escape(w)}</mark>')
+    return Markup(out)
+
+
 def progress_link(user_id: str, cell: Any, docs: set[str]) -> str:
     """一覧の表のマスから開く先。根拠の書類がその人の物なら左に実物を開き、無ければその人の画面の項目へ。「—」は開かない。"""
     if cell.status == "na":
@@ -213,6 +222,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["nav_section"] = nav_section
     templates.env.globals["progress_link"] = progress_link
+    templates.env.globals["mark_reason"] = mark_reason
+    templates.env.filters["marked"] = marked
     templates.env.globals["finding_where"] = finding_where
     templates.env.globals["sample"] = sample
     templates.env.globals["legal"] = basis_for
@@ -1006,8 +1017,21 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             return PlainTextResponse(f"{name}の下書きを作れませんでした。時間をおいて、もう一度押してください。", status_code=502)
         return RedirectResponse(f"/careplans/{made}", status_code=303)
 
+    @app.post("/careplans/{plan_id}/ok")
+    def care_plan_ok(plan_id: int, item: str = Form("")):
+        if sample:
+            raise HTTPException(403, "見本モードでは直せません")
+        _care_plan_or_404(plan_id)
+        try:
+            ok_cell(conn, plan_id, item)
+        except KeyError:
+            raise HTTPException(404, "そのマスはありません") from None
+        return RedirectResponse(f"/careplans/{plan_id}#cell-{item}", status_code=303)
+
     @app.get("/careplans/{plan_id}")
     def care_plan_page(request: Request, plan_id: int, compare: str = "", saved: str = ""):
+        if not sample:
+            refresh_marks(conn, s, plan_id)
         return _care_plan_page(request, _care_plan_or_404(plan_id), compare, saved)
 
     @app.post("/careplans/{plan_id}/cells")

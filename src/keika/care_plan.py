@@ -279,8 +279,37 @@ def _texts(conn: sqlite3.Connection, s: Settings, user_id: str) -> dict[str, str
     user = get_user(conn, user_id)
     foreign = {r.rel_path for r, f in stored_facts(conn, user_refs(conn, s, user)) if not belongs_to(f, user)}
     texts = {f: t for f, t in source_texts(conn, s, user_id).items() if f not in foreign}
-    texts[APP_RECORDS] = "\n".join(r.body for r in list_records(conn, user_id))
+    texts[APP_RECORDS] = "\n".join(f"{r.event_date} {r.kind_read or r.kind_written or ''} {r.body}" for r in list_records(conn, user_id))  # 日付と種別も元の事実として照らす
     return texts
+
+
+def _numbers(text: str) -> set[int]:
+    """数として比べる（2026-11-02 と 11/2 と 11月2日 を同じに見る）。"""
+    return {int(x) for x in re.findall(r"\d+", _normal(text))}
+
+
+def _pieces_known(word: str, material: str) -> bool:
+    """元にある語がつながっただけか（毎回＋次女 → 毎回次女）。前は2字以上で切る。
+    終わりの1字は、元に送り仮名つきである時だけ認める（毎回＋付き添う → 毎回付）。"""
+    if word in material:
+        return True
+    if len(word) == 1:
+        return bool(re.search(re.escape(word) + "[ぁ-ゖ]", material))
+    return any(word[:i] in material and _pieces_known(word[i:], material) for i in range(2, len(word)))
+
+
+def mark_reason(cell: dict) -> str:
+    """マスを押した時に出す理由。見比べの語は文の中で赤くするので、ここでは一言だけにする。"""
+    parts = [x for x in (cell.get("flag") or "").split(" / ") if x and not x.startswith(COMPARE)]
+    if cell.get("words") or any(x.startswith(COMPARE) for x in (cell.get("flag") or "").split(" / ")):
+        parts.append("赤い語は元の書類に見当たりません")
+    return "。".join(parts)
+
+
+def cell_words(cell: dict) -> list[str]:
+    if "words" in cell:
+        return cell["words"]
+    return next((x[len(COMPARE):].split("、") for x in (cell.get("flag") or "").split(" / ") if x.startswith(COMPARE)), [])
 
 
 def _same_lines(quote: str, source: str) -> tuple[str, str]:
@@ -434,13 +463,20 @@ class _Checker:
             flags.append(SCAN_NOTE.strip("（）"))
         elif kind is None or not (squash(text) in squash(quote) or _shares_kanji(text, quote)):
             flags.append(NOT_FOUND)
-        near = _same_lines(quote, self.texts.get(file) or "")[1] if kind else ""
-        extra = invented_terms(self.material, text, self.names) + sorted(_digits(_without_spoken_clocks(near, text)) - _digits(near))
-        extra += [n for n in _changed_numbers(text, quote) if n not in extra]
-        extra += [w for w in _TERMS.findall(text) if w not in self.material and w not in _PLAN_WORDS and w not in extra]
+        extra = self.extra(text, quote, file, kind)
         if extra:
-            flags.append(COMPARE + "、".join(dict.fromkeys(extra)))
-        return {"id": self._next(), "text": text, "quote": quote if kind else "", "file": file if kind else "", "flag": " / ".join(flags)}
+            flags.append(COMPARE + "、".join(extra))
+        return {"id": self._next(), "text": text, "quote": quote if kind else "", "file": file if kind else "", "flag": " / ".join(flags), "words": extra}
+
+    def extra(self, text: str, quote: str, file: str, kind: str | None) -> list[str]:
+        """元の書類に無い数字と語。日付の書き方の違いと、元にある語のつながりは数えない。"""
+        near = _same_lines(quote, self.texts.get(file) or "")[1] if kind else ""
+        known = _numbers(f"{near}\n{file}\n{self.texts.get(file) or ''}") if kind else set()
+        found = invented_terms(self.material, text, self.names) + sorted(_digits(_without_spoken_clocks(near, text)) - _digits(near))
+        found = [w for w in found if not (w.isdigit() and int(w) in known)]
+        found += [n for n in _changed_numbers(text, quote) if n not in found]
+        found += [w for w in _TERMS.findall(text) if w not in self.material and w not in _PLAN_WORDS and w not in found and not _pieces_known(w, self.material)]
+        return list(dict.fromkeys(found))
 
     def week(self, w: WireWeek) -> dict | None:
         service, quote, file = w.service.strip(), w.quote.strip(), w.file.strip()
@@ -598,7 +634,7 @@ def make_care_plan(conn: sqlite3.Connection, client: Any, s: Settings, user_id: 
         author = {p.id: p.name for p in list_people(conn, "staff")}.get(user.cm, "")
         head = _head(kind, user, author, check)
         grid, extra = _grid(week, check)
-        payload = {"head": head, "sections": sections, "rows": rows, "week": week, "grid": grid, "week_extra": extra, "held": check.held, "gaps": None, "gaps_key": "", "next_id": check.counter + 1}
+        payload = {"head": head, "sections": sections, "rows": rows, "week": week, "grid": grid, "week_extra": extra, "held": check.held, "gaps": None, "gaps_key": "", "next_id": check.counter + 1, "marks_v": MARKS_VERSION}
         cur = conn.execute(
             "INSERT INTO care_plans (user_id, kind, payload, created_at) VALUES (?, ?, ?, ?)",
             (user_id, kind, json.dumps(payload, ensure_ascii=False), now_real().isoformat()),
@@ -658,7 +694,53 @@ def edit_cell(conn: sqlite3.Connection, plan_id: int, item_id: str, text: str, b
         if before is not None and before.replace("\r\n", "\n") != now:
             raise EditConflict(cell["text"])
         _log(conn, plan_id, where, cell["text"], text)
-        cell.update(text=text, flag="")
+        cell.update(text=text, flag="", words=[])
+        _store(conn, plan_id, d)
+
+
+def ok_cell(conn: sqlite3.Connection, plan_id: int, item_id: str) -> None:
+    """人が元の書類と見比べて〔これでいい〕とした。文は変えず、赤だけ消して履歴に残す。"""
+    with _LOCK, conn:
+        row = conn.execute("SELECT kind, payload FROM care_plans WHERE id = ?", (plan_id,)).fetchone()
+        d = json.loads(row["payload"])
+        for cell, where in _located_cells(d, row["kind"]):
+            if cell["id"] == item_id:
+                break
+        else:
+            raise KeyError(item_id)
+        if not cell["flag"] and not cell.get("words"):
+            return
+        _log(conn, plan_id, where, cell["text"], f"{cell['text']}（見比べて、これでいいとしました）")
+        cell.update(flag="", words=[])
+        _store(conn, plan_id, d)
+
+
+MARKS_VERSION = 2
+
+
+def refresh_marks(conn: sqlite3.Connection, s: Settings, plan_id: int) -> None:
+    """前の決まりで付けた見比べの印を、今の決まりで一度だけ見直す。AI は呼ばない。印は減るだけで、増やさない。"""
+    if not 0 < plan_id < 2 ** 63:  # 番号として使えない数は、無い物として扱う
+        return
+    row = conn.execute("SELECT user_id, kind, payload FROM care_plans WHERE id = ?", (plan_id,)).fetchone()
+    if row is None:
+        return
+    d = json.loads(row["payload"])
+    if d.get("marks_v") == MARKS_VERSION:
+        return
+    texts = _texts(conn, s, row["user_id"])
+    check = _Checker(texts, set(), set(), _name_parts(conn))
+    for cell, _ in _located_cells(d, row["kind"]):
+        flags = [x for x in (cell.get("flag") or "").split(" / ") if x]
+        if not any(x.startswith(COMPARE) for x in flags):
+            continue
+        kind = "text" if cell.get("file") in texts and texts.get(cell["file"]) is not None and cell.get("quote") else None
+        words = [w for w in check.extra(cell["text"], cell.get("quote", ""), cell.get("file", ""), kind) if w in cell_words(cell)]
+        rest = [x for x in flags if not x.startswith(COMPARE)]
+        cell["flag"] = " / ".join(rest + ([COMPARE + "、".join(words)] if words else []))
+        cell["words"] = words
+    d["marks_v"] = MARKS_VERSION
+    with _LOCK, conn:
         _store(conn, plan_id, d)
 
 

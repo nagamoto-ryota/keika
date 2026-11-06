@@ -1,11 +1,22 @@
 {% extends "base.html" %}
 {% block title %}{{ p.title }}の下書き - {{ user.name }} - ケイカ{% endblock %}
-{% macro cell(c, label) %}<div class="cell-box{{ ' blank-cell' if c.text == '〇〇' }}{{ ' flagged' if c.flag }}">
+{% macro cell(c, label) %}{% set srcs = c.sources if c.sources else ([c] if c.quote else []) %}<div class="cell-box{{ ' blank-cell' if c.text == '〇〇' }}{{ ' flagged' if c.flag }}" id="cell-{{ c.id }}">
+  {% if srcs or c.flag %}
+  <details class="cell-more">
+    <summary class="cell-text">{{ c.text|marked(c) }}</summary>
+    <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>
+{{ c.text }}</textarea>
+    <div class="cell-why no-print">
+      {% for src in srcs %}<p class="cell-src">元の書類: {% if src.file and src.file != records_name %}<a href="/doc?path={{ src.file|urlencode }}">{{ src.file.rsplit('/', 1)[-1] }}</a>{% else %}支援経過{% endif %}「{{ src.quote }}」</p>{% endfor %}
+      {% if c.flag %}<p class="draft-flag">{{ mark_reason(c) }}</p>
+      {% if not sample %}<form method="post" action="/careplans/{{ p.id }}/ok" class="flush-first cell-ok"><input type="hidden" name="item" value="{{ c.id }}"><button class="ok-button">これでいい</button></form>{% endif %}{% endif %}
+    </div>
+  </details>
+  {% else %}
   <textarea class="sheet-cell" data-item="{{ c.id }}" aria-label="{{ label }}" rows="1"{{ ' readonly' if sample }}>
 {{ c.text }}</textarea>
+  {% endif %}
   <div class="cell-print">{{ c.text }}</div>
-  {% if c.flag %}<p class="draft-flag no-print">{{ c.flag }}</p>{% endif %}
-  {% for src in (c.sources if c.sources else ([c] if c.quote else [])) %}<details class="no-print"><summary class="muted">元の書類</summary>{% if src.file and src.file != records_name %}<a href="/doc?path={{ src.file|urlencode }}">{{ src.file.rsplit('/', 1)[-1] }}</a>{% else %}支援経過{% endif %}: {{ src.quote }}</details>{% endfor %}
 </div>{% endmacro %}
 {% macro lines(key, label) %}{% for c in p.sections[key] %}{{ cell(c, label) }}{% endfor %}{% if not sample %}<div class="line-add no-print"><form method="post" action="/careplans/{{ p.id }}/lines" class="flush-first"><input type="hidden" name="key" value="{{ key }}"><button class="plain small">行を足す</button></form></div>{% endif %}{% endmacro %}
 {% macro section_row(key) %}<tr><th>{{ p.headings[key] }}</th><td>{{ lines(key, p.headings[key]) }}</td></tr>{% endmacro %}
