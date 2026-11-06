@@ -101,7 +101,7 @@ def test_user_page_shows_extracted_points_with_source(client, conn, settings):
 def test_user_page_shows_records_with_written_at(client, conn):
     add_record(conn, RecordIn(user_id="U04", event_date="2026-11-01", kind_written="訪問", kind_read="電話", body="電話で確認した。"))
     body = client.get("/users/U04").text
-    assert "電話で確認した。" in body and "未確認" in body
+    assert "電話で確認した。" in body and "未読" in body and "記入:" in body  # 11/6 から印は「未読」
 
 
 def test_user_page_shows_finding_with_basis_and_confirm_wording(client, conn):

@@ -68,7 +68,7 @@
       <div class="head">
         <strong>{{ r.event_date|hdate }}</strong>
         <span class="muted">{{ r.kind_read or r.kind_written }}{% if r.partner %}・{{ r.partner }}{% endif %}</span>
-        {% if r.unchecked %}<span class="pill todo">未確認</span>{% endif %}
+        {% if r.unchecked %}<span class="pill todo" title="ケイカが自動で入れて、まだ人が読んでいない記録です">未読</span>{% endif %}
         {% if r.id in med_waiting %}<span class="pill finding">薬の名前が未確認</span>{% endif %}
         {% if r.kind_read and r.kind_written and r.kind_read not in r.kind_written and '訪問' in r.kind_written %}<span class="pill finding">種別は「{{ r.kind_written }}」</span>{% endif %}
       </div>
@@ -76,9 +76,8 @@
       <div class="record-links small">
         {% if r.unchecked %}<form method="post" action="/records/{{ r.id }}/checked"><button class="plain">読んだ</button></form>{% endif %}
         <a href="/records/{{ r.id }}/edit">直す</a>
-        <a href="/records/{{ r.id }}/history">履歴</a>
         <a href="/records/{{ r.id }}/share">共有</a>
-        <span class="muted">記入: {{ r.first_written_at[:16].replace('T', ' ') if r.first_written_at else '不明（取り込み）' }}</span>
+        {% if r.first_written_at %}<span class="muted">記入: {{ r.first_written_at[:16].replace('T', ' ') }}</span>{% endif %}
       </div>
     </article>
   {% else %}

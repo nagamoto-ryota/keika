@@ -73,10 +73,10 @@ def test_unknown_record_gives_404(env):
     assert client.post("/records/99999/checked").status_code == 404
 
 
-def test_user_page_links_to_edit_and_history(env):
+def test_user_page_links_to_edit_but_not_history(env):
     s, c, r, client = env
-    body = client.get("/users/U04").text
-    assert f"/records/{r.id}/edit" in body and f"/records/{r.id}/history" in body and f"/records/{r.id}/checked" in body
+    body = client.get("/users/U04").text  # 履歴の画面は案内しない（11/6 方針。データは残す）
+    assert f"/records/{r.id}/edit" in body and f"/records/{r.id}/history" not in body and f"/records/{r.id}/checked" in body
 
 
 def test_tests_never_see_a_real_key():
