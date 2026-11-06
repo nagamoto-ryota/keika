@@ -192,3 +192,11 @@ def test_an_older_draft_without_the_new_fields_still_opens_and_saves_to_word(env
     web = TestClient(create_app(s))
     assert web.get(f"/drafts/{d.id}").status_code == 200
     assert web.get(f"/drafts/{d.id}/docx").status_code == 200
+
+
+def test_only_short_term_goals_are_used_when_the_plan_marks_them(env):
+    s, c = env
+    with_plan(s, c, goals=["長期: 在宅生活を続ける", "短期: 自分で歩いて庭に出る", "長期: 外出の機会を保てる", "短期: 週2回デイに通い人と話す"])
+    d, client = make(s, c, wire())
+    assert [i["text"].split(": ")[0] for i in d.sections["achievement"]] == ["自分で歩いて庭に出る", "週2回デイに通い人と話す"]
+    assert "外出の機会" not in json.dumps(client.calls[0], ensure_ascii=False, default=str)

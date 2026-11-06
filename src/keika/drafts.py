@@ -35,6 +35,7 @@ NOT_DISCUSSED = "話に出ていない（次回確かめる）"  # 満足度が�
 NO_PLAN_GOALS = "ケアプランの目標が読めないため、判断できない（計画書を確かめる）"
 CANNOT_JUDGE = "判断できない"
 MAX_GOALS = 10
+_SHORT_GOAL = re.compile(r"^\s*短期(?:目標)?\s*[:：]\s*")
 HOMEWORK_SECTION = {"meeting": "remaining", "monitoring": "next"}  # やることへ載せる欄
 _NOTHING = re.compile(r"(特に)?(なし|無し|ありません|ない)。?")
 _NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
@@ -240,8 +241,9 @@ def plan_goals(conn: sqlite3.Connection, s: Settings, user: Any) -> list[str]:
     except Exception:  # 書類が読めなくても下書きは作る。目標は「判断できない」にする
         return []
     plan = _latest_plan(facts)
-    goals = [g.text.strip() for g in plan[1].goals if g.text.strip()] if plan else []
-    return list(dict.fromkeys(goals))[:MAX_GOALS]
+    goals = list(dict.fromkeys(g.text.strip() for g in plan[1].goals if g.text.strip())) if plan else []
+    short = [_SHORT_GOAL.sub("", g) for g in goals if _SHORT_GOAL.match(g)]  # 長期と短期が分かる時は、短期目標ごとに見る
+    return (short or goals)[:MAX_GOALS]
 
 
 def _achievement_items(wire: "WireDraft", goals: list[str], text: str, names: list[str], kana_names: str) -> tuple[list[tuple[str, dict]], list[dict]]:
