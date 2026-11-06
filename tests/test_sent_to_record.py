@@ -210,6 +210,6 @@ def test_mail_cards_come_first_in_the_asks_newest_first(env):
     to_review(c, "電話で話した2。", "voice2.txt", entry | {"body": "電話で話した2。"}, [], "")
     to_review(c, "返事", "mail_reply", entry | {"body": "新しい方の返事の案です。"}, [], "")
     html = TestClient(create_app(s)).get("/").text
-    asks = html.split("聞くこと")[1]
+    asks = html.split("あなたの番")[1]  # 11/6 見出しを「あなたの番」に
     at = [asks.index(x) for x in ("新しい方の返事の案です。", "古い方のメールの案です。", "電話で話した2。")]
     assert at == sorted(at)

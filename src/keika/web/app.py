@@ -301,7 +301,16 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         picked, more = pick_asks(conn, s, keys, write=not sample)
         mine = {u.id for u in list_users(conn, cm=cm)} if cm else None
         since = opened_since(conn, write=not sample)
+        offers, seen = [], set()
+        for person in board.people:  # 指摘カードの「次の一手」を、入口でも1行で出す。押した時の動きは利用者の画面と同じ
+            for task in person.tasks:
+                offer = offer_for(task.item.finding.rule_id) if task.item else None
+                if offer and (person.user.id, offer["purpose"]) not in seen and not offer_skipped(conn, task.item.fingerprint):
+                    seen.add((person.user.id, offer["purpose"]))
+                    offers.append({"user_id": person.user.id, "name": person.user.name, "fp": task.item.fingerprint, "text": offer["text"].split("。")[0] + "。メールを作ります"})
+        visit_users = board.visit_waiting or list_users(conn, cm=cm)
         return templates.TemplateResponse(request, "home.html", {
+            "offers": offers, "ask_count": len(keys), "visit_users": visit_users,
             "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn), "user_names": {u.id: u.name for u in list_users(conn)},
             "mail_lines": home_lines(conn, mine), "new_records": new_records(conn, since, mine), "max_new": MAX_NEW_ROWS, "deadlines": deadline_lines(board, s),
             "reviews": [it for it in reviews if f"r{it['id']}" in picked], "drafts": [row for row in waiting if f"d{row[0].id}" in picked], "more": more,

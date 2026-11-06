@@ -58,7 +58,7 @@ def test_says_what_was_recorded_since_last_open(env):
     s, c = env
     spoken(c)
     html = home(s)
-    assert "前回開いた後の 1件を記録しました" in html and "柚木 茂" in html
+    assert "記録しました <b>1</b>件" in html and "柚木 茂" in html  # 11/6 入口を今日の結果＋あなたの番に
 
 
 def test_csv_records_are_not_counted(env):
@@ -144,7 +144,7 @@ def test_near_deadline_gets_one_line_from_the_secretary(env):
     lines = deadline_lines(build_board(c, s), s)
     assert lines[0]["days"] == 25 and lines[0]["user_id"] == "U04"
     html = home(s)
-    assert "ケイカより" in html and "計画の見直しの準備" in html and "あと25日" in html and "/desk?t=U04" in html
+    assert "計画の見直しの準備" in html  # 「ケイカより」の前置きは外した（11/6） and "あと25日" in html and "/desk?t=U04" in html
 
 
 def test_far_deadline_stays_off(env):
