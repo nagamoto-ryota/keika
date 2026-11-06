@@ -5,7 +5,7 @@
 <h1>{{ user.name }} <small>{{ user.data.get('care_level', '') }}</small></h1>
 
 <div class="steps">
-  {% for c in cells %}<span class="chk {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status in ('todo', 'check') %}！{% elif c.status == 'unknown' %}?{% else %}—{% endif %} {{ c.label }}</span>{% endfor %}
+  {% for c in cells %}<span class="chk {{ c.status }}" id="step-{{ c.key }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status in ('todo', 'check') %}！{% elif c.status == 'unknown' %}?{% else %}—{% endif %} {{ c.label }}<span class="step-why">（{{ c.note or ('書類が見つかりません' if c.status == 'todo' else '中身を確かめてください' if c.status == 'check' else c.date|hdate if c.status == 'done' else 'まだ点検していません') }}）</span></span>{% endfor %}
 </div>
 
 <section id="forms" class="form-shelf no-print">

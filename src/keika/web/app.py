@@ -181,6 +181,15 @@ NAV_SECTIONS = (
 SENT_CHECK_GAP = 60  # 送ったかを見るのは、入口を開いた時に1分に1回まで
 
 
+def progress_link(user_id: str, cell: Any, docs: set[str]) -> str:
+    """一覧の表のマスから開く先。根拠の書類がその人の物なら左に実物を開き、無ければその人の画面の項目へ。「—」は開かない。"""
+    if cell.status == "na":
+        return ""
+    if cell.file and cell.file in docs and cell.status in ("done", "check", "unknown"):
+        return f"/desk?t={quote(user_id)}&doc={quote(cell.file)}"
+    return f"/users/{quote(user_id)}#step-{cell.key}"
+
+
 def nav_section(path: str) -> str | None:
     """上のメニューのどれを今いる画面として見せるか。"""
     if path == "/":
@@ -202,6 +211,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["as_of"] = s.as_of
     templates.env.globals["nav_section"] = nav_section
+    templates.env.globals["progress_link"] = progress_link
     templates.env.globals["finding_where"] = finding_where
     templates.env.globals["sample"] = sample
     templates.env.globals["legal"] = basis_for
@@ -891,7 +901,8 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         rows = [_dashboard_row(conn, s, u, month) for u in list_users(conn, cm=cm)]
         staff = list_people(conn, "staff")
         summary = _summary(conn, staff, rows) if not cm else []
-        return templates.TemplateResponse(request, "board.html", {"rows": rows, "staff": staff, "cm": cm, "summary": summary, "steps": STEPS, "med_waiting_users": {m.record.user_id for m in open_checks(conn, s)}})
+        docs = {r.user.id: {d.rel_path for d in user_refs(conn, s, r.user)} for r in rows}  # 開いてよいのは、その人の書類だけ
+        return templates.TemplateResponse(request, "board.html", {"rows": rows, "staff": staff, "cm": cm, "summary": summary, "steps": STEPS, "docs": docs, "med_waiting_users": {m.record.user_id for m in open_checks(conn, s)}})
 
     @app.get("/users/{user_id}")
     @one_view_route
