@@ -494,3 +494,8 @@ mark.cmp { background: #fdeceb; color: #b3261e; font-weight: 700; padding: 0 1px
 .home-visit { margin: 12px 0; }
 .home-done { margin: 8px 0; }
 .home-done > summary { cursor: pointer; }
+
+/* その人の画面の窓口（11/6） */
+.person-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.person-actions a { padding: 6px 12px; border: 1px solid var(--line, #ccc); border-radius: 999px; text-decoration: none; color: inherit; background: var(--card, #fff); }
+.person-actions a:hover { background: var(--accent-soft, #eef5f1); }

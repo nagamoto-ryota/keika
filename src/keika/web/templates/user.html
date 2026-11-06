@@ -4,24 +4,35 @@
 {% block main %}
 <h1>{{ user.name }} <small>{{ user.data.get('care_level', '') }}</small></h1>
 
+{# この人の事は、この画面から全部行ける。行き先は今までと同じ URL #}
+<nav class="person-actions no-print" aria-label="{{ user.name }}さんの事">
+  <a href="#kiroku">記録</a>
+  <a href="/desk?t={{ user.id }}">AI相談</a>
+  <a href="#form-plan">ケアプラン</a>
+  <a href="#form-assessment">アセスメント</a>
+  <a href="#form-monitoring">モニタリング</a>
+  <a href="{{ '/desk/' ~ user.id ~ '/mail/' ~ open_mail if open_mail else '/desk?t=' ~ user.id }}">メール</a>
+  <a href="/users/{{ user.id }}/visit">訪問前の1枚</a>
+</nav>
+
 <div class="steps">
   {% for c in cells %}<span class="chk {{ c.status }}" id="step-{{ c.key }}" title="{{ c.date|hdate }} {{ c.note }}">{% if c.status == 'done' %}✓{% elif c.status in ('todo', 'check') %}！{% elif c.status == 'unknown' %}?{% else %}—{% endif %} {{ c.label }}<span class="step-why">（{{ c.note or ('書類が見つかりません' if c.status == 'todo' else '中身を確かめてください' if c.status == 'check' else c.date|hdate if c.status == 'done' else 'まだ点検していません') }}）</span></span>{% endfor %}
 </div>
 
 <section id="forms" class="form-shelf no-print">
   <h2>帳票</h2>
-  <div class="shelf-row"><span class="shelf-name">ケアプラン</span><span class="shelf-items">
+  <div class="shelf-row" id="form-plan"><span class="shelf-name">ケアプラン</span><span class="shelf-items">
     {% for p in care_plans %}<a href="/careplans/{{ p.id }}">{{ p.title }}（{{ p.created_at[:10]|hdate }}{% if p.edits %}、手直し {{ p.edits }} 件{% endif %}）</a>{% endfor %}
     {% if not sample %}<form method="post" action="/users/{{ user.id }}/careplan" class="shelf-make" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='作っています（2分ほど）';"><button class="plain">{{ '新しく作る' if care_plans else '下書きを作る' }}</button> <span class="small muted">AI の案です。確定は人が行います</span></form>{% endif %}
   </span></div>
   <div class="shelf-row"><span class="shelf-name">会議録</span><span class="shelf-items">
     {% for d in drafts if d.kind == 'meeting' %}<a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}{% else %}<span class="muted small">会議の記録が入ると作れます</span>{% endfor %}
   </span></div>
-  <div class="shelf-row"><span class="shelf-name">モニタリング</span><span class="shelf-items">
+  <div class="shelf-row" id="form-monitoring"><span class="shelf-name">モニタリング</span><span class="shelf-items">
     {% for d in drafts if d.kind != 'meeting' %}<a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}{% else %}<span class="muted small">訪問の記録が入ると作れます</span>{% endfor %}
   </span></div>
   <div class="shelf-row"><span class="shelf-name">訪問前の1枚</span><span class="shelf-items"><a href="/users/{{ user.id }}/visit">開く</a></span></div>
-  <div class="shelf-row"><span class="shelf-name">アセスメント</span><span class="shelf-items">
+  <div class="shelf-row" id="form-assessment"><span class="shelf-name">アセスメント</span><span class="shelf-items">
     {% if assessment %}<a href="/desk?t={{ user.id }}&amp;doc={{ assessment|urlencode }}">今の書類を見る</a>{% endif %}
     {% for p in assessments %}<a href="/careplans/{{ p.id }}">下書き（{{ p.created_at[:10]|hdate }}{% if p.edits %}、手直し {{ p.edits }} 件{% endif %}）</a>{% endfor %}
     {% if not sample %}<form method="post" action="/users/{{ user.id }}/assessment" class="shelf-make" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='作っています（2分ほど）';"><button class="plain">{{ '新しく作る' if assessments else '下書きを作る' }}</button> <span class="small muted">AI の案です。確定は人が行います</span></form>{% endif %}
@@ -61,7 +72,7 @@
   {% endif %}
 </section>
 
-<section>
+<section id="kiroku">
   <h2>支援経過</h2>
   {% for r in records %}
     <article class="record">

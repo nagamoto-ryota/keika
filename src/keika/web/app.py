@@ -966,6 +966,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             "drafts": list_drafts(conn, user_id, status=None),
             "care_plans": [p for p in list_care_plans(conn, user_id) if p.kind != "assessment"],
             "assessments": [p for p in list_care_plans(conn, user_id) if p.kind == "assessment"],
+            "open_mail": (lambda r: r["mail_id"] if r else None)(conn.execute("SELECT mail_id FROM mail_out WHERE user_id = ? AND state = 'open' ORDER BY mail_id DESC", (user_id,)).fetchone()),
             "assessment": max([r.rel_path for r, f in facts if f.doc_type == "アセスメント"] + [r.rel_path for r in user_refs(conn, s, user) if "アセスメント" in r.rel_path.rsplit("/", 1)[-1]], default=""),
         })
 
