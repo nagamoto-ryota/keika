@@ -208,6 +208,9 @@ def nav_section(path: str) -> str | None:
     return next((to for start, to in NAV_SECTIONS if path == start or path.startswith(start.rstrip("/") + "/")), None)
 
 
+_FALL_WORDS = re.compile(r"転倒|転ん|転び|転ぶ|尻もち|こけ")
+
+
 def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False, gmail_factory: Callable[[], Any] | None = None) -> FastAPI:
     app = FastAPI(title="ケイカ")
     gmail_factory = gmail_factory or (lambda: gmail_draft.connected(s))
@@ -399,7 +402,13 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         user = get_user(conn, thread) if thread != ALL else None
         records = list(reversed(list_records(conn, thread))) if user else []
         docs = [r.rel_path for r in user_refs(conn, s, user)] if user else []
-        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs, "open_file": doc if doc in docs else "", "question": _desk_question(thread, about) if user else ""})
+        if not user:
+            example = "例: 今週の段取りを一緒に考えたい"
+        elif any(_FALL_WORDS.search(r.body or "") for r in records):  # 例文はその人の記録に合う物だけ
+            example = "例: 夜の転倒が続いてる。計画で足りない所を一緒に考えたい"
+        else:
+            example = "例: 最近の記録から、次の訪問で確かめることを一緒に考えたい"
+        return templates.TemplateResponse(request, "desk.html", {"thread": thread, "user": user, "users": list_users(conn), "records": records, "docs": docs, "open_file": doc if doc in docs else "", "question": _desk_question(thread, about) if user else "", "example": example})
 
     def _desk_question(thread: str, about: str) -> str:
         """項目から来た時に、入力欄へ入れておく文。送るのは人。"""

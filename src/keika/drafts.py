@@ -28,12 +28,17 @@ NEARBY = 60  # 1文が前後の発言をまとめることがあるので、数�
 KINDS = {"meeting": "サービス担当者会議の要点", "monitoring": "モニタリングの記録"}
 SECTIONS = {
     "meeting": {"items": "検討した項目", "discussion": "検討内容", "conclusion": "結論", "remaining": "残された課題（次回の開催時期）"},
-    "monitoring": {"condition": "本人・家族の様子", "services": "サービスの利用状況", "goals": "目標に対する変化", "plan_change": "計画を変える必要の有無", "next": "次に確かめること"},
+    "monitoring": {"condition": "本人・家族の様子", "services": "サービスの利用状況", "satisfaction": "満足度", "goals": "目標に対する変化", "achievement": "目標の達成状況",
+                   "plan_change": "計画を変える必要の有無", "next": "次に確かめること"},
 }
+NOT_DISCUSSED = "話に出ていない（次回確かめる）"  # 満足度が話に無い時。推測で埋めない
+NO_PLAN_GOALS = "ケアプランの目標が読めないため、判断できない（計画書を確かめる）"
+CANNOT_JUDGE = "判断できない"
+MAX_GOALS = 10
 HOMEWORK_SECTION = {"meeting": "remaining", "monitoring": "next"}  # やることへ載せる欄
 _NOTHING = re.compile(r"(特に)?(なし|無し|ありません|ない)。?")
 _NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
-SectionKey = Literal["items", "discussion", "conclusion", "remaining", "condition", "services", "goals", "plan_change", "next"]
+SectionKey = Literal["items", "discussion", "conclusion", "remaining", "condition", "services", "satisfaction", "goals", "plan_change", "next"]
 
 
 class WireItem(BaseModel):
@@ -53,12 +58,26 @@ class WireAttendee(BaseModel):
     quote: str = Field(description="その人が出席していると分かる発言をそのまま")
 
 
+class WireAchievement(BaseModel):
+    goal_no: int = Field(description="渡したケアプランの目標の番号")
+    status: Literal["達成", "一部達成", "未達成", "判断できない"]
+    reason: str = Field(description="根拠の一言。話に出たことだけ")
+    quote: str = Field(description="根拠になった発言を、文字起こしからそのまま抜き出す。判断できない時は空文字")
+
+
 class WireDraft(BaseModel):
     place: str = Field(description="開催場所や訪問先。文字起こしの言葉のまま。話に無ければ空文字")
     start_time: str = Field(description="開始時刻 HH:MM。話に無ければ空文字。文字起こしの経過時間は時刻ではない")
     end_time: str = Field(description="終了時刻 HH:MM。話に無ければ空文字")
     attendees: list[WireAttendee]
     sections: list[WireSection]
+    achievements: list[WireAchievement] = Field(default_factory=list, description="モニタリングの時だけ。ケアプランの目標ごとの達成状況。会議では空")
+
+
+MONITORING_RULES = """## モニタリングの欄の書き方
+- satisfaction（満足度）: 本人と家族の、サービスへの満足や不満。文字起こしにある言葉だけを根拠にする。話に出ていなければ items を空にする。推測で埋めない。
+- achievements（目標の達成状況）: 下の「ケアプランの目標」の番号ごとに、達成 / 一部達成 / 未達成 / 判断できない のどれかと、根拠の一言を書く。
+  話に根拠が無い目標は「判断できない」にし、quote は空にする。目標が無い時は achievements を空にする。"""
 
 
 SYSTEM = """日本の介護支援専門員が使う書類の下書きを、会議や訪問の文字起こしから作ります。下書きは人が確かめて直します。
@@ -102,7 +121,8 @@ class Draft:
 
     @property
     def headings(self) -> dict[str, str]:
-        return SECTIONS[self.kind]
+        """欄を足す前に作った下書きは、持っている欄だけを出す。"""
+        return {k: v for k, v in SECTIONS[self.kind].items() if k in self.sections}
 
     @property
     def flagged(self) -> int:
@@ -210,16 +230,56 @@ def _blank_item(number: int) -> dict:
     return {"id": f"i{number}", "text": BLANK, "quote": "", "flag": ""}
 
 
+def plan_goals(conn: sqlite3.Connection, s: Settings, user: Any) -> list[str]:
+    """その人の一番新しいケアプランの目標。読み取り済みの事実から取るので、AI は呼ばない。"""
+    from keika.machine_checks import _latest_plan, belongs_to, user_refs
+    from keika.reading import stored_facts
+
+    try:
+        facts = [(r, f) for r, f in stored_facts(conn, user_refs(conn, s, user)) if belongs_to(f, user)]
+    except Exception:  # 書類が読めなくても下書きは作る。目標は「判断できない」にする
+        return []
+    plan = _latest_plan(facts)
+    goals = [g.text.strip() for g in plan[1].goals if g.text.strip()] if plan else []
+    return list(dict.fromkeys(goals))[:MAX_GOALS]
+
+
+def _achievement_items(wire: "WireDraft", goals: list[str], text: str, names: list[str], kana_names: str) -> tuple[list[tuple[str, dict]], list[dict]]:
+    """目標ごとの達成状況。目標の言葉はケアプランのものを使い、AI の書いた目標は使わない。"""
+    if not goals:
+        return [("", {"text": NO_PLAN_GOALS, "quote": "", "flag": ""})], []
+    said = {a.goal_no: a for a in wire.achievements if 1 <= a.goal_no <= len(goals)}
+    out, held = [], []
+    for no, goal in enumerate(goals, start=1):
+        a = said.get(no)
+        if a is None or a.status == CANNOT_JUDGE:
+            reason = (a.reason.strip() if a and a.reason.strip() and _quote_ok(a.reason.strip(), text) else "話に出ていない")
+            out.append(("", {"text": f"{goal}: {CANNOT_JUDGE}（{reason}）", "quote": "", "flag": ""}))
+            continue
+        checked, kept_back = _checked_item(WireItem(text=a.reason, quote=a.quote), text, names, kana_names)
+        if kept_back:
+            held.append(kept_back)
+            out.append(("", {"text": f"{goal}: {CANNOT_JUDGE}（話に出ていない）", "quote": "", "flag": ""}))
+            continue
+        out.append(("", {**checked, "text": f"{goal}: {a.status}（{checked['text'].rstrip('。')}）"}))
+    return out, held
+
+
 def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Any, text: str, source: str, review_id: int | None = None) -> int | None:
     """失敗しても記録は残るので、下書きが無いだけにする。"""
     kind = draft_kind(record)
     user = get_user(conn, record.user_id)
     if kind is None or user is None:
         return None
-    wanted = "、".join(f"{key}={label}" for key, label in SECTIONS[kind].items())
+    wanted = "、".join(f"{key}={label}" for key, label in SECTIONS[kind].items() if key != "achievement")
+    goals = plan_goals(conn, s, user) if kind == "monitoring" else []
+    extra = ""
+    if kind == "monitoring":
+        listed = "\n".join(f"{n}. {g}" for n, g in enumerate(goals, start=1)) or "（読めるケアプランがありません）"
+        extra = f"{MONITORING_RULES}\n\n## ケアプランの目標\n{listed}\n\n"
     prompt = (
         f"作る書類: {KINDS[kind]}\n利用者: {user.name}\n出来事の日: {record.event_date}\n使う欄の key: {wanted}\n\n"
-        f"## 台帳\n{_roster(conn)}\n\n## 文字起こし\n{text}"
+        f"{extra}## 台帳\n{_roster(conn)}\n\n## 文字起こし\n{text}"
     )
     try:
         wire = ask_structured(client, SYSTEM, [{"type": "text", "text": prompt}], WireDraft, model=model_for("INTAKE"))
@@ -239,6 +299,15 @@ def make_draft(conn: sqlite3.Connection, client: Any, s: Settings, record: Any, 
                 else:
                     counter += 1
                     sections[section.key].append({"id": f"i{counter}", **checked})
+        if kind == "monitoring":
+            found, kept = _achievement_items(wire, goals, text, names, kana_names)
+            held += kept
+            for _, item in found:
+                counter += 1
+                sections["achievement"].append({"id": f"i{counter}", **item})
+            if not sections["satisfaction"]:
+                counter += 1
+                sections["satisfaction"].append({"id": f"i{counter}", "text": NOT_DISCUSSED, "quote": "", "flag": ""})
         for key, items in sections.items():
             if not items:
                 counter += 1
@@ -443,7 +512,7 @@ def to_docx(draft: Draft, user_name: str, author: str) -> bytes:
                 cell.text = clean(value)
     for key, label in draft.headings.items():
         doc.add_heading(label, level=2)
-        for item in draft.sections[key]:
+        for item in draft.sections.get(key, []):
             doc.add_paragraph(clean(("【確かめる】" if item["flag"] else "") + item["text"]))
     out = io.BytesIO()
     doc.save(out)
@@ -456,5 +525,5 @@ def plain_text(draft: Draft, user_name: str) -> str:
     lines = [draft.title, f"利用者: {user_name}", f"日: {draft.event_date}", f"場所: {draft.place}", f"時間: {when}", "出席者:"]
     lines += [f"  {a['org']} {a['role']} {a['name']}".rstrip() for a in draft.attendees]
     for key, label in draft.headings.items():
-        lines += ["", f"【{label}】"] + [("【確かめる】" if i["flag"] else "") + i["text"] for i in draft.sections[key]]
+        lines += ["", f"【{label}】"] + [("【確かめる】" if i["flag"] else "") + i["text"] for i in draft.sections.get(key, [])]
     return "\n".join(lines)
