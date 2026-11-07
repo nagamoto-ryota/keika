@@ -2,7 +2,7 @@
 {% block title %}進み具合の一覧 - ケイカ{% endblock %}
 {% block main %}
 {% with tab = 'board' %}{% include "_list_tabs.html" %}{% endwith %}
-<p class="muted">今の計画の進み具合です。「まだ」は書類が見つからない物、「確認」は書類はあるけれど中身を確かめたい物です。印を押すと、その人の書類（無い時はその人の画面の項目）が開きます。</p>
+<p class="muted">今の計画の進み具合です。「まだ」は書類が見つからない物、「確認」は書類はあるけれど中身を確かめたい物です。「?」はケイカでは判断できない物（書類が読めない、まだ点検していないなど）、「—」はその人には対象外の物（医療系のサービスが無い、予防なので毎月の訪問が要らないなど）です。印に指を乗せると理由が出ます。印を押すと、その人の書類（無い時はその人の画面の項目）が開きます。</p>
 <div class="tabs">
   <a href="/board" class="{{ 'on' if not cm }}">全員</a>
   {% for p in staff %}<a href="/board?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}

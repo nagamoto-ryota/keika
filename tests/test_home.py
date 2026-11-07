@@ -106,7 +106,7 @@ def test_page_shows_at_most_the_limit_and_says_how_many_more(env):
     for n in range(DAILY_ASKS + 2):
         card(c, n)
     html = home(s)
-    assert html.count('data-compare="/review/') == DAILY_ASKS and "あと 2件" in html
+    assert html.count('data-compare="/review/') == DAILY_ASKS and "ほかに 2件" in html  # 11/7 言い方を変えた
 
 
 def test_review_card_is_answerable_on_the_page(env):

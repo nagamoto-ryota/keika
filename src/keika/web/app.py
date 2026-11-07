@@ -52,7 +52,7 @@ from keika.records import KindRead, RecordIn, add_record, edit_record, get_recor
 from keika.responses import Item, respond, silenced_counts, silenced_list, sort_findings
 from keika.rules import basis_text, get_rule
 from keika.files import one_view
-from keika.home import MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
+from keika.home import DAILY_ASKS, MAX_NEW_ROWS, deadline_lines, new_records, opened_since, pick_asks, unchecked_count
 from keika.outbox import Blocked, candidates as mail_candidates, drop_mail, edit_mail, home_lines, make_share, med_ok, out_row, out_view, propose, recipients, send_mail, sent_list
 from keika.secretary import ALL, answer_question, get_mail, made_list, mark_mail_ok, open_source, revise_mail, others_in_text, start_question, thread_messages, threads_state
 from keika.tasks import build_board, finding_where, person_lines
@@ -310,7 +310,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
                     offers.append({"user_id": person.user.id, "name": person.user.name, "fp": task.item.fingerprint, "text": offer["text"].split("。")[0] + "。メールを作ります"})
         visit_users = board.visit_waiting or list_users(conn, cm=cm)
         return templates.TemplateResponse(request, "home.html", {
-            "offers": offers, "ask_count": len(keys), "visit_users": visit_users,
+            "offers": offers, "daily": DAILY_ASKS, "visit_users": visit_users,
             "staff": list_people(conn, "staff"), "cm": cm, "users": list_users(conn), "user_names": {u.id: u.name for u in list_users(conn)},
             "mail_lines": home_lines(conn, mine), "new_records": new_records(conn, since, mine), "max_new": MAX_NEW_ROWS, "deadlines": deadline_lines(board, s),
             "reviews": [it for it in reviews if f"r{it['id']}" in picked], "drafts": [row for row in waiting if f"d{row[0].id}" in picked], "more": more,

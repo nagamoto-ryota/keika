@@ -119,13 +119,56 @@ def test_visit_sheet_is_one_click_from_home_and_from_the_board(env):
 
 
 
-def test_cards_come_before_offers_and_offers_are_at_most_three(env):
+
+def draft_with_checks(s, c):
+    from keika.drafts import WireDraft as WD, WireItem as WI, WireSection as WS, make_draft
+    from test_reading import FakeClient, answer
+    r = add_record(c, RecordIn(user_id="U04", event_date="2026-11-05", kind_read="居宅訪問", monitoring=True, body="話した。"))
+    w = WD(place="", start_time="", end_time="", attendees=[], sections=[WS(key="services", items=[WI(text="デイは週3回のまま続ける。", quote="デイは週2回のまま続けます")])])
+    return make_draft(c, FakeClient(answer(w)), s, r, "デイは週2回のまま続けます。", "話.txt")
+
+
+def tiles(html):
+    import re
+    top = html.split('class="home-summary"')[1].split("</div>")[0]
+    return {m[0]: (m[1], int(m[2])) for m in re.findall(r'href="#([^"]+)"[^>]*>([^<]+)<b>(\d+)</b>', top)}
+
+
+def rows(html, group):
+    part = html.split(f'id="{group}"')[1].split('<!-- /group -->')[0]
+    return part.count('class="turn-row')
+
+
+def test_each_top_number_equals_the_rows_under_it(env):
     s, c = env
     card(c)
+    draft_with_checks(s, c)
+    deadline(c)
     for uid in ("U01", "U02", "U03", "U04", "U05"):
         save_run(c, uid, CheckRun(findings=[Finding(rule_id="R01", user_id=uid, kind="finding", period="2026-10", source="claude", message="担当者会議の記録が見当たりません。",
                                                     evidence=[Evidence(file="x.pdf", page=1, quote="月")])]))
-    turn = home(s).split("あなたの番")[1]
-    assert turn.count('action="/users/U0') - turn.count("/offer/skip") == 3
-    assert turn.index("data-compare=") < turn.index("/offer")
-    assert "ほか 2件" in turn
+    html = home(s)
+    got = tiles(html)
+    for group in ("kakunin-list", "mail-list", "kigen-list"):
+        assert group in got and got[group][1] == rows(html, group), group
+    assert got["kakunin-list"][1] == 2 and got["mail-list"][1] == 5  # 〔作って〕を待つ案も用意したメールに入れる
+
+
+def test_draft_row_does_not_use_the_same_word_as_the_top(env):
+    s, c = env
+    draft_with_checks(s, c)
+    part = home(s).split('id="kakunin-list"')[1].split('<!-- /group -->')[0]
+    assert "直す所" in part and "か所" in part and "確かめること" not in part
+
+
+def test_recorded_number_says_since_when(env):
+    s, c = env
+    assert "前回から記録しました" in home(s).split('class="home-summary"')[1].split("</div>")[0]
+
+
+def test_board_explains_every_mark_it_shows(env):
+    s, c = env
+    html = TestClient(create_app(s)).get("/board").text
+    lead = html.split('<p class="muted">今の計画の進み具合です。')[1].split("</p>")[0]
+    assert "「?」" in lead and "判断できない" in lead
+    assert "「—」" in lead and "対象外" in lead
