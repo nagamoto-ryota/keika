@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import threading
 from typing import Any
 
 from typing import Literal
@@ -153,12 +154,21 @@ def settle_draft(conn: sqlite3.Connection, client: Any, s: Settings, draft_id: i
         answers = {v.number: v.verdict for v in out.items}
     except Exception:  # 外部との境界。照らせなければ今までどおり人に聞く
         return
-    for n, item in enumerate(rows):
-        verdict = answers.get(n, ASK)
-        item["verdict"] = verdict
-        if verdict == SAID and not _is_medicine(item):
-            item["checked_flag"], item["flag"] = item["flag"], ""
-    _store(conn, draft_id, data)
+    asked = {item["id"]: (item["text"], item["flag"]) for item in rows}
+    with _WRITE:  # Claude を待つ間に人が直した文は、照らした時の文と違うので触らない
+        data = _load(conn, draft_id)
+        for n, (item_id, (text, flag)) in enumerate(asked.items()):
+            try:
+                _, item = _find(data, item_id)
+            except ValueError:
+                continue  # 人が消した
+            if item["text"] != text or item["flag"] != flag or "verdict" in item or "instructions" in item:
+                continue
+            verdict = answers.get(n, ASK)
+            item["verdict"] = verdict
+            if verdict == SAID and not _is_medicine(item):
+                item["checked_flag"], item["flag"] = item["flag"], ""
+        _store(conn, draft_id, data)
 
 
 def _around(quote: str, text: str) -> str:
@@ -173,6 +183,10 @@ def next_draft(conn: sqlite3.Connection, draft: Draft) -> int | None:
     left = [d for d in list_drafts(conn) if d.id != draft.id and count_left(conn, d)]
     left.sort(key=lambda d: (cm_of(d.user_id) != mine, d.id < draft.id, d.id))
     return left[0].id if left else None
+
+
+_WRITE = threading.Lock()  # Claude の答えを書き戻す時は、読み直してから書く
+CHANGED_MEANWHILE = "待つ間にこの文が直されたので、直した文を残しました。"
 
 
 def _load(conn: sqlite3.Connection, draft_id: int) -> dict:
@@ -238,10 +252,19 @@ def revise_item(conn: sqlite3.Connection, client: Any, s: Settings, draft_id: in
         return "薬の飲み方に関わる文になったので直しませんでした。本文のその文を押して、ご自身で直してください。"
     if added:
         return "、".join(f"「{w}」" for w in added) + "は、話にも書いた内容にも無いので直しませんでした。もう一度書いてください。"
-    item.update(changed=_what_changed(item["text"], new), text=new, instructions=told, flag=_MISSING + "、".join(now) if now else _RECHECK)
-    item.pop("verdict", None)
-    item["done"] = False
-    _store(conn, draft_id, data)
+    sent_text = item["text"]
+    with _WRITE:
+        data = _load(conn, draft_id)
+        try:
+            _, item = _find(data, item_id)
+        except ValueError:
+            return CHANGED_MEANWHILE
+        if item["text"] != sent_text:
+            return CHANGED_MEANWHILE
+        item.update(changed=_what_changed(item["text"], new), text=new, instructions=told, flag=_MISSING + "、".join(now) if now else _RECHECK)
+        item.pop("verdict", None)
+        item["done"] = False
+        _store(conn, draft_id, data)
     return ""
 
 
