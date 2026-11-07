@@ -1,0 +1,15 @@
+# 公開版（審査用）の動く版。手元の試験で全部が通った組み合わせに固定する
+anthropic==2.3.0
+fastapi==0.162.0
+starlette==1.10.0
+jinja2==3.1.6
+openpyxl==3.1.5
+pydantic==2.14.2
+pydantic_core==2.50.2
+pypdf==6.21.4
+python-docx==1.2.0
+python-multipart==0.0.33
+PyYAML==6.0.3
+uvicorn==0.54.0
+httpx==0.28.1
+lxml==6.1.3

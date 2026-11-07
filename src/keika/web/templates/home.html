@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}ケイカ{% endblock %}
+{% block main %}
+{% if staff|length > 1 %}
+<div class="tabs">
+  <a href="/" class="{{ 'on' if not cm }}">全員</a>
+  {% for p in staff %}<a href="/?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
+</div>
+{% endif %}
+
+{# 1. 今日の結果。上の数は、下の行の数と必ず同じ（押すとその行へ飛ぶ） #}
+{% set ask_rows = reviews|length + drafts|length %}
+{% set mail_rows = mail_lines|length + offers|length %}
+<div class="home-summary">
+  <a class="sum-tile done" href="#kiroku">前回から記録しました <b>{{ new_records|length }}</b>件</a>
+  <a class="sum-tile" href="#kakunin-list">確かめてほしいこと <b>{{ ask_rows }}</b>件</a>
+  <a class="sum-tile" href="#mail-list">用意したメール <b>{{ mail_rows }}</b>件</a>
+  <a class="sum-tile" href="#kigen-list">近い期限 <b>{{ deadlines|length }}</b>件</a>
+</div>
+
+{# 2. あなたの番。上の数ごとに分けて、1件1行で並べる #}
+<section class="person consult home-turn" id="anata">
+  {% if ask_rows or mail_rows or deadlines %}
+  <h2 id="kakunin">あなたの番</h2>
+  {% if ask_rows or more %}
+  <div class="turn-group" id="kakunin-list">
+    <h3>確かめてほしいこと <span class="muted small">{{ ask_rows }}件</span></h3>
+    {% if reviews %}<div class="compare-cards">{% set compact = true %}{% for it in reviews %}<div class="turn-row">{% include "_review_card.html" %}</div>{% endfor %}</div>{% endif %}
+    {% for d, left in drafts %}
+    <a class="turn-row task task-link" href="/drafts/{{ d.id }}#kakunin"><span class="dot"></span><span class="title">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</span><span class="opens">直す所 {{ left }}か所 ▸</span></a>
+    {% endfor %}
+    {% if more %}<p class="small muted">ほかに {{ more }}件あります。1日に出すのは {{ daily }}件までです。<a href="/todo">すべて見る</a></p>{% endif %}
+  </div><!-- /group -->
+  {% endif %}
+  {% if mail_rows %}
+  <div class="turn-group" id="mail-list">
+    <h3>用意したメール <span class="muted small">{{ mail_rows }}件</span></h3>
+    {% for m in mail_lines %}
+    <a class="turn-row task task-link" href="{{ m.url }}" title="根拠: {{ m.date|hdate }} の記録「{{ m.ground }}」"><span class="dot"></span><span class="title">{{ m.user_name }}さん: {{ m.text }}</span><span class="opens">見る ▸</span></a>
+    {% endfor %}
+    {% for o in offers %}
+    <div class="turn-row task turn-offer"><span class="dot"></span><span class="title">{{ o.name }}さん: {{ o.text }}</span>
+      <form method="post" action="/users/{{ o.user_id }}/offer" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（数十秒）';"><input type="hidden" name="fp" value="{{ o.fp }}"><button class="ok-button">作って</button></form>
+      <form method="post" action="/users/{{ o.user_id }}/offer/skip"><input type="hidden" name="fp" value="{{ o.fp }}"><button class="plain">今はいい</button></form>
+    </div>
+    {% endfor %}
+  </div><!-- /group -->
+  {% endif %}
+  {% if deadlines %}
+  <div class="turn-group" id="kigen-list">
+    <h3>近い期限 <span class="muted small">{{ deadlines|length }}件</span></h3>
+    {% for d in deadlines %}
+    <a class="turn-row task task-link turn-soon" href="/desk?t={{ d.user_id }}{% if d.about %}&about={{ d.about }}{% endif %}" title="{{ d.where }}"><span class="dot"></span><span class="title">{{ d.name }}さん: {{ d.title|hdate }} {{ d.deadline|hdate }} まで（{% if d.days >= 0 %}あと{{ d.days }}日{% else %}{{ -d.days }}日過ぎています{% endif %}）</span><span class="opens">ケイカに聞く ▸</span></a>
+    {% endfor %}
+  </div><!-- /group -->
+  {% endif %}
+  {% elif more %}
+  <h2 id="kakunin">今日の分は終わりました。</h2>
+  <p>あと {{ more }}件あります。急ぐ物ではありません。<a href="/todo">見る</a></p>
+  {% else %}
+  <h2 id="kakunin">あなたの番はありません。</h2>
+  {% endif %}
+</section>
+
+{# 3. 次の訪問。訪問時の聞き取りリストへ1回で行く #}
+{% if visit_users %}
+<p class="home-visit"><span class="muted small">次の訪問（訪問時の聞き取りリスト）</span>
+  {% for u in visit_users %}<a href="/users/{{ u.id }}/visit">{{ u.name }}</a>{% if not loop.last %} ／ {% endif %}{% endfor %}
+</p>
+{% endif %}
+
+<details class="home-done" id="kiroku">
+  <summary>前回から記録しました {{ new_records|length }}件</summary>
+  {% if new_records %}
+  <ul class="home-new">
+    {% for r in new_records[:max_new] %}<li><a href="/desk?t={{ r.user_id }}">{{ r.user_name }}</a> <span class="muted small">{{ r.event_date|hdate }} {{ r.kind }}</span></li>{% endfor %}
+    {% if new_records|length > max_new %}<li class="muted small">ほか {{ new_records|length - max_new }}件</li>{% endif %}
+  </ul>
+  {% else %}<p class="muted small">前回開いた後の新しい記録はありません。</p>{% endif %}
+</details>
+
+<p class="home-small small muted">
+  未確認の記録 {{ unchecked }}件（下書きです。最後に決めるのは人です）
+  ／ <a href="/todo">すべての項目 {{ total }}件</a>
+  ／ <a href="/board">一覧</a>
+</p>
+<script src="/static/review_card.js"></script>
+{% endblock %}

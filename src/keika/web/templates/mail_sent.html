@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}メールの控え - ケイカ{% endblock %}
+{% block main %}
+<h1 class="do-line">メールの控え</h1>
+{% if demo %}<p class="mail-sent">架空データなので実際には送っていません。</p>{% endif %}
+{% for r in rows %}
+<article class="mail-sheet">
+  <p><span class="muted small">{{ r.sent_at[:16].replace('T', ' ') }}</span> {{ r.user_name }}さんの件</p>
+  <p><span class="muted small">宛先</span> {{ r.sent_name }} <span class="muted small">{{ r.sent_to }}</span></p>
+  <p><span class="muted small">件名</span> {{ r.sent_subject }}</p>
+  {% if r.attached %}<p><span class="muted small">添付</span> {{ r.attached|join('、') }}</p>{% endif %}
+  <p class="mail-body">{{ r.sent_body }}</p>
+</article>
+{% else %}
+<p class="muted">まだありません。</p>
+{% endfor %}
+<p class="small"><a href="/">やることへ戻る</a></p>
+{% endblock %}

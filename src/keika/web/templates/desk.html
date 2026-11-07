@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}AI相談 - ケイカ{% endblock %}
+{% block main %}
+<div class="desk" id="desk" data-thread="{{ thread }}" data-view="talk"{% if open_file %} data-open-file="{{ open_file }}"{% endif %}>
+  <div class="desk-views">
+    <button type="button" data-show="people">人</button>
+    {% if user %}<button type="button" data-show="real">実物</button>{% endif %}
+    <button type="button" data-show="talk">AI相談</button>
+  </div>
+
+  <nav class="desk-people" aria-label="担当の一覧">
+    <a href="/desk" data-thread="all" class="{{ 'on' if thread == 'all' }}">全体<span class="desk-mark"></span></a>
+    {% for u in users %}<a href="/desk?t={{ u.id }}" data-thread="{{ u.id }}" class="{{ 'on' if thread == u.id }}">{{ u.name }}<span class="desk-mark"></span></a>{% endfor %}
+  </nav>
+
+  <section class="desk-real">
+    {% if user %}
+    <div class="desk-tabs">
+      <button type="button" class="on" data-tab="records">支援経過 <span class="muted small">{{ records|length }}</span></button>
+      <button type="button" data-tab="docs">書類 <span class="muted small">{{ docs|length }}</span></button>
+      <button type="button" data-tab="made">作った物 <span class="muted small" id="made-count">0</span></button>
+      <a class="small" href="/users/{{ user.id }}">{{ user.name }}さんのページ</a>
+    </div>
+    <div class="desk-pane" id="pane-records">
+      {% for r in records %}
+      <article class="desk-record" id="rec-{{ r.id }}">
+        <p class="small muted">{{ r.event_date|hdate_full }} {{ r.kind_written or r.kind_read or '' }}{% if r.partner %} ／ {{ r.partner }}{% endif %}{% if r.unchecked %} ／ 未確認{% endif %}</p>
+        <p class="desk-body">{{ r.body }}</p>
+      </article>
+      {% else %}<p class="muted">記録はまだありません。</p>{% endfor %}
+    </div>
+    <div class="desk-pane" id="pane-docs" hidden>
+      <ul class="desk-docs">
+        {% for d in docs %}<li><button type="button" class="linklike" data-file="{{ d }}">{{ d.rsplit('/', 1)[-1] }}</button></li>{% else %}<li class="muted">書類はありません。</li>{% endfor %}
+      </ul>
+      <h3 id="doc-title" hidden></h3>
+      <p class="small" id="doc-open" hidden></p>
+      <pre class="desk-doc" id="doc-body" hidden></pre>
+      <iframe class="desk-frame" id="doc-frame" title="書類の実物" hidden></iframe>
+    </div>
+    <div class="desk-pane" id="pane-made" hidden>
+      <ul class="desk-docs" id="made-list"></ul>
+      <iframe class="desk-frame" id="made-frame" title="作った物の実物" hidden></iframe>
+    </div>
+    {% else %}
+    <div class="desk-pane">
+      <h2>全体</h2>
+      <p>事業所全体の話の枠です。個人の記録や書類はここでは読めません。一覧から人を押すと、その人の記録と会話に切り替わります。</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="desk-talk">
+    <p class="desk-who">{{ user.name + 'さんの枠' if user else '全体の枠' }} <span class="muted small">読むのは{{ 'この人の記録と書類だけ' if user else '名前と件数だけ' }}。決めるのは人です。</span></p>
+    <div class="desk-log" id="desk-log" aria-live="polite"></div>
+    <div class="desk-move" id="desk-move" hidden></div>
+    <form class="desk-ask" id="desk-ask">
+      <textarea name="question" rows="2" placeholder="{{ example }}"{% if sample %} disabled{% endif %}{% if question %} autofocus{% endif %}>{{ question }}</textarea>
+      <button{% if sample %} disabled{% endif %}>送る</button>
+    </form>
+    <p class="small muted">話して入れる時は OS の音声入力が使えます（Windows は Win + H）。</p>
+  </section>
+</div>
+<script src="/static/desk.js"></script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% if out.state == 'sent' and gmail_open %}
+<h1 class="do-line">Gmailの下書きに入れました。送るのは Gmail からです</h1>
+<p><a class="main-link" href="{{ gmail_open }}" target="_blank" rel="noopener">Gmailで開く</a></p>
+<p class="small muted">Gmail から送ると、入口に支援経過の案が出ます。返事が届いた時も出ます。</p>
+{% endif %}
+{% if out.state == 'sent' and not gmail_open %}
+<h1 class="do-line">控えに残しました。送るのはメールアプリからです</h1>
+<p><a class="main-link" href="{{ out.sent_mailto }}">メールアプリで開く</a></p>
+{% if just %}<script>location.href = {{ out.sent_mailto|tojson }};</script>{% endif %}
+{% endif %}
+{% if out.state == 'sent' %}
+<article class="mail-sheet">
+  <p><span class="muted small">宛先</span> {{ out.sent_name }} <span class="muted small">{{ out.sent_to }}</span></p>
+  <p><span class="muted small">日時</span> {{ out.sent_at[:16].replace('T', ' ') }}</p>
+  <p><span class="muted small">件名</span> {{ out.sent_subject }}</p>
+  {% if out.sent_attached %}<p><span class="muted small">添付</span> {{ out.sent_attached|join('、') }}</p>{% endif %}
+  <p class="mail-body">{{ out.sent_body }}</p>
+</article>
+{% if out.siblings %}<p class="small mail-siblings">同じ用件の案: {% for x in out.siblings %}<a href="/desk/{{ thread }}/mail/{{ x.id }}">{{ x.label }}宛て</a>{% if x.state == 'sent' %}<span class="muted">（済み）</span>{% endif %}{% if not loop.last %} ／ {% endif %}{% endfor %}</p>{% endif %}
+<p class="small"><a href="/">やることへ戻る</a></p>
+{% elif out.state == 'dropped' %}
+<h1 class="do-line">要らない案にしました</h1>
+<p class="small"><a href="/">やることへ戻る</a></p>
+{% else %}
+<h1 class="do-line">{{ '確かめて、Gmailに入れる' if gmail_on else '確かめて、メールアプリで開く' }}</h1>
+{% if out.siblings %}<p class="small mail-siblings">同じ用件の案: {% for x in out.siblings %}<a href="/desk/{{ thread }}/mail/{{ x.id }}">{{ x.label }}宛て</a>{% if x.state == 'sent' %}<span class="muted">（済み）</span>{% endif %}{% if not loop.last %} ／ {% endif %}{% endfor %}</p>{% endif %}
+{% if notice %}<p class="todo-line">{{ notice }}</p>{% endif %}
+{% if out.consent %}<p class="mail-notice">{{ out.consent }}</p>{% endif %}
+{% if m.changed %}<p class="small">{{ m.changed }}</p>{% endif %}
+<form id="mail-form" method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/edit" data-inplace>
+<article class="mail-sheet">
+  <p><span class="muted small">宛先</span> {% if out.recipient %}{{ out.recipient.label }} <span class="muted small">{{ out.recipient.kind_label }} {{ out.address or '（アドレス未登録）' }}</span>{% else %}{{ m.to_name }}{% endif %}</p>
+  <p class="mail-subject-row"><span class="muted small">件名</span> <input class="mail-subject" name="subject" value="{{ m.subject }}" aria-label="件名" autocomplete="off"{% if sample %} readonly{% else %} data-autosave{% endif %}></p>
+  <div class="mail-body" id="mail-body">
+  {% for l in out.lines %}<textarea class="mail-line{{ ' is-blank' if l.check }}" name="line" rows="{{ l.rows }}" aria-label="本文 {{ loop.index }}行目"{% if sample %} readonly{% else %} data-autosave{% endif %}>{{ l.text }}</textarea>
+  {% endfor %}</div>
+  {% if gmail_on %}
+  <fieldset class="mail-attach{{ ' is-blank' if out.attach_red }}">
+    <legend>添付</legend>
+    <input type="hidden" name="attach_shown" value="1">
+    {% for a in out.attach_items %}
+    <label class="attach-row"><input type="checkbox" name="attach" value="{{ a.key }}"{% if a.key in out.attach_chosen %} checked{% endif %}{% if sample %} disabled{% else %} data-autosave{% endif %}> {{ a.name }} <span class="muted small">{{ a.size_label }}</span></label>
+    {% else %}
+    <span class="muted small">この方の書類はまだありません</span>
+    {% endfor %}
+  </fieldset>
+  {% else %}
+  <p class="small muted">添付は Gmail につないだ時だけ使えます</p>
+  {% endif %}
+</article>
+</form>
+<p class="small muted">{% if out.origin == 'proposal' %}根拠: {{ out.ground }}{% else %}元の記録: {{ out.ground }}{% endif %}（AI が作った案です。最後に決めるのは人です）</p>
+{% if not sample %}
+<div class="mail-go">
+  <button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/send" class="send-button"{% if out.blocks %} disabled{% endif %} data-leave>{{ 'Gmailの下書きに入れる' if gmail_on else 'メールアプリで開く' }}</button>
+  {% if out.blocks %}<span class="mail-why">{{ out.why }}</span>{% endif %}
+  {% if out.med_open %}<button form="mail-form" formaction="/desk/{{ thread }}/mail/{{ m.id }}/med-ok" class="plain">薬の文はこのままでいい</button>{% endif %}
+  <span class="muted small draft-say">{% if not gmail_on %}Gmail はまだつながっていません。Gmail につなぐと、送ったメールと受け取った返事が支援経過の案になります{% endif %}</span>
+</div>
+<div class="mail-side">
+  <details class="mail-ai">
+    <summary>AIに直してもらう</summary>
+    <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/revise" class="mail-edit">
+      <p><textarea class="card-instruction" name="instruction" rows="2" required aria-label="直してほしいこと" placeholder="例: 金曜までにと足して"></textarea></p>
+      <p><button class="plain">直してもらう</button></p>
+    </form>
+  </details>
+  <form method="post" action="/desk/{{ thread }}/mail/{{ m.id }}/drop"><button class="plain">要らない</button></form>
+</div>
+<script src="/static/draft.js"></script>
+{% endif %}
+{% endif %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}やること - ケイカ{% endblock %}
+{% block main %}
+<div class="tabs">
+  <a href="/todo" class="{{ 'on' if not cm }}">全員</a>
+  {% for p in staff %}<a href="/todo?cm={{ p.id }}" class="{{ 'on' if cm == p.id }}">{{ p.name }}</a>{% endfor %}
+  <a href="/todo?cm=office" class="{{ 'on' if cm == 'office' }}">事業所</a>
+</div>
+
+<h1 class="big">今決めること <span class="count">{{ decide_count }}</span>{% if other_count %} <a class="others" href="#hoka">ほかに {{ other_count }}件</a>{% endif %}</h1>
+
+<section class="person consult" id="kakunin">
+  <h2>ケイカからの相談 <span class="muted small">{{ reviews|length }}件</span></h2>
+  {% if reviews %}
+  <p class="small muted">AI が迷った記録の確認です。よければ〔いいよ〕、違えば〔違う〕を押してください。</p>
+  <div class="compare-cards">{% for it in reviews %}{% include "_review_card.html" %}{% endfor %}</div>
+  {% else %}
+  <p class="muted">今はありません。</p>
+  {% endif %}
+</section>
+
+{% macro task_row(t, person_id) %}
+{% if t.opens %}
+<details class="task">
+  <summary><span class="dot"></span><span class="title">{{ t.title|hdate }}{% if t.where %}<span class="task-where">{{ t.where }}</span>{% endif %}</span>{% if t.deadline %}<span class="due">{{ t.deadline|hdate }}まで</span>{% endif %}<span class="opens">{{ t.opens }} ▸</span></summary>
+  <div class="task-body">
+    {% if t.homework %}
+      {% for h in t.homework %}
+      <div class="homework">
+        <p>{% if h.flag %}【確かめる】{% endif %}{{ h.text }} <span class="small muted">（{{ h.event_date|hdate }} の<a href="/drafts/{{ h.draft_id }}">{{ h.title }}</a>）</span></p>
+        {% if not sample %}<form method="post" action="/drafts/{{ h.draft_id }}/items/{{ h.item_id }}/done"><button class="plain">済んだ</button></form>{% endif %}
+      </div>
+      {% endfor %}
+    {% elif t.view %}
+      {% with v = t.view, uid = person_id, back = '/todo' ~ ('?cm=' ~ cm if cm else '') ~ '#p-' ~ person_id %}{% include "_finding.html" %}{% endwith %}
+    {% endif %}
+  </div>
+</details>
+{% else %}
+<a class="task task-link" href="/users/{{ person_id }}"><span class="dot"></span><span class="title">{{ t.title|hdate }}{% if t.where %}<span class="task-where">{{ t.where }}</span>{% endif %}</span><span class="opens">利用者のページへ ▸</span></a>
+{% endif %}
+{% endmacro %}
+
+{% if drafts %}
+<section class="person" id="shitagaki">
+  <h2>書類の下書きの確認 <span class="muted small">{{ drafts|length }}件</span></h2>
+  {% for d, left in drafts %}
+  <a class="task task-link" href="/drafts/{{ d.id }}#kakunin"><span class="dot"></span><span class="title">{{ user_names.get(d.user_id, d.user_id) }}さんの{{ d.title }}（{{ d.event_date|hdate }}）</span><span class="opens">{% if left %}確かめること {{ left }}件 ▸{% else %}確かめ済み。Word で保存へ ▸{% endif %}</span></a>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section id="hoka">
+<h2 class="others-head">ほかの項目 <span class="muted small">{{ other_count }}件</span></h2>
+
+{% if med_checks %}
+<details class="row" id="kusuri">
+  <summary><span class="row-name">薬の名前の確認</span><span class="muted small">{{ med_checks|length }}件</span><span class="row-lead">書類の名前と並べて、押した時だけ直します</span></summary>
+  <div class="row-body">{% for m in med_checks %}{% include "_med_check.html" %}{% endfor %}</div>
+</details>
+{% endif %}
+
+{% if board.visit_waiting %}
+<details class="row visit-line">
+  <summary><span class="row-name">今月の訪問がまだの方</span><span class="muted small">{{ board.visit_waiting|length }}人</span><span class="row-lead">今月はあと{{ board.days_left }}日</span></summary>
+  <p class="row-body">{% for u in board.visit_waiting %}<a href="/users/{{ u.id }}">{{ u.name }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</p>
+</details>
+{% endif %}
+
+{% for line in person_lines %}
+<details class="row person-row" id="p-{{ line.user.id }}">
+  <summary><span class="row-name">{{ line.user.name }}</span><span class="muted small">{{ line.count }}件</span><span class="row-lead">{% if line.deadline %}<span class="due">{{ line.deadline|hdate }}まで</span> {% endif %}{{ line.lead|hdate }}</span></summary>
+  <div class="row-body">
+    {% for r in line.rows %}
+    {% if r.group %}
+    <div class="task-group">
+      <p class="group-head">{{ r.group }} <span class="muted small">{{ r.tasks|length }}件</span>{% if r.deadline %} <span class="due">{{ r.deadline|hdate }}まで</span>{% endif %}</p>
+      {% for t in r.tasks %}{{ task_row(t, line.user.id) }}{% endfor %}
+    </div>
+    {% else %}{{ task_row(r.task, line.user.id) }}{% endif %}
+    {% endfor %}
+    <p class="small"><a href="/users/{{ line.user.id }}">{{ line.user.name }}さんのページを開く</a></p>
+  </div>
+</details>
+{% endfor %}
+
+{% if office %}
+<details class="row" id="jigyosho">
+  <summary><span class="row-name">事業所のこと</span><span class="muted small">{{ office|length }}件</span><span class="row-lead">{{ office[0].rule.title }}</span></summary>
+  <div class="row-body">{% with rows = office %}{% include "_office_tasks.html" %}{% endwith %}</div>
+</details>
+{% endif %}
+
+{% if not (board.total or reviews or office or med_checks or drafts) %}<p class="clear">やることはありません。</p>{% endif %}
+
+{% set quiet = board.people|rejectattr('tasks')|list %}
+{% if quiet %}
+<p class="quiet"><span class="ok-mark">✓</span> 今は何もなし: {% for p in quiet %}<a href="/users/{{ p.user.id }}">{{ p.user.name }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</p>
+{% endif %}
+
+{% if board.unknowns %}
+<details class="fold">
+  <summary>読み取れず確かめきれなかったこと {{ board.unknowns|length }}件</summary>
+  {% for u, item in board.unknowns %}<p class="small"><a href="/users/{{ u.id }}">{{ u.name }}</a>: {{ item.finding.message|hdate }}</p>{% endfor %}
+</details>
+{% endif %}
+
+</section>
+<script src="/static/review_card.js"></script>
+{% endblock %}

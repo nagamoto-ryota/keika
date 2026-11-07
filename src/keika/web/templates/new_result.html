@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}記録しました - ケイカ{% endblock %}
+{% block main %}
+<h1 class="big">記録しました</h1>
+{% if notice %}<p class="notice">{{ notice }}。話した文は「記録の確認」に残っています。</p>{% endif %}
+<p class="muted">読んで確かめてください。あとから普通に直せます。お知らせは今、AI が確かめ直しています。</p>
+{% for r in results %}
+  {% if r.record %}
+  <article class="record">
+    <div class="head"><strong><a href="/users/{{ r.record.user_id }}">{{ names[r.record.user_id] }}</a></strong> <span class="muted">{{ r.record.event_date|hdate }} {{ r.record.kind_read or '' }}</span> <span class="pill todo">未確認</span></div>
+    <p>{{ r.record.body }}</p>
+  </article>
+  {% else %}
+  <article class="card unknown">
+    <p>「記録の確認」に回しました。{% if r.warnings %}入力した文章に無い言葉があります: {{ r.warnings|join('、') }}{% endif %}</p>
+    <a href="/review">記録の確認を開く</a>
+  </article>
+  {% endif %}
+{% endfor %}
+<p><a href="/records/new">続けて記録する</a></p>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}問題なしとした指摘 - ケイカ{% endblock %}
+{% block main %}
+{% with tab = 'silenced' %}{% include "_list_tabs.html" %}{% endwith %}
+<h1>問題なしにした物</h1>
+<p class="muted">担当者が「確認した・問題なし」を押した指摘の一覧です（管理者向け）。点検表そのものは変わりません。根拠の書類が変わると、また出ます。</p>
+{% for r in rows %}
+  <article class="card">
+    <p><a href="/users/{{ r.user_id }}">{{ r.user_id }}</a> {{ r.period|hdate }}</p>
+    <p>{{ r.message|hdate }}</p>
+    <p class="muted small">{{ r.who }} {{ r.at[:16].replace('T', ' ') }}</p>
+  </article>
+{% else %}
+  <p class="muted">まだありません。</p>
+{% endfor %}
+{% endblock %}

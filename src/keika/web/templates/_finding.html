@@ -1,0 +1,64 @@
+{# 指摘の中身。v は _view の結果、uid は利用者 ID、back は押した後に戻る場所 #}
+<p class="msg">{{ v.f.message|hdate }}</p>
+{% if v.added_by %}<p class="small muted">この点検項目は「{{ v.added_by }}」をもとに足しました。</p>{% endif %}
+{% if v.changed %}<p class="notice small">根拠の書類が変更されました。もう一度確かめてください。</p>{% endif %}
+{% if v.evidence %}
+<div class="evi">
+  {% for e in v.evidence %}
+  <details class="evi-item">
+    <summary>{{ e.label }}</summary>
+    <div class="evi-body">
+      <p class="original">{{ e.context|mark_quote(e.highlight) }}</p>
+      {% if e.unverified %}<p class="small muted">スキャンした書類なので、AI が抜き出した文が正しいか機械で確かめられていません。書類の現物で確かめてください。</p>{% endif %}
+      {% if e.open_url %}<a href="{{ e.open_url }}" target="_blank" rel="noopener">書類を開く</a>{% endif %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+{# 記録に書き足す文の案（v.f.suggestion）は出さない。支援経過は実際の訪問・電話・送ったメールと返事から作る。データは残す #}
+{% set offer = offer_for(v.f.rule_id) if v.f.user_id else none %}
+{% if offer and not offer_skipped(v.fp) %}
+<div class="offer">
+  <p class="offer-line">{{ offer.text }}</p>
+  {% if not sample %}
+  <div class="offer-buttons">
+    <form method="post" action="/users/{{ v.f.user_id }}/offer" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（数十秒）';">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <button class="ok-button">作って</button>
+    </form>
+    <form method="post" action="/users/{{ v.f.user_id }}/offer/skip">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <button class="plain">今はいい</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+<div class="actions">
+  <form method="post" action="/users/{{ uid }}/respond">
+    <input type="hidden" name="fp" value="{{ v.fp }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button name="kind" value="off_target" class="plain">確認した・問題なし</button>
+  </form>
+  <details class="more">
+    <summary>その他</summary>
+    {% if not sample and v.f.user_id %}
+    <form method="post" action="/users/{{ uid }}/plan" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '作っています（1分ほど）';">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <button class="plain">次の手順と下書きを作る</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/users/{{ uid }}/respond">
+      <input type="hidden" name="fp" value="{{ v.fp }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <input type="hidden" name="kind" value="history_noted">
+      <p class="small muted">今日の日付で経緯を残す</p>
+      <textarea name="note" rows="3" required placeholder="後から直せない漏れは、今日の日付で経緯を残します"></textarea>
+      <button>残す</button>
+    </form>
+  </details>
+  {% if v.f.user_id %}<a class="plain-link" href="/desk?t={{ v.f.user_id }}&about={{ v.fp }}">ケイカに聞く</a>{% endif %}
+  {% with rule_id = v.f.rule_id, basis_label = v.basis %}{% include "_basis.html" %}{% endwith %}
+  {% if v.f.searched_scope %}<p class="small muted">探した範囲: {{ v.f.searched_scope|hdate }}</p>{% endif %}
+</div>

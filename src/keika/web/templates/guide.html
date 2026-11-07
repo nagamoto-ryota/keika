@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}導入の前に - ケイカ{% endblock %}
+{% block main %}
+<h1 class="do-line">この3つが揃えば始められます</h1>
+<p>事故があった時に説明できる状態にしておく。これが考え方です。</p>
+
+<h2 class="guide-step">1. 利用者の同意</h2>
+<ul class="guide-short">
+  <li><a href="/guide/consent.docx">同意書のたたき台</a>を埋めて署名をもらう。今の同意書があれば追記でかまいません。ご家族の情報も入るので、家族の署名欄も使います。</li>
+  <li>AI の提供元が海外の場合は、その事（外国にある第三者への提供）も同じ欄で説明する。</li>
+  <li>同意しない人は、台帳にも読み取りフォルダにも入れず、ケイカの外で記録する。</li>
+</ul>
+
+<h2 class="guide-step">2. AI の契約</h2>
+<p class="guide-lead">公式の文書で確かめ、サービスごとに1行残す。音声入力など、AI サービスが増えたら1行足すだけです。</p>
+<table class="fill">
+  <tr><th>AI サービス</th><th>学習に使われない設定か、事業者向けの契約か</th><th>処理する国</th><th>確かめた日</th></tr>
+  <tr><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<h2 class="guide-step">3. 事業所の決まりと端末</h2>
+<ul class="guide-short">
+  <li>個人情報の規程と、委託先の一覧に AI の利用を足す。AI の下書きは人が確かめてから使う。</li>
+  <li>端末はディスクの暗号化（Windows の BitLocker など）と画面ロック。ログインが無く、開けた人は全員の情報を見られるので、職員ごとに端末のアカウントを分ける。</li>
+  <li>事故の時の連絡先を決める。端末をなくした時と退職の時は API キーを取り替える。</li>
+  <li>記録の保存期間を決め、廃棄の時はデータベースとバックアップの両方から消す。</li>
+</ul>
+
+<p class="small muted guide-foot">この手引きは法的助言ではありません。必要なら専門家に確かめてください。 <button type="button" class="plain no-print" onclick="window.print()">印刷する</button></p>
+{% endblock %}

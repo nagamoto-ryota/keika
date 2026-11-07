@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}訪問時の聞き取りリスト - {{ sheet.user.name }} - ケイカ{% endblock %}
+{% macro ask(it) %}<li class="ask" data-section="{{ it.section }}" data-label="{{ it.label }}" data-past="{{ it.past }}"><span class="box" aria-hidden="true">□</span><span>{{ it.label }}{% if it.past %} <span class="muted small">前回: {{ it.past }}</span>{% endif %}</span><textarea class="note" rows="1" placeholder="ここに入力" aria-label="{{ it.label }} の答え">{{ it.answer }}</textarea><div class="note-print">{{ it.answer }}</div><div class="write-space"></div></li>{% endmacro %}
+{% block main %}
+<p class="muted no-print"><a href="/users/{{ sheet.user.id }}">{{ sheet.user.name }}のページへ戻る</a></p>
+<h1>訪問時の聞き取りリスト <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
+<div class="write-actions no-print">
+  <button type="button" class="plain" onclick="window.print()">印刷する</button>
+  <button type="button" class="plain" id="copy-sheet">文章をコピーする</button>
+  {% if not sample %}<form method="post" action="/users/{{ sheet.user.id }}/visit/to-record" class="flush-first inline"><button class="plain">記録の入力欄へ送る</button></form>{% endif %}
+  <span class="small muted" id="note-state" role="status">{{ '見本のため保存されません' if sample else '書いた内容は自動で保存します' }}</span>
+</div>
+
+{% if sheet.foreign %}<p class="notice">別の人の名前が読めた書類があるので、この1枚には使っていません: {{ sheet.foreign|join('、') }}</p>{% endif %}
+<table class="sheet-dates">
+  <tr><th>前回の訪問</th><td>{{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'まだありません' }}</td>
+      <th>今月の訪問</th><td>{{ sheet.visited_this_month|hdate ~ ' に済み' if sheet.visited_this_month else 'まだです' }}</td></tr>
+  <tr><th>計画の期限</th><td>{{ sheet.plan_end|hdate if sheet.plan_end else '読み取れていません' }}</td>
+      <th>認定の期限</th><td>{{ sheet.cert_end|hdate if sheet.cert_end else '台帳にありません' }}</td></tr>
+</table>
+
+{% if items['項目が変わった入力'] %}
+<h2>項目が変わった入力</h2>
+<p class="small muted">書いた後に項目が変わったか、片付いた物です。必要なら記録に送ってください。</p>
+<ul class="asks">{% for it in items['項目が変わった入力'] %}{{ ask(it) }}{% endfor %}</ul>
+{% endif %}
+
+<h2>宿題・持ち越し</h2>
+{% if items['宿題・持ち越し'] %}
+<ul class="asks">{% for it in items['宿題・持ち越し'] %}{{ ask(it) }}{% endfor %}</ul>
+{% else %}<p class="muted">まだありません。</p>{% endif %}
+
+<h2>今確かめること</h2>
+{% if items['今確かめること'] %}
+<ul class="asks">{% for it in items['今確かめること'] %}{{ ask(it) }}{% endfor %}</ul>
+{% else %}<p class="muted">今のところありません。</p>{% endif %}
+
+<h2>目標（様子を聞く）</h2>
+{% if items['目標（様子を聞く）'] %}
+<ul class="asks">{% for it in items['目標（様子を聞く）'] %}{{ ask(it) }}{% endfor %}</ul>
+{% else %}<p class="muted">計画書から読み取れていません。</p>{% endif %}
+{% if sheet.services %}<p class="small">サービス: {{ sheet.services|join('、') }}</p>{% endif %}
+
+{% if not sample %}
+<form method="post" action="/users/{{ sheet.user.id }}/visit/questions" class="no-print flush-first busy">
+  <button class="plain">{{ '聞くことを作り直す' if q else '聞くことを洗い出す' }}</button>
+  <span class="small muted">AI が書類を読み、アセスメントで聞けていないことなどを挙げます</span>
+</form>
+{% endif %}
+{% if failed %}<p class="notice no-print">作れませんでした。時間をおいて、もう一度押してください。</p>{% endif %}
+{% if stale %}<p class="notice no-print">洗い出しの後に書類か記録が変わっています。作り直してください。</p>{% endif %}
+
+{% for title in ['アセスメントで聞けていないこと', '現状に対する意向（予防プラン）', '基本情報'] %}{% if items[title] %}
+<h2>{{ title }}</h2>
+<ul class="asks">{% for it in items[title] %}{{ ask(it) }}{% endfor %}</ul>
+{% endif %}{% endfor %}
+{% if items['基本チェックリスト'] %}
+<h2>基本チェックリスト</h2>
+<table class="sheet-check">
+  <tr><th>No</th><th>質問</th><th>前回</th><th>今回</th></tr>
+  {% for it in items['基本チェックリスト'] %}<tr class="ask-row" data-section="{{ it.section }}" data-label="{{ it.label }}" data-past="{{ it.past }}"><td>{{ it.raw.no }}</td><td>{{ it.raw.question }}</td><td>{% if it.past %}前回: {{ it.past }}{% else %}<span class="muted">－</span>{% endif %}</td><td class="sheet-answer">
+    {%- if it.raw.no == 12 %}<input type="text" class="note-line" value="{{ it.answer }}" placeholder="身長　　cm　体重　　kg" aria-label="身長と体重"><span class="note-print">{{ it.answer }}</span>
+    {%- else %}{% for v in ['はい', 'いいえ'] %}<label class="yesno"><input type="radio" name="c{{ it.raw.no }}" value="{{ v }}"{{ ' checked' if it.answer == v }}>{{ v }}</label>{% endfor %}{% endif -%}
+  </td></tr>{% endfor %}
+</table>
+{% endif %}
+
+<h2>前回の訪問の記録</h2>
+{% if sheet.last_visit %}
+<p class="sheet-record small">{{ sheet.last_visit.body }}</p>
+{% else %}<p class="muted">まだありません。</p>{% endif %}
+
+{% if sheet.since_visit %}
+<h2>その後の記録</h2>
+{% for r in sheet.since_visit %}<p class="sheet-record small"><strong>{{ r.event_date|hdate }} {{ r.kind_read or r.kind_written }}</strong> {{ r.body }}</p>{% endfor %}
+{% endif %}
+
+<div id="sheet-data" hidden data-url="{{ '' if sample else '/users/' ~ sheet.user.id ~ '/visit/notes' }}" data-head="{{ sheet.user.name }} 訪問時の聞き取りリスト&#10;前回の訪問 {{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'なし' }} ／ 計画の期限 {{ sheet.plan_end|hdate if sheet.plan_end else '不明' }} ／ 認定の期限 {{ sheet.cert_end|hdate if sheet.cert_end else '不明' }}"></div>
+<script src="/static/visit_sheet.js"></script>
+{% endblock %}
