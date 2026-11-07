@@ -2,6 +2,7 @@
 {% block title %}記録しました - ケイカ{% endblock %}
 {% block main %}
 <h1 class="big">記録しました</h1>
+{% if notice %}<p class="notice">{{ notice }}。話した文は「記録の確認」に残っています。</p>{% endif %}
 <p class="muted">読んで確かめてください。あとから普通に直せます。お知らせは今、AI が確かめ直しています。</p>
 {% for r in results %}
   {% if r.record %}

@@ -1,6 +1,7 @@
 """画面。ログインや権限は作らない（事業所内の PC で動かす）。"""
 from __future__ import annotations
 
+import hmac
 import ipaddress
 import os
 import re
@@ -14,7 +15,7 @@ from typing import Any, Callable, get_args
 from urllib.parse import quote
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
@@ -211,8 +212,10 @@ def nav_section(path: str) -> str | None:
 _FALL_WORDS = re.compile(r"転倒|転ん|転び|転ぶ|尻もち|こけ")
 
 
-def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False, gmail_factory: Callable[[], Any] | None = None) -> FastAPI:
+def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sample: bool = False, gmail_factory: Callable[[], Any] | None = None, access_code: str | None = None) -> FastAPI:
     app = FastAPI(title="ケイカ")
+    if access_code:  # 審査用の公開版。Gmail にはつながない
+        gmail_factory = lambda: None  # noqa: E731
     gmail_factory = gmail_factory or (lambda: gmail_draft.connected(s))
     conn = ThreadConnection(s)
     connect(s).close()  # 表を先に作る
@@ -256,6 +259,31 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-cache"  # 直した JS が古いまま動かないように、毎回確かめさせる
         return response
+
+    if access_code:
+        from keika import public
+
+        passed, misses = public.pass_value(access_code), public.Misses()
+
+        @app.middleware("http")
+        async def judges_only(request: Request, call_next):
+            """合言葉を知っている人だけ。知らない人には案内だけを出し、画面の処理（AI を含む）に進ませない。"""
+            if request.url.path.startswith("/static/") or request.url.path == "/enter" or hmac.compare_digest(request.cookies.get(public.COOKIE, ""), passed):
+                return await call_next(request)
+            if request.method != "GET":
+                return PlainTextResponse("合言葉を入れてから使ってください。", status_code=403)
+            return HTMLResponse(public.gate_page(), status_code=401)
+
+        @app.post("/enter")
+        def enter(request: Request, code: str = Form("")):
+            if misses.too_many():
+                return HTMLResponse(public.gate_page("間違いが続いたので、しばらく受け付けません。"), status_code=429)
+            if not public.code_ok(code, access_code):
+                misses.add()
+                return HTMLResponse(public.gate_page("合言葉が違います。"), status_code=401)
+            response = RedirectResponse("/", status_code=303)
+            response.set_cookie(public.COOKIE, passed, httponly=True, samesite="lax", secure=request.url.scheme == "https", max_age=60 * 60 * 24 * 30)
+            return response
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
@@ -555,7 +583,11 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         try:
             try:
                 client = client_factory()
-            except RuntimeError:  # キーが無い時
+            except RuntimeError as e:  # キーが無い時、公開版で1日の上限に達した時
+                if "上限" in str(e):
+                    own.execute("UPDATE desk_messages SET text = ?, status = 'failed', seen = 0 WHERE id = ?", (str(e), working_id))
+                    own.commit()
+                    return
                 client = None
             answer_question(own, client, s, thread, working_id)
         finally:
@@ -775,12 +807,14 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
             raise HTTPException(403, "見本モードでは記録できません。API キーを設定して keika serve で起動してください。")
         if not text.strip():
             raise HTTPException(400, "文章を入れてください")
+        notice = ""
         if visit_user and visit_stamp and not get_notes(conn, visit_user):  # 同じ送信の二度目
             return RedirectResponse(f"/users/{visit_user}/visit", status_code=303)
         try:
             client = client_factory()
         except RuntimeError as e:  # キーが無くても、話した内容は失わない
             results = [IntakeResult(review_id=to_review(conn, text.strip(), "画面", {}, [], f"整えられませんでした（{e}）"))]
+            notice = str(e)
         else:
             saved: list[str] = []
             results = process_text(conn, client, s, text.strip(), "画面", on_saved=saved.append)
@@ -790,7 +824,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         if visit_user and visit_stamp and any(r.review_id or (r.record and r.record.user_id == visit_user) for r in results):
             mark_used(conn, visit_user, visit_stamp, text)  # この人の記録か確認に入った分は、次の訪問の欄に出さない
         names = {u.id: u.name for u in list_users(conn)}
-        return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names})
+        return templates.TemplateResponse(request, "new_result.html", {"results": results, "names": names, "notice": notice})
 
     def _record_or_404(record_id: int):
         record = get_record(conn, record_id)
