@@ -35,7 +35,7 @@ class Counting:
 
 def web(s, factory=None):
     factory = factory or Counting()
-    return TestClient(create_app(s, client_factory=factory, access_code=CODE), follow_redirects=False), factory
+    return TestClient(create_app(s, client_factory=factory, access_code=CODE), base_url="https://testserver", follow_redirects=False), factory  # 公開版は https だけ
 
 
 def test_without_the_code_only_the_notice_is_shown_and_no_ai_is_called(env):
@@ -149,7 +149,65 @@ def test_public_start_resets_the_db_and_gates(env, tmp_path, monkeypatch):
     run_db = tmp_path / "run" / "keika.db"
     for k, v in {"KEIKA_ACCESS_CODE": CODE, "KEIKA_BASE_DB": str(base), "KEIKA_DB_PATH": str(run_db), "KEIKA_DRIVE_ROOT": str(SAMPLE / "drive"), "KEIKA_AS_OF": "2026-11-13"}.items():
         monkeypatch.setenv(k, v)
-    http = TestClient(app_from_env(), follow_redirects=False)
+    http = TestClient(app_from_env(), base_url="https://testserver", follow_redirects=False)
     assert http.get("/").status_code == 401
     texts = [r[0] for r in sqlite3.connect(run_db).execute("SELECT text FROM desk_messages")]
     assert texts == ["汚れ"]
+
+
+def test_ai_consultation_spending_counts_toward_the_limit(env):
+    """AI相談の額も、1日の上限の数に入る（11/7 最終レビュー 🔴）。"""
+    from types import SimpleNamespace as NS
+    from keika.claude import METER
+    from keika.secretary import _loop
+
+    usage = NS(input_tokens=2_000_000, output_tokens=0, cache_read_input_tokens=0, cache_creation_input_tokens=0)
+    message = NS(usage=usage, content=[NS(type="text", text="答え")], stop_reason="end_turn")
+
+    class Stream:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def get_final_message(self): return message
+
+    client = NS(beta=NS(messages=NS(stream=lambda **kw: Stream())))
+    before = METER.cost_usd
+    s, c = env
+    _loop(client, c, s, "U04", [], [{"role": "user", "content": "x"}], [], "claude-sonnet-5-5", "")
+    assert METER.cost_usd - before > 1.0
+
+
+def test_the_limit_is_checked_on_every_call_not_only_when_the_client_is_made():
+    spent = [0.0]
+    calls = []
+    inner = type("C", (), {})()
+    from types import SimpleNamespace as NS
+    inner.beta = NS(messages=NS(stream=lambda **kw: calls.append(kw) or "stream"))
+    limit = DailyLimit(lambda: inner, limit_usd=5.0, spent=lambda: spent[0])
+    client = limit()
+    assert client.beta.messages.stream(model="m") == "stream"
+    spent[0] = 6.0
+    with pytest.raises(RuntimeError, match=LIMIT_MESSAGE):
+        client.beta.messages.stream(model="m")
+    assert len(calls) == 1
+
+
+def test_one_person_guessing_does_not_lock_out_the_judges(env):
+    s, _ = env
+    http, _ = web(s)
+    for _ in range(40):
+        http.post("/enter", data={"code": "nope"}, headers={"x-forwarded-for": "203.0.113.9"})
+    r = http.post("/enter", data={"code": CODE}, headers={"x-forwarded-for": "198.51.100.7"})
+    assert r.status_code == 303
+
+
+def test_pass_cookie_is_secure_on_the_public_version(env):
+    s, _ = env
+    http, _ = web(s)
+    cookie = http.post("/enter", data={"code": CODE}).headers["set-cookie"]
+    assert "secure" in cookie.lower()
+
+
+def test_strange_cookie_does_not_break_the_gate(env):
+    s, _ = env
+    http, _ = web(s)
+    assert http.get("/", headers={"cookie": "keika_pass=é".encode("utf-8")}).status_code == 401

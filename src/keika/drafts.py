@@ -8,7 +8,9 @@ from __future__ import annotations
 import io
 import json
 import re
+import functools
 import sqlite3
+import threading
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Literal
@@ -395,6 +397,18 @@ def _tidy(text: str) -> str:
     return text.replace("\r\n", "\n").strip()
 
 
+WRITE = threading.RLock()  # 下書きを「読んで全部書き戻す」処理は、人も AI もこの順番待ちに並ぶ
+
+
+def locked(fn):
+    @functools.wraps(fn)
+    def run(*args, **kw):
+        with WRITE:
+            return fn(*args, **kw)
+    return run
+
+
+@locked
 def update_draft(conn: sqlite3.Connection, draft_id: int, *, place: str, start_time: str, end_time: str, attendees: list[dict], sections: dict[str, list[dict]]) -> None:
     """人が直した文は人の文なので、印を外す。元の発言は残す。項目は番号で照らす（古い画面から送られても、ずれない）。"""
     row = conn.execute("SELECT payload FROM drafts WHERE id = ?", (draft_id,)).fetchone()
@@ -476,6 +490,7 @@ def open_homework(conn: sqlite3.Connection, user_id: str) -> list[Homework]:
     return found
 
 
+@locked
 def finish_homework(conn: sqlite3.Connection, draft_id: int, item_id: str) -> None:
     row = conn.execute("SELECT payload FROM drafts WHERE id = ?", (draft_id,)).fetchone()
     data = json.loads(row["payload"]) if row else {"sections": {}}

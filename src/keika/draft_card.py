@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import threading
 from typing import Any
 
 from typing import Literal
@@ -17,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from keika.claude import MODEL, StructuredError, ask_structured, model_for
 from keika.claude_checks import _BACKDATE, crosses_line
-from keika.drafts import BLANK, Draft, _names_said_in_kana, _nearby, _tidy, get_draft, list_drafts, update_draft
+from keika.drafts import BLANK, WRITE, Draft, _names_said_in_kana, locked, _nearby, _tidy, get_draft, list_drafts, update_draft
 from keika.intake import _digits, _name_parts, _normal, _without_spoken_clocks, invented_terms
 from keika.ledger import get_user
 from keika.med_names import MEDICINE_SENTENCE
@@ -185,7 +184,7 @@ def next_draft(conn: sqlite3.Connection, draft: Draft) -> int | None:
     return left[0].id if left else None
 
 
-_WRITE = threading.Lock()  # Claude の答えを書き戻す時は、読み直してから書く
+_WRITE = WRITE  # Claude の答えを書き戻す時は、読み直してから書く。人の保存も同じ順番待ちに並ぶ
 CHANGED_MEANWHILE = "待つ間にこの文が直されたので、直した文を残しました。"
 
 
@@ -206,6 +205,7 @@ def _find(data: dict, item_id: str) -> tuple[str, dict]:
     raise ValueError("その文は見つかりません")
 
 
+@locked
 def ok_item(conn: sqlite3.Connection, draft_id: int, item_id: str, text: str = "") -> None:
     """人が確かめた。何の印だったかは残す。直してから押した時は、書いた文を捨てない。"""
     data = _load(conn, draft_id)
@@ -268,6 +268,7 @@ def revise_item(conn: sqlite3.Connection, client: Any, s: Settings, draft_id: in
     return ""
 
 
+@locked
 def edit_item(conn: sqlite3.Connection, draft_id: int, item_id: str, text: str) -> None:
     """本文の文を人が直す。人の文なので印は外れる。空にすると消える。"""
     draft = get_draft(conn, draft_id)
@@ -281,6 +282,7 @@ def edit_item(conn: sqlite3.Connection, draft_id: int, item_id: str, text: str) 
     _store(conn, draft_id, data)
 
 
+@locked
 def add_item(conn: sqlite3.Connection, draft_id: int, key: str, text: str) -> None:
     """欄に文を足す。「〇〇」だけの欄は置き換える。"""
     if not text.strip():
@@ -303,6 +305,7 @@ def time_of(answer: str) -> str:
     return f"{hour:02d}:{minute:02d}" if hour < 25 and minute < 60 else answer.strip()
 
 
+@locked
 def fill_blank(conn: sqlite3.Connection, draft_id: int, field: str, answer: str) -> None:
     """質問の答えを欄へそのまま入れる。AI は呼ばない。"""
     written = answer.strip()
@@ -327,6 +330,7 @@ def fill_blank(conn: sqlite3.Connection, draft_id: int, field: str, answer: str)
     update_draft(conn, draft_id, place=place, start_time=start, end_time=end, attendees=people, sections=sections)
 
 
+@locked
 def keep_blank(conn: sqlite3.Connection, draft_id: int, field: str) -> None:
     """今は分からない欄。「〇〇」のまま残し、もう聞かない。"""
     data = _load(conn, draft_id)

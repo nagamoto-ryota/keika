@@ -80,3 +80,27 @@ def test_revising_does_not_overwrite_a_sentence_the_person_fixed_meanwhile(env):
     client = Meanwhile(lambda: edit_item(c, i, item_id, fixed), answer(WireSentence(text="デイは週2回のまま続ける。")))
     notice = revise_item(c, client, s, i, item_id, "週2回です")
     assert any(x["text"] == fixed for x in items(c, i)) and notice
+
+
+@pytest.mark.parametrize("act", ["edit", "ok", "form"])
+def test_a_person_s_save_waits_while_the_ai_writes_back(env, act):
+    """AI が読み直して書き戻す間は、人の保存も待つ。どちらかが黙って消えない（11/7 追加レビュー）。"""
+    import threading
+    from keika import drafts
+    from keika.drafts import update_draft
+    s, c = env
+    i = draft(s, c, [THREE])
+    item_id = items(c, i)[0]["id"]
+    d = get_draft(c, i)
+    run = {
+        "edit": lambda: edit_item(c, i, item_id, "人の文。"),
+        "ok": lambda: ok_item(c, i, item_id),
+        "form": lambda: update_draft(c, i, place=d.place, start_time=d.start_time, end_time=d.end_time, attendees=d.attendees, sections={"services": [{"id": item_id, "text": "人の文。"}]}),
+    }[act]
+    done = threading.Event()
+    with drafts.WRITE:
+        t = threading.Thread(target=lambda: (run(), done.set()))
+        t.start()
+        assert not done.wait(0.3)  # AI が書いている間は保存しない
+    t.join(5)
+    assert done.is_set()

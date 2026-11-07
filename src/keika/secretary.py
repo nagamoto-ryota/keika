@@ -17,7 +17,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from keika.care_plan import make_care_plan
-from keika.claude import PRICES, StructuredError, UsageMeter, ask_structured
+from keika.claude import METER, PRICES, StructuredError, UsageMeter, ask_structured
 from keika.claude_checks import APP_RECORDS, _quote_ok, _read_document, _squeeze, line_crossings, record_context, source_texts
 from keika.drafts import get_draft, list_drafts, plain_text
 from keika.findings import fingerprint
@@ -401,6 +401,7 @@ def _loop(client: Any, conn: sqlite3.Connection, s: Settings, thread: str, syste
         with client.beta.messages.stream(messages=messages, **args) as stream:
             message = stream.get_final_message()
         cost += _usage_cost(message.usage, model)
+        METER.add(message.usage, model if model in PRICES else DEFAULT_MODEL)  # 公開版の1日の上限は、全体の計量器で数える
         messages.append({"role": "assistant", "content": message.content})
         written += [b.text.strip() for b in message.content if b.type == "text" and b.text.strip()]
         if message.stop_reason != "tool_use":

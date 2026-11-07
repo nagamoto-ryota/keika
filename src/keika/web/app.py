@@ -268,7 +268,7 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
         @app.middleware("http")
         async def judges_only(request: Request, call_next):
             """合言葉を知っている人だけ。知らない人には案内だけを出し、画面の処理（AI を含む）に進ませない。"""
-            if request.url.path.startswith("/static/") or request.url.path == "/enter" or hmac.compare_digest(request.cookies.get(public.COOKIE, ""), passed):
+            if request.url.path.startswith("/static/") or request.url.path == "/enter" or hmac.compare_digest(request.cookies.get(public.COOKIE, "").encode(), passed.encode()):
                 return await call_next(request)
             if request.method != "GET":
                 return PlainTextResponse("合言葉を入れてから使ってください。", status_code=403)
@@ -276,13 +276,14 @@ def create_app(s: Settings, client_factory: Callable[[], Any] = make_client, sam
 
         @app.post("/enter")
         def enter(request: Request, code: str = Form("")):
-            if misses.too_many():
+            who = (request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else ""))
+            if misses.too_many(who):
                 return HTMLResponse(public.gate_page("間違いが続いたので、しばらく受け付けません。"), status_code=429)
             if not public.code_ok(code, access_code):
-                misses.add()
+                misses.add(who)
                 return HTMLResponse(public.gate_page("合言葉が違います。"), status_code=401)
             response = RedirectResponse("/", status_code=303)
-            response.set_cookie(public.COOKIE, passed, httponly=True, samesite="lax", secure=request.url.scheme == "https", max_age=60 * 60 * 24 * 30)
+            response.set_cookie(public.COOKIE, passed, httponly=True, samesite="lax", secure=True, max_age=60 * 60 * 24 * 30)  # 公開版は https だけ
             return response
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import shutil
 import sqlite3
 import threading
 import time
@@ -17,7 +16,8 @@ from typing import Any, Callable
 COOKIE = "keika_pass"
 LIMIT_MESSAGE = "今日の AI の利用の上限に達しました。明日になると使えます"
 JST = timezone(timedelta(hours=9))
-MAX_MISSES = 30  # 1時間に間違えてよい回数。総当たりを止める
+MAX_MISSES = 30  # 1人が1時間に間違えてよい回数。総当たりを止める
+MAX_MISSES_ALL = 1000  # 全体で1時間に間違えてよい回数。1人の間違いで審査員を締め出さないよう、1人分とは別に大きく取る
 
 
 def pass_value(code: str) -> str:
@@ -30,21 +30,25 @@ def code_ok(given: str, code: str) -> bool:
 
 
 class Misses:
-    """合言葉の間違いを数える。多すぎる時はしばらく受け付けない。"""
+    """合言葉の間違いを、送ってきた相手ごとに数える。多すぎる相手はしばらく受け付けない。"""
 
     def __init__(self) -> None:
-        self._at: list[float] = []
+        self._at: dict[str, list[float]] = {}
         self._lock = threading.Lock()
 
-    def too_many(self) -> bool:
+    def _recent(self, who: str, now: float) -> list[float]:
+        self._at[who] = [t for t in self._at.get(who, []) if now - t < 3600]
+        return self._at[who]
+
+    def too_many(self, who: str = "") -> bool:
         with self._lock:
             now = time.monotonic()
-            self._at = [t for t in self._at if now - t < 3600]
-            return len(self._at) >= MAX_MISSES
+            everyone = sum(len(self._recent(w, now)) for w in list(self._at))
+            return len(self._recent(who, now)) >= MAX_MISSES or everyone >= MAX_MISSES_ALL
 
-    def add(self) -> None:
+    def add(self, who: str = "") -> None:
         with self._lock:
-            self._at.append(time.monotonic())
+            self._at.setdefault(who, []).append(time.monotonic())
 
 
 def _today_jst() -> str:
@@ -69,10 +73,31 @@ class DailyLimit:
                 self._start = (today, now if self._start else 0.0)
             return now - self._start[1]
 
-    def __call__(self) -> Any:
+    def check(self) -> None:
         if self.used_today() >= self.limit_usd:
             raise RuntimeError(LIMIT_MESSAGE)
-        return self.factory()
+
+    def __call__(self) -> Any:
+        self.check()
+        client = self.factory()
+        return _Guarded(client, self) if hasattr(client, "beta") else client
+
+
+class _Guarded:
+    """AI を呼ぶたびに上限を確かめる client。1回作った client で何回も呼ぶ処理も止まる。"""
+
+    def __init__(self, client: Any, limit: DailyLimit):
+        self._client, self._limit = client, limit
+        stream = client.beta.messages.stream
+
+        def guarded_stream(**kw: Any) -> Any:
+            limit.check()
+            return stream(**kw)
+
+        self.beta = type("Beta", (), {"messages": type("Messages", (), {"stream": staticmethod(guarded_stream)})()})()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
 
 
 def fresh_db(base: Path, target: Path) -> None:
@@ -87,11 +112,6 @@ def fresh_db(base: Path, target: Path) -> None:
     finally:
         dst.close()
         src.close()
-
-
-def copy_tree(src: Path, dst: Path) -> None:
-    if not dst.exists():
-        shutil.copytree(src, dst)
 
 
 GATE_PAGE = """<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
