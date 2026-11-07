@@ -49,7 +49,7 @@ def assessment(s, c):
 def test_shelf_lists_the_forms_in_one_place(env):
     s, c = env
     part = shelf(s)
-    for word in ("ケアプラン", "会議録", "モニタリング", "訪問前の1枚"):
+    for word in ("ケアプラン", "会議録", "モニタリング", "訪問時の聞き取りリスト"):
         assert word in part
     assert 'href="/users/U04/visit"' in part
 

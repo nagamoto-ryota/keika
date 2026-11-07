@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}訪問前の1枚 - {{ sheet.user.name }} - ケイカ{% endblock %}
+{% block title %}訪問時の聞き取りリスト - {{ sheet.user.name }} - ケイカ{% endblock %}
 {% macro ask(it) %}<li class="ask" data-section="{{ it.section }}" data-label="{{ it.label }}" data-past="{{ it.past }}"><span class="box" aria-hidden="true">□</span><span>{{ it.label }}{% if it.past %} <span class="muted small">前回: {{ it.past }}</span>{% endif %}</span><textarea class="note" rows="1" placeholder="ここに入力" aria-label="{{ it.label }} の答え">{{ it.answer }}</textarea><div class="note-print">{{ it.answer }}</div><div class="write-space"></div></li>{% endmacro %}
 {% block main %}
 <p class="muted no-print"><a href="/users/{{ sheet.user.id }}">{{ sheet.user.name }}のページへ戻る</a></p>
-<h1>訪問前の1枚 <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
+<h1>訪問時の聞き取りリスト <small>{{ sheet.user.name }} {{ sheet.user.data.get('care_level', '') }}</small></h1>
 <div class="write-actions no-print">
   <button type="button" class="plain" onclick="window.print()">印刷する</button>
   <button type="button" class="plain" id="copy-sheet">文章をコピーする</button>
@@ -75,6 +75,6 @@
 {% for r in sheet.since_visit %}<p class="sheet-record small"><strong>{{ r.event_date|hdate }} {{ r.kind_read or r.kind_written }}</strong> {{ r.body }}</p>{% endfor %}
 {% endif %}
 
-<div id="sheet-data" hidden data-url="{{ '' if sample else '/users/' ~ sheet.user.id ~ '/visit/notes' }}" data-head="{{ sheet.user.name }} 訪問前の1枚&#10;前回の訪問 {{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'なし' }} ／ 計画の期限 {{ sheet.plan_end|hdate if sheet.plan_end else '不明' }} ／ 認定の期限 {{ sheet.cert_end|hdate if sheet.cert_end else '不明' }}"></div>
+<div id="sheet-data" hidden data-url="{{ '' if sample else '/users/' ~ sheet.user.id ~ '/visit/notes' }}" data-head="{{ sheet.user.name }} 訪問時の聞き取りリスト&#10;前回の訪問 {{ sheet.last_visit.event_date|hdate if sheet.last_visit else 'なし' }} ／ 計画の期限 {{ sheet.plan_end|hdate if sheet.plan_end else '不明' }} ／ 認定の期限 {{ sheet.cert_end|hdate if sheet.cert_end else '不明' }}"></div>
 <script src="/static/visit_sheet.js"></script>
 {% endblock %}

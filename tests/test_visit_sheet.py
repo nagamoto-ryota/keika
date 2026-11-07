@@ -226,7 +226,7 @@ def test_sheet_without_records_or_documents_still_opens(env):
     s, c = env
     client = TestClient(create_app(s))
     r = client.get("/users/U04/visit")
-    assert r.status_code == 200 and "訪問前の1枚" in r.text and "まだありません" in r.text
+    assert r.status_code == 200 and "訪問時の聞き取りリスト" in r.text and "まだありません" in r.text
 
 
 def test_sheet_page_shows_all_parts_and_is_printable(env):

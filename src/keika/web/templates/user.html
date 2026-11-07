@@ -12,7 +12,7 @@
   <a href="#form-assessment">アセスメント</a>
   <a href="#form-monitoring">モニタリング</a>
   <a href="{{ '/desk/' ~ user.id ~ '/mail/' ~ open_mail if open_mail else '/desk?t=' ~ user.id }}">メール</a>
-  <a href="/users/{{ user.id }}/visit">訪問前の1枚</a>
+  <a href="/users/{{ user.id }}/visit">訪問時の聞き取りリスト</a>
 </nav>
 
 <div class="steps">
@@ -31,7 +31,7 @@
   <div class="shelf-row" id="form-monitoring"><span class="shelf-name">モニタリング</span><span class="shelf-items">
     {% for d in drafts if d.kind != 'meeting' %}<a href="/drafts/{{ d.id }}">{{ d.title }}（{{ d.event_date|hdate }}）</a>{% if d.status == 'checked' %} <span class="muted small">確かめ済み</span>{% endif %}{% else %}<span class="muted small">訪問の記録が入ると作れます</span>{% endfor %}
   </span></div>
-  <div class="shelf-row"><span class="shelf-name">訪問前の1枚</span><span class="shelf-items"><a href="/users/{{ user.id }}/visit">開く</a></span></div>
+  <div class="shelf-row"><span class="shelf-name">訪問時の聞き取りリスト</span><span class="shelf-items"><a href="/users/{{ user.id }}/visit">開く</a></span></div>
   <div class="shelf-row" id="form-assessment"><span class="shelf-name">アセスメント</span><span class="shelf-items">
     {% if assessment %}<a href="/desk?t={{ user.id }}&amp;doc={{ assessment|urlencode }}">今の書類を見る</a>{% endif %}
     {% for p in assessments %}<a href="/careplans/{{ p.id }}">下書き（{{ p.created_at[:10]|hdate }}{% if p.edits %}、手直し {{ p.edits }} 件{% endif %}）</a>{% endfor %}

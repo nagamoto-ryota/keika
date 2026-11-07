@@ -62,9 +62,9 @@
   {% endif %}
 </section>
 
-{# 3. 次の訪問。訪問前の1枚へ1回で行く #}
+{# 3. 次の訪問。訪問時の聞き取りリストへ1回で行く #}
 {% if visit_users %}
-<p class="home-visit"><span class="muted small">次の訪問（訪問前の1枚）</span>
+<p class="home-visit"><span class="muted small">次の訪問（訪問時の聞き取りリスト）</span>
   {% for u in visit_users %}<a href="/users/{{ u.id }}/visit">{{ u.name }}</a>{% if not loop.last %} ／ {% endif %}{% endfor %}
 </p>
 {% endif %}

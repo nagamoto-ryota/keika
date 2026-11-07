@@ -26,7 +26,7 @@
   <tbody>
   {% for r in rows %}
     <tr>
-      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a> <a class="small" href="/users/{{ r.user.id }}/visit">訪問前の1枚</a>{% if r.user.id in med_waiting_users %} <span class="pill finding">薬の名前が未確認</span>{% endif %}</td>
+      <td><a href="/users/{{ r.user.id }}">{{ r.user.name }}</a> <a class="small" href="/users/{{ r.user.id }}/visit">訪問時の聞き取りリスト</a>{% if r.user.id in med_waiting_users %} <span class="pill finding">薬の名前が未確認</span>{% endif %}</td>
       {% for c in r.cells %}{% set link = progress_link(r.user.id, c, docs[r.user.id]) %}<td class="cell {{ c.status }}" title="{{ c.date|hdate }} {{ c.note }}">{% if link %}<a class="cell-link" href="{{ link }}">{% endif %}{% if c.status == 'done' %}✓{% elif c.status == 'todo' %}まだ{% elif c.status == 'check' %}確認{% elif c.status == 'unknown' %}?{% else %}—{% endif %}{% if link %}</a>{% endif %}</td>{% endfor %}
       <td>{{ r.plan_end|hdate_full }}</td>
       <td>{{ r.cert_end|hdate_full }}</td>

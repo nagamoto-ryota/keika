@@ -27,7 +27,7 @@ def row(s, uid="U04"):
 
 def test_one_row_of_buttons_comes_right_under_the_name(env):
     html, actions = row(env[0])
-    for label in (">記録<", ">AI相談<", ">ケアプラン<", ">アセスメント<", ">モニタリング<", ">メール<", ">訪問前の1枚<"):
+    for label in (">記録<", ">AI相談<", ">ケアプラン<", ">アセスメント<", ">モニタリング<", ">メール<", ">訪問時の聞き取りリスト<"):
         assert label in actions, label
     assert html.index('class="person-actions') < html.index('id="forms"')
 
