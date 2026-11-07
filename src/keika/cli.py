@@ -157,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--sample", action="store_true", help="同梱の架空データの結果を、API キーなしで表示する")
     sub.add_parser("intake", help="入口のファイルを今すぐ取り込む")
     sub.add_parser("mcp", help="Claude Desktop から話した内容を受け取る MCP サーバーを動かす")
-    sub.add_parser("gmail-connect", help="このパソコンのブラウザで同意して、Gmail の下書きに入れられるようにする（送る権限は求めない）")
+    sub.add_parser("gmail-connect", help="このパソコンのブラウザで同意して、Gmail の下書きに入れられるようにする（権限は gmail.compose と gmail.readonly。compose は送信もできる範囲だが、ケイカは送らない）")
     p_sync = sub.add_parser("sync", help="Drive の書類を読み、支援経過の CSV を取り込む（Claude を使う）")
     p_sync.add_argument("--user", help="利用者フォルダの先頭（例: U04）")
     p_check = sub.add_parser("check", help="1人分を Claude で点検する")

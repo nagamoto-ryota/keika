@@ -1,6 +1,6 @@
 """Gmail の下書きに入れるだけの道具。送る機能は作らない。
 
-範囲は gmail.compose（下書きを作る）と gmail.readonly（ケイカが作ったメールが送信済みかと、その返事を読む。変更・送信・削除はできない）だけ。認証はこのパソコンでの OAuth 同意で、クライアントの情報と token は
+範囲は gmail.compose（下書きを作るため。Google の決まりでは送信もできる範囲だが、ケイカは送信の処理を持たない）と gmail.readonly（ケイカが作ったメールが送信済みかと、その返事を読む。変更・送信・削除はできない）だけ。認証はこのパソコンでの OAuth 同意で、クライアントの情報と token は
 DB と同じフォルダ（git に入らない data/）に置く。本文を URL に載せない。
 """
 from __future__ import annotations
