@@ -11,6 +11,8 @@
 - **誰の、何を**: 居宅のケアマネジャー（作者は常勤8年目で、介護事業所の経営者）が、書類と、抜けると報酬の返還につながる法定の手順に追われる毎日。国の調査では、書類づくりと連絡調整、同じ情報の転記だけで月に約58時間です。
 - **どう変える**: 訪問の文字起こしを置くと、1分ほどで支援経過の下書きになります。Claude が書類と記録を読み比べ、計画書が古いままといった食い違いを根拠つきで知らせ、照会のメールを書類つきで Gmail の下書きまで用意します。送るのは人です。
 - **デモ動画（2分56秒）**: https://youtu.be/KjqPYNGmee4 ／ **触れる公開版**: 次の節（合言葉は提出フォームの審査員欄）
+- **既存の介護ソフトとの違い**: 既存の点検は、人が記録に手でタグを付ける前提です。ケイカは、タグの無い支援経過の文章を Claude がそのまま読みます。たとえば入院中で訪問できなかった月は、記録の文から「特段の事情」と読み、指摘しません（手順は `src/keika/skills/candidates.md`）。
+- **測定の要点**: 作り手が中身を見ていない架空データ（5人）で、判定表の13問中12問を見つけ、わな5件には一度も反応しませんでした（1回の測定）。点検の費用は1人あたり約 $0.3 です（架空データ8人の実費）。詳しくは下の「測定の結果と費用」にあります。
 
 **Claude をどこで、どう使ったか**（作る過程の記録は [docs/claude-usage.md](docs/claude-usage.md)）
 
@@ -24,6 +26,42 @@
 | 構造化出力 | 書類の読み取り結果を決まった項目で保存し、以後の点検では書類を送り直さない | `src/keika/reading.py` |
 | モデルの使い分け | 読み取りと整文は Opus 5.5、AI相談と返事の要約は Sonnet 5.5。Haiku 5.5 は実測で書類の種類の取り違えが36通あり、選ばなかった | `eval/compare_models.py`、`docs/claude-usage.md` |
 | Claude を採点者に | 答えを見ない採点役の Claude で、点検の結果を伏せて採点。確認用の架空データは作者も中身を見ない | `eval/`、`eval/results/` |
+| プロンプトキャッシュ（`cache_control`） | 点検は、毎回同じ前置き（指示・点検項目・skills）の system に印を付け、要求にも `cache_control` を付けて、道具を呼ぶたびの往復で前の部分を使い回す。AI相談も、要求の `cache_control` と、その人の記録と書類の文脈の印の2つ。効果（節約の額）は未測定 | `src/keika/claude_checks.py`、`src/keika/secretary.py` |
+| adaptive thinking と fallbacks | 決まった形で受け取る呼び出し（整文・書類の読み取りなど、`ask_structured`）と点検、AI相談（Haiku 以外の時）で、`thinking: {"type": "adaptive"}` と `effort` を指定し、考える量をモデルに任せる。介護の記録には病名や服薬が出るので、`fallbacks: "default"`（ベータ `server-side-fallback-2026-07-01`）を有効にし、それでも断られた時は、形の崩れと同じく失敗（`StructuredError`）として扱う。効果は未測定 | `src/keika/claude.py`、`src/keika/claude_checks.py` |
+
+**流れ図**（実線の箱が Claude を呼ぶ所、点線の箱は Claude を呼ばないプログラムの処理）
+
+```mermaid
+flowchart TD
+    T["訪問の文字起こし・話した内容<br/>入口/ のフォルダか画面"] --> S["整文（Claude）<br/>構造化出力で、誰の・いつの記録か"]
+    S --> M["機械の検査<br/>話に無い数字・人名・薬名、誰の話か"]
+    M -- 通らない --> Q["「記録の確認」に回す"]
+    M -- 通る --> DB[("保存<br/>SQLite")]
+    DOC["事業所の書類フォルダ"] --> RD["書類の読み取り（Claude）<br/>構造化出力、同じ書類は初回だけ"]
+    RD --> DB
+    DB --> C["日付と有無の計算<br/>machine_checks.py"]
+    C -- 候補 --> K["点検（Claude）<br/>道具: read_document・lookup_ledger・report_finding など<br/>手順: skills/*.md"]
+    DB --> K
+    K --> P["プログラムの検査<br/>引用が原文にあるか、医療の判断に踏み込んでいないか"]
+    P -- 落ちる --> X["画面に出さない"]
+    P -- 通る --> F["「確認してください」の指摘カード"]
+    F --> H(["人（ケアマネジャー）"])
+    Q --> H
+    F -- 〔作って〕 --> ML["照会メールの案（Claude）"]
+    ML --> G["Gmail の下書き・メールアプリ<br/>自動では送らない"]
+    G -- 送るのは人 --> H
+    classDef noai stroke-dasharray: 5 5
+    class M,C,P,G,Q,X noai
+```
+
+**画面**（すべて架空データ）
+
+| | |
+|---|---|
+| ![支援経過の記録が入った画面（AI相談の左側）](docs/images/records.png) | ![根拠つきの指摘カードと、入院を理由に取り下げた指摘](docs/images/finding.png) |
+| 記録が入った画面。左に支援経過、右に AI相談 | 根拠つきの指摘カード。入院中の月は「事情が分かって取り下げた指摘」に回る |
+| ![照会メールの下書きと添付の選択](docs/images/mail-draft.png) | ![全員分の進み具合の一覧](docs/images/overview.png) |
+| 照会メールの下書き。添付は人が選び、Gmail の下書きまで | 全員分の進み具合の一覧 |
 
 ## 審査用の公開版
 
@@ -47,6 +85,14 @@ uv pip install --python .venv/Scripts/python.exe -e ".[dev]"
 .venv/Scripts/python.exe -m keika.cli serve --sample
 ```
 
+Mac / Linux では、`.venv/Scripts/python.exe` を `.venv/bin/python` に読み替えます。
+
+```
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -e ".[dev]"
+.venv/bin/python -m keika.cli serve --sample
+```
+
 http://127.0.0.1:8000 を開きます。
 
 ## 架空データで Claude を動かす
@@ -57,6 +103,13 @@ http://127.0.0.1:8000 を開きます。
 ```
 .venv/Scripts/python.exe -m keika.cli sync     # 書類を読み取り、支援経過の CSV を取り込む
 .venv/Scripts/python.exe -m keika.cli serve    # 画面を開き、入口のフォルダを見張る
+```
+
+Mac / Linux:
+
+```
+.venv/bin/python -m keika.cli sync
+.venv/bin/python -m keika.cli serve
 ```
 
 `KEIKA_AS_OF=2026-11-04` を指定すると、画面に「デモ基準日」と出て、その日を今日として動きます。記入日時は常に実際の時計です。
@@ -209,6 +262,7 @@ Claude Desktop に話した内容を、ケイカの入口と同じ整文と検�
 - 21 / 21 は、見落としを確かめながら直した問題での1回の結果です。全部見つかるという意味ではありません。見ていないデータの 12 / 13 の方が実力に近い数字です。
 - 判定表に無い指摘の中に、誤りが混じります（話を入れた後の回で9件中4件。うち2件はその後直しました）。指摘はそのまま信じず、確かめるためのお知らせとして使ってください。
 - 確認用データは3人だけで、6 / 6 を「取りこぼしなし」とは言えません。
+- 試験: pytest: 1563 passed, 2 skipped（11/8 main）
 
 **費用の目安**（Claude の API の料金。測定の実費で、架空データの場合）
 
