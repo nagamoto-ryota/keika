@@ -18,6 +18,10 @@
 - モデルを比べて、詳しく読む Opus の方が損をする不具合（委員会の題名を研修の実施と数えていた）を見つけて直した。
 - 別の Claude にブランチ全体を読ませる独立レビューで、「おばあちゃん」のような呼び方で別の人に保存される穴などを見つけ、再現の試験を先に書いて直した（`tests/test_hardening.py`）。
 
+**費用と断りへの備え（どちらも効果は未測定）**
+- プロンプトキャッシュ: 点検（`claude_checks.py`）と AI相談（`secretary.py`）で、毎回同じ前置きと文脈に `cache_control` の印を付け、道具の往復で使い回す。
+- adaptive thinking と fallbacks: `claude.py` の `ask_structured` と点検で、考える量をモデルに任せ（`thinking: adaptive`）、病名や服薬で断られた時の備えに `fallbacks: "default"` を有効にした。
+
 ## 1日目（2026-11-02）
 
 - **Claude Code が本線**: 設計書と計画をリポの外に置き、Claude Code が失敗する試験から順に書いています。
